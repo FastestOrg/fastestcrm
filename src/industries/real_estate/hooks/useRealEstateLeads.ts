@@ -72,19 +72,22 @@ export function useRealEstateLeads({
           if (activeOwnerIds && activeOwnerIds.length > 0) {
             const activeIdList = activeOwnerIds.join(',');
             if (realOwnerIds.length > 0) {
-              query = query.or(`sales_owner_id.is.null,sales_owner_id.not.in.(${activeIdList}),sales_owner_id.in.(${realOwnerIds.join(',')})`);
+              const realIds = realOwnerIds.join(',');
+              query = query.or(`sales_owner_id.is.null,sales_owner_id.not.in.(${activeIdList}),sales_owner_id.in.(${realIds}),pre_sales_owner_id.in.(${realIds}),post_sales_owner_id.in.(${realIds})`);
             } else {
               query = query.or(`sales_owner_id.is.null,sales_owner_id.not.in.(${activeIdList})`);
             }
           } else {
             if (realOwnerIds.length > 0) {
-              query = query.or(`sales_owner_id.is.null,sales_owner_id.in.(${realOwnerIds.join(',')})`);
+              const realIds = realOwnerIds.join(',');
+              query = query.or(`sales_owner_id.is.null,sales_owner_id.in.(${realIds}),pre_sales_owner_id.in.(${realIds}),post_sales_owner_id.in.(${realIds})`);
             } else {
               query = query.is('sales_owner_id', null);
             }
           }
         } else {
-          query = query.in('sales_owner_id', realOwnerIds);
+          const realIds = realOwnerIds.join(',');
+          query = query.or(`sales_owner_id.in.(${realIds}),pre_sales_owner_id.in.(${realIds}),post_sales_owner_id.in.(${realIds})`);
         }
       }
 
@@ -92,9 +95,10 @@ export function useRealEstateLeads({
         query = query.in('property_type', propertyTypeFilter);
       }
 
-      // Hierarchy filtering: restrict to accessible users' leads
+      // Hierarchy filtering: restrict to accessible users' leads across all owner roles
       if (!canViewAll && accessibleUserIds.length > 0) {
-        query = query.in('sales_owner_id', accessibleUserIds);
+        const ids = accessibleUserIds.join(',');
+        query = query.or(`sales_owner_id.in.(${ids}),pre_sales_owner_id.in.(${ids}),post_sales_owner_id.in.(${ids})`);
       }
 
       if (search) {
