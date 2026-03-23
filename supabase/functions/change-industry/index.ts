@@ -26,7 +26,7 @@ serve(async (req) => {
             global: { headers: { Authorization: authHeader } }
         })
 
-        const { data: { user }, error: userError } = await supabaseAnon.auth.getUser()
+        const { data: { user }, error: userError } = await supabaseAnon.auth.getUser(req.headers.get('Authorization')?.replace(/^Bearer\s+/i, ''))
         if (userError || !user) throw new Error('Not authenticated')
 
         // Admin client for database operations
@@ -100,7 +100,7 @@ serve(async (req) => {
         console.error('Error:', error)
         return new Response(
             JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
-            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
     }
 })

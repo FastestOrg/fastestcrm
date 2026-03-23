@@ -82,7 +82,7 @@ Deno.serve(async (req) => {
     const { data: profile } = await adminClient.from("profiles").select("company_id").eq("id", userId).single();
     if (!profile?.company_id) {
       return new Response(JSON.stringify({ error: "No company" }), {
-        status: 400,
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -97,7 +97,7 @@ Deno.serve(async (req) => {
 
     if (!integration) {
       return new Response(JSON.stringify({ error: "No active email integration" }), {
-        status: 400,
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -175,7 +175,7 @@ Deno.serve(async (req) => {
 
         if (!to || !subject || !bodyContent) {
           return new Response(JSON.stringify({ error: "to, subject, bodyContent required" }), {
-            status: 400,
+            status: 200,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
@@ -261,7 +261,7 @@ Deno.serve(async (req) => {
       }
 
       return new Response(JSON.stringify({ error: "Invalid action" }), {
-        status: 400,
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

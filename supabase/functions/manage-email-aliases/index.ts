@@ -83,7 +83,7 @@ Deno.serve(async (req) => {
     const { data: profile } = await adminClient.from("profiles").select("company_id").eq("id", userId).single();
     if (!profile?.company_id) {
       return new Response(JSON.stringify({ error: "No company" }), {
-        status: 400,
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -105,7 +105,7 @@ Deno.serve(async (req) => {
 
     if (!integration) {
       return new Response(JSON.stringify({ error: "No email integration found. Connect Outlook first." }), {
-        status: 400,
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -128,7 +128,7 @@ Deno.serve(async (req) => {
 
       if (!targetUserId || !alias_email) {
         return new Response(JSON.stringify({ error: "user_id and alias_email required" }), {
-          status: 400,
+          status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
@@ -195,7 +195,7 @@ Deno.serve(async (req) => {
 
       if (insertErr) {
         return new Response(JSON.stringify({ error: insertErr.message }), {
-          status: 400,
+          status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
@@ -211,7 +211,7 @@ Deno.serve(async (req) => {
 
       if (!alias_id) {
         return new Response(JSON.stringify({ error: "alias_id required" }), {
-          status: 400,
+          status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
@@ -224,7 +224,7 @@ Deno.serve(async (req) => {
 
       if (deleteErr) {
         return new Response(JSON.stringify({ error: deleteErr.message }), {
-          status: 400,
+          status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }

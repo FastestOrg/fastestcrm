@@ -26,7 +26,7 @@ serve(async (req) => {
     const {
       data: { user: requester },
       error: userError,
-    } = await supabaseAuth.auth.getUser();
+    } = await supabaseAuth.auth.getUser(req.headers.get('Authorization')?.replace(/^Bearer\s+/i, ''));
     if (userError || !requester) {
       throw new Error("Unauthorized");
     }
@@ -119,7 +119,7 @@ serve(async (req) => {
     console.error("Toggle user status error:", error);
     return new Response(
       JSON.stringify({ error: error.message || "Internal server error" }),
-      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });

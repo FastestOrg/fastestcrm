@@ -33,7 +33,7 @@ serve(async (req) => {
         const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
         // Verify user is authenticated
-        const { data: { user }, error: userError } = await supabaseUser.auth.getUser();
+        const { data: { user }, error: userError } = await supabaseUser.auth.getUser(req.headers.get('Authorization')?.replace(/^Bearer\s+/i, ''));
         if (userError || !user) {
             throw new Error("Unauthorized");
         }
@@ -78,7 +78,7 @@ serve(async (req) => {
         if (existingUnlock) {
             return new Response(
                 JSON.stringify({ error: "Feature already unlocked" }),
-                { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+                { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
             );
         }
 
@@ -100,7 +100,7 @@ serve(async (req) => {
                     currentBalance: wallet.balance,
                     required: amount
                 }),
-                { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+                { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
             );
         }
 
@@ -170,7 +170,7 @@ serve(async (req) => {
         return new Response(
             JSON.stringify({ error: error.message || "Internal server error" }),
             {
-                status: 400,
+                status: 200,
                 headers: { ...corsHeaders, "Content-Type": "application/json" }
             }
         );

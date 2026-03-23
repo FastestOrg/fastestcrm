@@ -14,20 +14,16 @@ serve(async (req) => {
 
     try {
         const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
-        const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? ''
         const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 
         const authHeader = req.headers.get('Authorization')
         if (!authHeader) throw new Error('No authorization header')
 
-        const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-            global: { headers: { Authorization: authHeader } }
-        })
-
-        const { data: { user }, error: userError } = await supabase.auth.getUser()
-        if (userError || !user) throw new Error('Not authenticated')
-
+        const token = authHeader.replace(/^Bearer\s+/i, '')
         const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
+
+        const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token)
+        if (userError || !user) throw new Error('Not authenticated')
         const { data: profile } = await supabaseAdmin
             .from('profiles')
             .select('company_id')
@@ -112,7 +108,7 @@ serve(async (req) => {
         console.error('Error:', error)
         return new Response(
             JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
-            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
     }
 })

@@ -79,7 +79,7 @@ serve(async (req) => {
     if (!formId) {
       return new Response(
         JSON.stringify({ error: "Form ID is required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -88,7 +88,7 @@ serve(async (req) => {
     if (!uuidRegex.test(formId)) {
       return new Response(
         JSON.stringify({ error: "Invalid form ID format" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -135,7 +135,7 @@ serve(async (req) => {
     if (form.status !== "published" && form.status !== "active") {
       return new Response(
         JSON.stringify({ error: "This form is not accepting submissions" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -175,7 +175,7 @@ serve(async (req) => {
         if (!emailRegex.test(value)) {
           return new Response(
             JSON.stringify({ error: "Invalid email format" }),
-            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
       }
@@ -199,7 +199,7 @@ serve(async (req) => {
     if (!leadData.name || typeof leadData.name !== "string" || leadData.name.length < 1) {
       return new Response(
         JSON.stringify({ error: "Name is required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 

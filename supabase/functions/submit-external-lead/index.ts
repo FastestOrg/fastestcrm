@@ -77,14 +77,14 @@ serve(async (req) => {
         if (!formId) {
             return new Response(
                 JSON.stringify({ error: "formId is required" }),
-                { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+                { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
             );
         }
 
         if (!data || typeof data !== 'object') {
             return new Response(
                 JSON.stringify({ error: "data object is required" }),
-                { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+                { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
             );
         }
 
@@ -93,7 +93,7 @@ serve(async (req) => {
         if (!uuidRegex.test(formId)) {
             return new Response(
                 JSON.stringify({ error: "Invalid formId format" }),
-                { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+                { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
             );
         }
 
@@ -140,7 +140,7 @@ serve(async (req) => {
         if (form.status !== "published" && form.status !== "active") {
             return new Response(
                 JSON.stringify({ error: "This form is not accepting submissions" }),
-                { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+                { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
             );
         }
 
@@ -188,7 +188,7 @@ serve(async (req) => {
                 if (!emailRegex.test(String(value))) {
                     return new Response(
                         JSON.stringify({ error: `Invalid email format for field '${key}'` }),
-                        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+                        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
                     );
                 }
             }
@@ -206,7 +206,7 @@ serve(async (req) => {
             if (field.required && field.attribute && !leadData[field.attribute]) {
                 return new Response(
                     JSON.stringify({ error: `Missing required field: ${field.attribute}` }),
-                    { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+                    { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
                 );
             }
         }
@@ -215,7 +215,7 @@ serve(async (req) => {
         if (!leadData.name || typeof leadData.name !== "string" || leadData.name.length < 1) {
             return new Response(
                 JSON.stringify({ error: "Name attribute is required and must be a non-empty string" }),
-                { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+                { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
             );
         }
 

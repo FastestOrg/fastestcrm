@@ -54,7 +54,7 @@ serve(async (req) => {
         });
 
         // Verify user is authenticated
-        const { data: { user }, error: userError } = await supabaseAuth.auth.getUser();
+        const { data: { user }, error: userError } = await supabaseAuth.auth.getUser(req.headers.get('Authorization')?.replace(/^Bearer\s+/i, ''));
         if (userError || !user) {
             throw new Error("Unauthorized");
         }
@@ -251,7 +251,7 @@ serve(async (req) => {
                 stack: error.stack
             }),
             {
-                status: 400,
+                status: 200,
                 headers: { ...corsHeaders, "Content-Type": "application/json" }
             }
         );

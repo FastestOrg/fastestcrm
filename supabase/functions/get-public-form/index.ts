@@ -35,7 +35,7 @@ serve(async (req) => {
         if (!formId) {
             return new Response(
                 JSON.stringify({ error: "Form ID is required" }),
-                { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+                { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
             );
         }
 

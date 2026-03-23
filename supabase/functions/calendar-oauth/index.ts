@@ -39,7 +39,7 @@ serve(async (req) => {
     if (action === "exchange_code") {
       if (!code || !userId || !companyId) {
         return new Response(JSON.stringify({ error: "Missing required parameters" }), {
-          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
@@ -59,7 +59,7 @@ serve(async (req) => {
       if (tokenData.error) {
         console.error("Token exchange error:", tokenData);
         return new Response(JSON.stringify({ error: tokenData.error_description || tokenData.error }), {
-          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
@@ -101,7 +101,7 @@ serve(async (req) => {
 
       if (!conn?.refresh_token) {
         return new Response(JSON.stringify({ error: "No refresh token found" }), {
-          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
@@ -119,7 +119,7 @@ serve(async (req) => {
       const tokenData = await tokenResponse.json();
       if (tokenData.error) {
         return new Response(JSON.stringify({ error: tokenData.error_description || tokenData.error }), {
-          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
@@ -136,7 +136,7 @@ serve(async (req) => {
     }
 
     return new Response(JSON.stringify({ error: "Invalid action" }), {
-      status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error: unknown) {
     console.error("calendar-oauth error:", error);

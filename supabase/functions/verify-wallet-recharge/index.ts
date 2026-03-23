@@ -30,7 +30,7 @@ serve(async (req) => {
         })
 
         // Get current user
-        const { data: { user }, error: userError } = await supabase.auth.getUser()
+        const { data: { user }, error: userError } = await supabase.auth.getUser(req.headers.get('Authorization')?.replace(/^Bearer\s+/i, ''))
         if (userError || !user) {
             throw new Error('Not authenticated')
         }
@@ -130,7 +130,7 @@ serve(async (req) => {
         console.error('Error:', error)
         return new Response(
             JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
-            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
     }
 })

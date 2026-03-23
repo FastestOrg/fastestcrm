@@ -27,7 +27,7 @@ serve(async (req) => {
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 
     // Get requesting user
-    const { data: { user: requester }, error: userError } = await supabaseAuth.auth.getUser();
+    const { data: { user: requester }, error: userError } = await supabaseAuth.auth.getUser(req.headers.get('Authorization')?.replace(/^Bearer\s+/i, ''));
     if (userError || !requester) {
       throw new Error("Unauthorized");
     }

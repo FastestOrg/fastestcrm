@@ -25,7 +25,7 @@ serve(async (req) => {
     if (!companyId || !pageId || !pageName) {
       console.error('meta-select-page: Missing required parameters', { companyId: !!companyId, pageId: !!pageId, pageName: !!pageName });
       return new Response(JSON.stringify({ error: 'Missing required parameters' }), {
-        status: 400,
+        status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
@@ -67,7 +67,7 @@ serve(async (req) => {
     if (!userAccessToken) {
       console.error('meta-select-page: No access token in integration');
       return new Response(JSON.stringify({ error: 'No access token found. Please reconnect to Facebook.' }), {
-        status: 400,
+        status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
@@ -83,7 +83,7 @@ serve(async (req) => {
     if (pagesData.error) {
       console.error('meta-select-page: Error fetching pages:', pagesData.error);
       return new Response(JSON.stringify({ error: pagesData.error.message }), {
-        status: 400,
+        status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
@@ -107,7 +107,7 @@ serve(async (req) => {
     if (!pageAccessToken) {
       console.error('meta-select-page: No page access token returned from Meta');
       return new Response(JSON.stringify({ error: 'Failed to get page access token from Meta' }), {
-        status: 400,
+        status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }

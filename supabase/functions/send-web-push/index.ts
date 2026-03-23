@@ -167,7 +167,7 @@ Deno.serve(async (req) => {
     if (!user_id || !title) {
       return new Response(JSON.stringify({ error: 'user_id and title are required' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400,
+        status: 200,
       })
     }
 

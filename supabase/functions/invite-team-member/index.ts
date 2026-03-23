@@ -48,7 +48,7 @@ serve(async (req) => {
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 
     // Get the requesting user
-    const { data: { user: requester }, error: userError } = await supabaseAuth.auth.getUser();
+    const { data: { user: requester }, error: userError } = await supabaseAuth.auth.getUser(req.headers.get('Authorization')?.replace(/^Bearer\s+/i, ''));
     if (userError || !requester) {
       console.error("Auth error:", userError);
       throw new Error("Unauthorized: " + (userError?.message || "User not found"));
@@ -359,7 +359,7 @@ serve(async (req) => {
     console.error("Unexpected error:", error);
     return new Response(
       JSON.stringify({ error: error.message || "Internal server error" }),
-      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });

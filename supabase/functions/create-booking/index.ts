@@ -19,7 +19,7 @@ serve(async (req) => {
 
     if (!bookingPageId || !startTime || !attendeeName || !attendeeEmail) {
       return new Response(JSON.stringify({ error: "Missing required fields" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 

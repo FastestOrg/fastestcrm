@@ -326,7 +326,7 @@ Deno.serve(async (req) => {
       if (!domain) {
         return new Response(
           JSON.stringify({ error: 'Domain is required' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
@@ -395,7 +395,7 @@ Deno.serve(async (req) => {
       if (!domainRegex.test(domain)) {
         return new Response(
           JSON.stringify({ error: 'Invalid domain format' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
@@ -410,7 +410,7 @@ Deno.serve(async (req) => {
       if (existingCompany) {
         return new Response(
           JSON.stringify({ error: 'This domain is already in use by another company' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
@@ -509,7 +509,7 @@ Deno.serve(async (req) => {
 
     return new Response(
       JSON.stringify({ error: 'Invalid action' }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error) {

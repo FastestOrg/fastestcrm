@@ -46,7 +46,7 @@ serve(async (req) => {
         });
 
         // Verify the user is authenticated
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        const { data: { user }, error: authError } = await supabase.auth.getUser(req.headers.get('Authorization')?.replace(/^Bearer\s+/i, ''));
         if (authError || !user) {
             console.error('Authentication failed:', authError?.message);
             return new Response(
@@ -88,7 +88,7 @@ serve(async (req) => {
         if (typeof amount !== 'number' || amount <= 0) {
             return new Response(
                 JSON.stringify({ error: 'Amount must be a positive number' }),
-                { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+                { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             );
         }
 
@@ -96,7 +96,7 @@ serve(async (req) => {
         if (amount < 100 || amount > 100000000) {
             return new Response(
                 JSON.stringify({ error: 'Amount must be between 100 paise (1 INR) and 10,00,00,000 paise (10 Lakh INR)' }),
-                { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+                { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             );
         }
 
@@ -104,14 +104,14 @@ serve(async (req) => {
         if (!customer || typeof customer !== 'object') {
             return new Response(
                 JSON.stringify({ error: 'Customer details are required' }),
-                { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+                { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             );
         }
 
         if (!customer.name || typeof customer.name !== 'string' || customer.name.trim().length === 0) {
             return new Response(
                 JSON.stringify({ error: 'Customer name is required' }),
-                { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+                { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             );
         }
 
@@ -121,7 +121,7 @@ serve(async (req) => {
         if (!hasEmail && !hasPhone) {
             return new Response(
                 JSON.stringify({ error: 'At least one valid contact method (email or phone) is required' }),
-                { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+                { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             );
         }
 
@@ -129,7 +129,7 @@ serve(async (req) => {
         if (!reference_id || typeof reference_id !== 'string') {
             return new Response(
                 JSON.stringify({ error: 'Reference ID (lead_id) is required' }),
-                { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+                { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             );
         }
 
@@ -213,7 +213,7 @@ serve(async (req) => {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error'
         return new Response(
             JSON.stringify({ error: errorMessage }),
-            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
     }
 })

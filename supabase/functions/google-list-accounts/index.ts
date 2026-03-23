@@ -27,7 +27,7 @@ serve(async (req) => {
 
         if (!companyId) {
             return new Response(JSON.stringify({ error: "Missing companyId" }), {
-                status: 400,
+                status: 200,
                 headers: { ...corsHeaders, "Content-Type": "application/json" },
             });
         }
@@ -84,7 +84,7 @@ serve(async (req) => {
         if (listData.error) {
             console.error("Google Ads API Error:", listData.error);
             return new Response(JSON.stringify({ error: listData.error.message }), {
-                status: 400,
+                status: 200,
                 headers: { ...corsHeaders, "Content-Type": "application/json" },
             });
         }
