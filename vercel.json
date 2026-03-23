@@ -1,10 +1,4 @@
 {
-    "crons": [
-        {
-            "path": "/api/cron-process-reminders",
-            "schedule": "0 0 * * *"
-        }
-    ],
     "rewrites": [
         {
             "source": "/rest/:path*",
@@ -177,6 +171,10 @@
         {
             "source": "/functions/v1/verify-wallet-recharge",
             "destination": "https://uykdyqdeyilpulaqlqip.supabase.co/functions/v1/verify-wallet-recharge"
+        },
+        {
+            "source": "/functions/v1/:path*",
+            "destination": "https://uykdyqdeyilpulaqlqip.supabase.co/functions/v1/:path*"
         },
         {
             "source": "/((?!api/).*)",

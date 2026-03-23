@@ -1,7 +1,8 @@
-// Vercel Cron handler – invokes the Supabase process-reminders edge function.
-// Configured in vercel.json to run every minute.
+// Cron handler – invokes the Supabase process-reminders edge function.
+// Designed to be triggered by external cron services like cron-job.org every minute.
+// Setup requires a GET request to this endpoint with Authorization: Bearer <CRON_SECRET>.
 export default async function handler(req, res) {
-    // Vercel Cron calls with GET; also allow POST for manual triggers
+    // Cron calls with GET; also allow POST for manual triggers
     if (req.method !== 'GET' && req.method !== 'POST') {
         return res.status(405).json({ error: 'Method not allowed' });
     }
