@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: fastestcrm-whatsapp-backend
+    env: node
+    rootDir: whatsapp-server
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: WHATSAPP_SERVER_API_KEY
+        generateValue: true
