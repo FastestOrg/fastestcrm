@@ -143,9 +143,11 @@ export function useNotifications() {
                     setNotifications(prev => [newNotification, ...prev]);
                     setUnreadCount(prev => prev + 1);
 
-                    // In-app toast
+                    // In-app toast (bottom right, 10 seconds)
                     toast.info(newNotification.title, {
                         description: newNotification.message,
+                        duration: 10000,
+                        position: 'bottom-right',
                     });
 
                     // Play notification sound
