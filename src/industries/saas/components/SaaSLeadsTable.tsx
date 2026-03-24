@@ -4,7 +4,7 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Phone, Mail, MoreHorizontal, Building2 } from 'lucide-react';
+import { Phone, Mail, MoreHorizontal, Building2, ChevronDown } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
   DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent,
@@ -281,16 +281,31 @@ export function SaaSLeadsTable({
                   {lead.demo_date ? format(new Date(lead.demo_date), 'MMM dd, yyyy') : '-'}
                 </TableCell>
                 <TableCell>
-                  <Select
-                    value={lead.status}
-                    onValueChange={(val) => handleStatusChange(lead.id, val)}
-                  >
-                    <SelectTrigger className="h-8 w-[130px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        className="h-8 w-[130px] justify-between px-3 font-normal"
+                        variant="outline"
+                      >
+                        <div className="flex items-center gap-2 truncate">
+                          {statuses.find(s => s.value === lead.status)?.color && (
+                            <div
+                              className="w-2 h-2 rounded-full shrink-0"
+                              style={{ backgroundColor: statuses.find(s => s.value === lead.status)?.color }}
+                            />
+                          )}
+                          <span className="truncate">{statuses.find(s => s.value === lead.status)?.label || lead.status}</span>
+                        </div>
+                        <ChevronDown className="h-4 w-4 ml-2 opacity-50 shrink-0" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
                       {statuses.map((s) => (
-                        <SelectItem key={s.id} value={s.value}>
+                        <DropdownMenuItem
+                          key={s.id}
+                          onClick={() => handleStatusChange(lead.id, s.value)}
+                          className="capitalize cursor-pointer"
+                        >
                           <div className="flex items-center gap-2">
                             <div
                               className="w-2 h-2 rounded-full"
@@ -298,10 +313,10 @@ export function SaaSLeadsTable({
                             />
                             {s.label}
                           </div>
-                        </SelectItem>
+                        </DropdownMenuItem>
                       ))}
-                    </SelectContent>
-                  </Select>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </TableCell>
                 <TableCell>
                   <Select

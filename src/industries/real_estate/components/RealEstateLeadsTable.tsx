@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Phone, Mail, MoreHorizontal, MapPin, Camera } from 'lucide-react';
+import { Phone, Mail, MoreHorizontal, MapPin, Camera, ChevronDown } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -408,28 +408,28 @@ export function RealEstateLeadsTable({
       label: 'Status',
       minWidth: 'min-w-[150px]',
       render: (lead) => (
-        <Select
-          value={lead.status}
-          onValueChange={(value) => handleStatusChange(lead.id, value)}
-        >
-          <SelectTrigger
-            className="w-[140px] h-8 text-white border-0 text-xs"
-            style={{ backgroundColor: getStatusColor(lead.status) }}
-          >
-            <SelectValue>{getStatusDisplay(lead)}</SelectValue>
-          </SelectTrigger>
-          <SelectContent>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              className="w-auto min-w-[140px] h-8 text-white border-0 px-3 justify-between"
+              style={{ backgroundColor: getStatusColor(lead.status) }}
+            >
+              <span className="truncate">{getStatusDisplay(lead)}</span>
+              <ChevronDown className="h-4 w-4 ml-2 opacity-50 shrink-0" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent>
             {statuses.map((status) => (
-              <SelectItem
+              <DropdownMenuItem
                 key={status.id}
-                value={status.value}
-                className="capitalize"
+                onClick={() => handleStatusChange(lead.id, status.value)}
+                className="capitalize cursor-pointer"
               >
                 {status.label}
-              </SelectItem>
+              </DropdownMenuItem>
             ))}
-          </SelectContent>
-        </Select>
+          </DropdownMenuContent>
+        </DropdownMenu>
       )
     },
     pre_sales_owner: {
@@ -767,20 +767,18 @@ export function RealEstateLeadsTable({
                       <DropdownMenuSub>
                         <DropdownMenuSubTrigger>Change Status</DropdownMenuSubTrigger>
                         <DropdownMenuSubContent>
-                          <DropdownMenuRadioGroup
-                            value={lead.status}
-                            onValueChange={(value) => handleStatusChange(lead.id, value)}
-                          >
-                            {statuses.map((status) => (
-                              <DropdownMenuRadioItem
-                                key={status.id}
-                                value={status.value}
-                                className="capitalize"
-                              >
-                                {status.label}
-                              </DropdownMenuRadioItem>
-                            ))}
-                          </DropdownMenuRadioGroup>
+                          {statuses.map((status) => (
+                            <DropdownMenuItem
+                              key={status.id}
+                              onClick={() => handleStatusChange(lead.id, status.value)}
+                              className="capitalize cursor-pointer"
+                            >
+                              <div className="flex items-center gap-2">
+                                {lead.status === status.value && <div className="w-1.5 h-1.5 rounded-full bg-primary" />}
+                                <span className={lead.status === status.value ? "font-medium" : ""}>{status.label}</span>
+                              </div>
+                            </DropdownMenuItem>
+                          ))}
                         </DropdownMenuSubContent>
                       </DropdownMenuSub>
                     </DropdownMenuContent>

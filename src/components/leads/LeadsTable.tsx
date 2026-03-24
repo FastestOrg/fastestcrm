@@ -271,28 +271,28 @@ export function LeadsTable({ leads, loading, selectedLeads, onSelectionChange, o
     status: {
       label: 'Status',
       render: (lead) => (
-        <Select
-          defaultValue={lead.status}
-          onValueChange={(value) => handleStatusChange(lead.id, value)}
-        >
-          <SelectTrigger
-            className="w-auto min-w-[140px] h-8 text-white border-0 px-3"
-            style={{ backgroundColor: getStatusColor(lead.status) }}
-          >
-            <SelectValue>{getStatusDisplay(lead)}</SelectValue>
-          </SelectTrigger>
-          <SelectContent>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              className="w-auto min-w-[140px] h-8 text-white border-0 px-3 justify-between"
+              style={{ backgroundColor: getStatusColor(lead.status) }}
+            >
+              <span className="truncate">{getStatusDisplay(lead)}</span>
+              <ChevronDown className="h-4 w-4 ml-2 opacity-50 shrink-0" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent>
             {statuses.map((status) => (
-              <SelectItem
+              <DropdownMenuItem
                 key={status.id}
-                value={status.value}
-                className="capitalize"
+                onClick={() => handleStatusChange(lead.id, status.value)}
+                className="capitalize cursor-pointer"
               >
                 {status.label}
-              </SelectItem>
+              </DropdownMenuItem>
             ))}
-          </SelectContent>
-        </Select>
+          </DropdownMenuContent>
+        </DropdownMenu>
       )
     },
     owner: {
@@ -518,17 +518,18 @@ export function LeadsTable({ leads, loading, selectedLeads, onSelectionChange, o
                       <DropdownMenuSub>
                         <DropdownMenuSubTrigger>Change Status</DropdownMenuSubTrigger>
                         <DropdownMenuSubContent>
-                          <DropdownMenuRadioGroup value={lead.status} onValueChange={(value) => handleStatusChange(lead.id, value)}>
-                            {statuses.map((status) => (
-                              <DropdownMenuRadioItem
-                                key={status.id}
-                                value={status.value}
-                                className="capitalize"
-                              >
-                                {status.label}
-                              </DropdownMenuRadioItem>
-                            ))}
-                          </DropdownMenuRadioGroup>
+                          {statuses.map((status) => (
+                            <DropdownMenuItem
+                              key={status.id}
+                              onClick={() => handleStatusChange(lead.id, status.value)}
+                              className="capitalize cursor-pointer"
+                            >
+                              <div className="flex items-center gap-2">
+                                {lead.status === status.value && <div className="w-1.5 h-1.5 rounded-full bg-primary" />}
+                                <span className={lead.status === status.value ? "font-medium" : ""}>{status.label}</span>
+                              </div>
+                            </DropdownMenuItem>
+                          ))}
                         </DropdownMenuSubContent>
                       </DropdownMenuSub>
                       <DropdownMenuItem onClick={() => handleCreatePaymentLink(lead)}>

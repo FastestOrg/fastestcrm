@@ -109,17 +109,18 @@ export function LeadMobileCard({
             <DropdownMenuSub>
               <DropdownMenuSubTrigger>Change Status</DropdownMenuSubTrigger>
               <DropdownMenuSubContent>
-                <DropdownMenuRadioGroup value={lead.status} onValueChange={onStatusChange}>
-                  {statuses.map((status) => (
-                    <DropdownMenuRadioItem
-                      key={status.id}
-                      value={status.value}
-                      className="capitalize"
-                    >
-                      {status.label}
-                    </DropdownMenuRadioItem>
-                  ))}
-                </DropdownMenuRadioGroup>
+                {statuses.map((status) => (
+                  <DropdownMenuItem
+                    key={status.id}
+                    onClick={() => onStatusChange(status.value)}
+                    className="capitalize cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2">
+                      {lead.status === status.value && <div className="w-1.5 h-1.5 rounded-full bg-primary" />}
+                      <span className={lead.status === status.value ? "font-medium" : ""}>{status.label}</span>
+                    </div>
+                  </DropdownMenuItem>
+                ))}
               </DropdownMenuSubContent>
             </DropdownMenuSub>
             {onCreatePaymentLink && (

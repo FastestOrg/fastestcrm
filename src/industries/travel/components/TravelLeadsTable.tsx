@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Phone, Mail, MoreHorizontal, Plane } from 'lucide-react';
+import { Phone, Mail, MoreHorizontal, Plane, ChevronDown } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
@@ -180,19 +180,39 @@ export function TravelLeadsTable({
                 <TableCell>{formatCurrency(lead.advance_paid)}</TableCell>
                 <TableCell>{formatCurrency(lead.balance_due)}</TableCell>
                 <TableCell>
-                  <Select value={lead.status} onValueChange={(val) => handleStatusChange(lead.id, val)}>
-                    <SelectTrigger className="h-8 w-[130px]"><SelectValue /></SelectTrigger>
-                    <SelectContent>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        className="h-8 w-[130px] justify-between px-3 font-normal"
+                        variant="outline"
+                      >
+                        <div className="flex items-center gap-2 truncate">
+                          {statuses.find(s => s.value === lead.status)?.color && (
+                            <div
+                              className="w-2 h-2 rounded-full shrink-0"
+                              style={{ backgroundColor: statuses.find(s => s.value === lead.status)?.color }}
+                            />
+                          )}
+                          <span className="truncate">{statuses.find(s => s.value === lead.status)?.label || lead.status}</span>
+                        </div>
+                        <ChevronDown className="h-4 w-4 ml-2 opacity-50 shrink-0" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
                       {statuses.map((s) => (
-                        <SelectItem key={s.id} value={s.value}>
+                        <DropdownMenuItem
+                          key={s.id}
+                          onClick={() => handleStatusChange(lead.id, s.value)}
+                          className="capitalize cursor-pointer"
+                        >
                           <div className="flex items-center gap-2">
                             <div className="w-2 h-2 rounded-full" style={{ backgroundColor: s.color }} />
                             {s.label}
                           </div>
-                        </SelectItem>
+                        </DropdownMenuItem>
                       ))}
-                    </SelectContent>
-                  </Select>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </TableCell>
                 <TableCell>
                   <Select value={lead.sales_owner_id || ''} onValueChange={(val) => handleUpdateField(lead.id, 'sales_owner_id', val)}>

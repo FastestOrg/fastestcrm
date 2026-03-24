@@ -1,4 +1,0 @@
-Bundling Function: toggle-user-status
-No change found in Function: toggle-user-status
-Deployed Functions on project uykdyqdeyilpulaqlqip: toggle-user-status
-You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/uykdyqdeyilpulaqlqip/functions
