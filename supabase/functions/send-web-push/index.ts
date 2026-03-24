@@ -56,21 +56,26 @@ async function buildVapidJWT(audience: string): Promise<string> {
 
   const sig = await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, key, new TextEncoder().encode(unsigned))
   
-  // Convert DER to raw r||s (64 bytes)
+  // Convert DER to raw r||s (64 bytes) — robust handling of variable-length integers
   const der = new Uint8Array(sig)
   const raw = new Uint8Array(64)
-  let offset = 2
-  if (der[offset] !== 0x02) throw new Error('Invalid DER sig')
-  offset++
-  const rLen = der[offset++]
-  const rStart = rLen === 33 ? offset + 1 : offset
-  raw.set(der.slice(rStart, rStart + 32), 0)
-  offset += rLen
-  if (der[offset] !== 0x02) throw new Error('Invalid DER sig s')
-  offset++
-  const sLen = der[offset++]
-  const sStart = sLen === 33 ? offset + 1 : offset
-  raw.set(der.slice(sStart, sStart + 32), 32)
+
+  function readDerInt(buf: Uint8Array, pos: number, outOffset: number): number {
+    if (buf[pos] !== 0x02) throw new Error('Invalid DER integer tag')
+    const len = buf[pos + 1]
+    const intBytes = buf.slice(pos + 2, pos + 2 + len)
+    // Remove leading zeros (DER pads positive ints with 0x00 if high bit set)
+    let start = 0
+    while (start < intBytes.length - 1 && intBytes[start] === 0) start++
+    const trimmed = intBytes.slice(start)
+    // Right-align into 32-byte field
+    raw.set(trimmed, outOffset + (32 - trimmed.length))
+    return pos + 2 + len
+  }
+
+  let pos = 2 // skip SEQUENCE tag + length
+  pos = readDerInt(der, pos, 0)   // r → raw[0..31]
+  readDerInt(der, pos, 32)        // s → raw[32..63]
 
   return `${unsigned}.${base64UrlEncode(raw)}`
 }

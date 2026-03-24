@@ -181,6 +181,14 @@ serve(async (req) => {
               type: 'info',
               lead_id: insertedLead.id
             });
+
+          // Send Web Push notification
+          const _serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+          fetch(`${supabaseUrl}/functions/v1/send-web-push`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${_serviceRoleKey}` },
+            body: JSON.stringify({ user_id: leadData.sales_owner_id, title: 'New Lead Received! 🚀', body: `New lead "${leadData.name}" has been captured via LinkedIn.` }),
+          }).catch(e => console.error('[Push] linkedin-lead-webhook:', e));
         }
       }
 

@@ -250,6 +250,14 @@ serve(async (req) => {
           lead_id: lead.id,
           read: false,
         });
+      // Send Web Push notification
+      const _supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+      const _serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+      fetch(`${_supabaseUrl}/functions/v1/send-web-push`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${_serviceRoleKey}` },
+        body: JSON.stringify({ user_id: form.created_by_id, title: 'New Form Submission \u{1F4CB}', body: `${submitterName} just submitted your form` }),
+      }).catch(e => console.error('[Push] submit-public-form:', e));
     } catch (notifyErr) {
       // Non-critical — do not fail the response
       console.error('Failed to create form submission notification:', notifyErr);

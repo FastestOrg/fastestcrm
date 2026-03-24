@@ -53,13 +53,11 @@ Deno.serve(async (req) => {
           })
           processedIds.push(lead.id)
 
-          // Only queue push if the user opted in
-          if (lead.send_web_push) {
-            pushTargets.set(lead.sales_owner_id, {
-              title: 'Lead Reminder',
-              body: `Time to follow up with ${lead.name}`,
-            })
-          }
+          // Always send push for reminders
+          pushTargets.set(lead.sales_owner_id, {
+            title: 'Lead Reminder',
+            body: `Time to follow up with ${lead.name}`,
+          })
         }
 
         // Mark as sent immediately
