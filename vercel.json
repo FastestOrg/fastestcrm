@@ -113,6 +113,10 @@
             "destination": "https://uykdyqdeyilpulaqlqip.supabase.co/functions/v1/process-auto-debit"
         },
         {
+            "source": "/api/cron-process-reminders",
+            "destination": "https://uykdyqdeyilpulaqlqip.supabase.co/functions/v1/process-reminders"
+        },
+        {
             "source": "/functions/v1/process-reminders",
             "destination": "https://uykdyqdeyilpulaqlqip.supabase.co/functions/v1/process-reminders"
         },

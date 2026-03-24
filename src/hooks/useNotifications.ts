@@ -148,6 +148,33 @@ export function useNotifications() {
                         description: newNotification.message,
                     });
 
+                    // Play notification sound
+                    try {
+                        const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+                        if (AudioContext) {
+                            const ctx = new AudioContext();
+                            const osc = ctx.createOscillator();
+                            const gainNodes = ctx.createGain();
+                            
+                            osc.connect(gainNodes);
+                            gainNodes.connect(ctx.destination);
+                            
+                            // Pleasant "pop" sound properties
+                            osc.type = 'sine';
+                            osc.frequency.setValueAtTime(600, ctx.currentTime);
+                            osc.frequency.exponentialRampToValueAtTime(1000, ctx.currentTime + 0.1);
+                            
+                            gainNodes.gain.setValueAtTime(0, ctx.currentTime);
+                            gainNodes.gain.linearRampToValueAtTime(0.5, ctx.currentTime + 0.05);
+                            gainNodes.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
+                            
+                            osc.start(ctx.currentTime);
+                            osc.stop(ctx.currentTime + 0.2);
+                        }
+                    } catch (e) {
+                        console.error('Failed to play notification sound', e);
+                    }
+
                     // Native OS browser popup
                     sendWebNotification(newNotification.title, newNotification.message, {
                         tag: newNotification.id,

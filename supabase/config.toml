@@ -80,7 +80,7 @@ verify_jwt = false
 
 [functions.process-reminders]
 enabled = true
-verify_jwt = true
+verify_jwt = false
 
 [functions.calendar-oauth]
 verify_jwt = false
