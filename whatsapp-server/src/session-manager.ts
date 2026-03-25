@@ -18,6 +18,7 @@ import makeWASocket, {
     makeCacheableSignalKeyStore,
     fetchLatestBaileysVersion,
     proto,
+    Browsers,
 } from '@whiskeysockets/baileys';
 import { supabase } from './supabase';
 import * as QRCode from 'qrcode';
@@ -155,6 +156,7 @@ class SessionManager extends EventEmitter {
                 creds: state.creds,
                 keys: makeCacheableSignalKeyStore(state.keys as any, logger),
             },
+            browser: Browsers.macOS('Desktop'),
             printQRInTerminal: false,
             generateHighQualityLinkPreview: false,
             defaultQueryTimeoutMs: undefined,
