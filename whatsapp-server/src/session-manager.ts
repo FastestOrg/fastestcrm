@@ -19,6 +19,7 @@ import makeWASocket, {
     fetchLatestBaileysVersion,
     proto,
     Browsers,
+    BufferJSON
 } from '@whiskeysockets/baileys';
 import { supabase } from './supabase';
 import * as QRCode from 'qrcode';
@@ -71,7 +72,8 @@ class SessionManager extends EventEmitter {
         let keys: Record<string, any> = {};
 
         if (account?.auth_creds) {
-            const stored = account.auth_creds as any;
+            // Re-hydrate Buffer objects correctly
+            const stored = JSON.parse(JSON.stringify(account.auth_creds), BufferJSON.reviver);
             creds = stored.creds;
             keys = stored.keys || {};
         }
@@ -86,10 +88,13 @@ class SessionManager extends EventEmitter {
             const currentSession = this.sessions.get(sessionId);
             if (!currentSession) return;
 
+            // Serialize carefully with BufferJSON so binary keys are safely stored in JSONB
+            const serializedCreds = JSON.parse(JSON.stringify({ creds, keys }, BufferJSON.replacer));
+
             await supabase
                 .from('whatsapp_accounts')
                 .update({
-                    auth_creds: { creds, keys },
+                    auth_creds: serializedCreds,
                 })
                 .eq('session_id', sessionId);
         };
@@ -156,7 +161,9 @@ class SessionManager extends EventEmitter {
                 creds: state.creds,
                 keys: makeCacheableSignalKeyStore(state.keys as any, logger),
             },
-            browser: Browsers.macOS('Desktop'),
+            browser: ['Ubuntu', 'Chrome', '20.0.04'],
+            markOnlineOnConnect: false,
+            syncFullHistory: false,
             printQRInTerminal: false,
             generateHighQualityLinkPreview: false,
             defaultQueryTimeoutMs: undefined,
