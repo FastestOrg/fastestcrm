@@ -12,6 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { useWhatsAppAccounts } from '@/hooks/useWhatsAppAccounts';
 import { useWhatsAppCampaigns } from '@/hooks/useWhatsAppCampaigns';
+import { useLeadStatuses } from '@/hooks/useLeadStatuses';
 import { format } from 'date-fns';
 
 // ─── Accounts Tab ────────────────────────────────────────────────────────────
@@ -21,6 +22,13 @@ function AccountsTab() {
     const [qrCode, setQrCode] = useState<string | null>(null);
     const [newSessionName, setNewSessionName] = useState('');
     const [qrStatus, setQrStatus] = useState<'idle' | 'loading' | 'waiting_scan' | 'connected'>('idle');
+    const pollInterval = React.useRef<any>(null);
+    
+    React.useEffect(() => {
+        return () => {
+            if (pollInterval.current) clearInterval(pollInterval.current);
+        };
+    }, []);
 
     const handleConnect = async () => {
         if (!newSessionName.trim()) return;
@@ -37,10 +45,11 @@ function AccountsTab() {
                 setQrStatus('waiting_scan');
                 
                 // Poll for scan
-                const interval = setInterval(async () => {
+                if (pollInterval.current) clearInterval(pollInterval.current);
+                pollInterval.current = setInterval(async () => {
                     const statusRes = await pollQR(sessionId);
                     if (statusRes.status === 'connected') {
-                        clearInterval(interval);
+                        if (pollInterval.current) clearInterval(pollInterval.current);
                         setQrStatus('connected');
                         setTimeout(() => {
                             setIsConnecting(false);
@@ -52,9 +61,6 @@ function AccountsTab() {
                         setQrCode(statusRes.qr);
                     }
                 }, 3000);
-                
-                // Cleanup on unmount or close
-                return () => clearInterval(interval);
             }
         } catch (e) {
             setQrStatus('idle');
@@ -111,9 +117,13 @@ function AccountsTab() {
             </div>
 
             <Dialog open={isConnecting} onOpenChange={(open) => {
-                if (!open && qrStatus === 'waiting_scan') return; // Prevent closing while waiting for scan
                 setIsConnecting(open);
-                if (!open) { setQrCode(null); setQrStatus('idle'); setNewSessionName(''); }
+                if (!open) { 
+                    if (pollInterval.current) clearInterval(pollInterval.current);
+                    setQrCode(null); 
+                    setQrStatus('idle'); 
+                    setNewSessionName(''); 
+                }
             }}>
                 <DialogContent>
                     <DialogHeader>
@@ -177,6 +187,7 @@ function AccountsTab() {
 function CampaignsTab() {
     const { campaigns, isLoading, startCampaign, pauseCampaign, resumeCampaign, deleteCampaign, fetchLeads, leadColumns, createCampaign } = useWhatsAppCampaigns();
     const { accounts } = useWhatsAppAccounts();
+    const { statuses } = useLeadStatuses();
     const [isCreating, setIsCreating] = useState(false);
     
     // Campaign Builder State
@@ -319,9 +330,11 @@ function CampaignsTab() {
                                     <SelectTrigger><SelectValue placeholder="Select segment" /></SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="all">All Leads</SelectItem>
-                                        <SelectItem value="new">New</SelectItem>
-                                        <SelectItem value="contacted">Contacted</SelectItem>
-                                        <SelectItem value="qualified">Qualified</SelectItem>
+                                        {statuses.map(s => (
+                                            <SelectItem key={s.value} value={s.value}>
+                                                {s.label}
+                                            </SelectItem>
+                                        ))}
                                     </SelectContent>
                                 </Select>
                             </div>
