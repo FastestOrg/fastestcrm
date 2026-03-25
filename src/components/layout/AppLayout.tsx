@@ -1,5 +1,5 @@
 import { useNavigate, useLocation, useSearchParams, Outlet } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useCompany } from '@/hooks/useCompany';
@@ -16,103 +16,138 @@ import { NotificationsBell } from './NotificationsBell';
 import { AnnouncementBanner } from './AnnouncementBanner';
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
-const navItems = [{
+type NavSection = 'FastBoard' | 'FastEngage' | 'Data Enrichment' | 'Accounts';
+
+interface NavItem {
+    icon: any;
+    label: string;
+    path: string;
+    section: NavSection;
+    industryOnly?: string | string[];
+    industryExclude?: string | string[];
+    adminOnly?: boolean;
+}
+
+const navItems: NavItem[] = [{
     icon: LayoutDashboard,
     label: 'Dashboard',
-    path: '/dashboard'
+    path: '/dashboard',
+    section: 'FastBoard'
 }, {
     icon: BarChart3,
     label: 'LG Dashboard',
-    path: '/dashboard/lg'
+    path: '/dashboard/lg',
+    section: 'FastBoard'
 }, {
     icon: Users,
     label: 'All Leads',
-    path: '/dashboard/leads'
+    path: '/dashboard/leads',
+    section: 'FastBoard'
 }, {
     icon: UserCheck,
     label: 'Interested',
-    path: '/dashboard/interested'
+    path: '/dashboard/interested',
+    section: 'FastBoard'
 }, {
     icon: CreditCard,
     label: 'Paid',
-    path: '/dashboard/paid'
+    path: '/dashboard/paid',
+    section: 'FastBoard'
 }, {
     icon: Calendar,
     label: 'Pending Payments',
-    path: '/dashboard/pending'
-}, {
-    icon: Phone,
-    label: 'Auto Dialer',
-    path: '/dashboard/dialer'
-}, {
-    icon: PieChart,
-    label: 'Report',
-    path: '/dashboard/report'
-}, {
-    icon: Brain,
-    label: 'AI Insights',
-    path: '/dashboard/ai'
-}, {
-    icon: FileText,
-    label: 'Forms',
-    path: '/dashboard/forms'
-}, {
-    icon: Users,
-    label: 'Team',
-    path: '/dashboard/team'
-}, {
-    icon: Workflow,
-    label: 'Automations',
-    path: '/dashboard/automations'
-}, {
-    icon: MessageCircle,
-    label: 'WhatsApp Campaign',
-    path: '/dashboard/whatsapp'
-}, {
-    icon: Link2,
-    label: 'Integrations',
-    path: '/dashboard/integrations'
-}, {
-    icon: Calendar,
-    label: 'Calendar',
-    path: '/dashboard/calendar'
-}, {
-    icon: Package,
-    label: 'Products',
-    path: '/dashboard/products',
-    industryExclude: ['real_estate', 'insurance']
-}, {
-    icon: Shield,
-    label: 'Insurance Plans',
-    path: '/dashboard/insurance-plans',
-    industryOnly: 'insurance'
-}, {
-    icon: Building2,
-    label: 'Properties',
-    path: '/dashboard/properties',
-    industryOnly: 'real_estate'
+    path: '/dashboard/pending',
+    section: 'FastBoard'
 }, {
     icon: Users,
     label: 'Lead Profiling',
     path: '/dashboard/lead-profiling',
-    industryOnly: ['real_estate', 'insurance']
+    industryOnly: ['real_estate', 'insurance'],
+    section: 'FastBoard'
 }, {
     icon: Building2,
-    label: 'Manage Company',
-    path: '/dashboard/company'
+    label: 'Properties',
+    path: '/dashboard/properties',
+    industryOnly: 'real_estate',
+    section: 'FastBoard'
+}, {
+    icon: Shield,
+    label: 'Insurance Plans',
+    path: '/dashboard/insurance-plans',
+    industryOnly: 'insurance',
+    section: 'FastBoard'
+}, {
+    icon: Phone,
+    label: 'Auto Dialer',
+    path: '/dashboard/dialer',
+    section: 'FastEngage'
+}, {
+    icon: FileText,
+    label: 'Forms',
+    path: '/dashboard/forms',
+    section: 'FastEngage'
+}, {
+    icon: MessageCircle,
+    label: 'WhatsApp Campaign',
+    path: '/dashboard/whatsapp',
+    section: 'FastEngage'
+}, {
+    icon: Calendar,
+    label: 'Calendar',
+    path: '/dashboard/calendar',
+    section: 'FastEngage'
+}, {
+    icon: PieChart,
+    label: 'Report',
+    path: '/dashboard/report',
+    section: 'Data Enrichment'
+}, {
+    icon: Brain,
+    label: 'AI Insights',
+    path: '/dashboard/ai',
+    section: 'Data Enrichment'
+}, {
+    icon: Database,
+    label: 'Big Data SQL',
+    path: '/dashboard/bigdata-sql',
+    adminOnly: true,
+    section: 'Data Enrichment'
+}, {
+    icon: Users,
+    label: 'Team',
+    path: '/dashboard/team',
+    section: 'Accounts'
 }, {
     icon: Package,
     label: 'Statuses',
-    path: '/dashboard/statuses'
+    path: '/dashboard/statuses',
+    section: 'Accounts'
 }, {
-    icon: Database,
-    label: 'Bigdata SQL',
-    path: '/dashboard/bigdata-sql',
-    adminOnly: true
+    icon: Workflow,
+    label: 'Automations',
+    path: '/dashboard/automations',
+    section: 'Accounts'
+}, {
+    icon: Package,
+    label: 'Products',
+    path: '/dashboard/products',
+    industryExclude: ['real_estate', 'insurance'],
+    section: 'Accounts'
+}, {
+    icon: Link2,
+    label: 'Integrations',
+    path: '/dashboard/integrations',
+    section: 'Accounts'
+}, {
+    icon: Building2,
+    label: 'Manage Company',
+    path: '/dashboard/company',
+    section: 'Accounts'
 }, {
     icon: Settings,
     label: 'Settings',
-    path: '/dashboard/settings'
+    path: '/dashboard/settings',
+    section: 'Accounts'
 }];
 
 export default function AppLayout() {
@@ -210,7 +245,7 @@ export default function AppLayout() {
         if (item.label === 'Statuses') {
             return role === 'company' || role === 'company_subadmin' || isCompanyAdmin;
         }
-        if (item.label === 'Bigdata SQL') {
+        if (item.label === 'Big Data SQL') {
             return isCompanyAdmin;
         }
         return true;
@@ -279,186 +314,188 @@ export default function AppLayout() {
                     )}
                 </div>
 
-                <nav className="flex-1 p-3 space-y-1 overflow-y-auto overflow-x-hidden">
-                    {/* Regular nav items — Dashboard + LG Dashboard first */}
-                    {filteredNavItems.slice(0, 2).map(item => (
-                        <Tooltip key={item.label}>
-                            <TooltipTrigger asChild>
-                                <button
-                                    onClick={() => navigate(item.path)}
-                                    className={`w-full flex items-center ${isCollapsed ? 'justify-center px-0' : 'gap-3 px-3'} py-2.5 rounded-lg text-sm transition-all duration-200 cursor-pointer ${location.pathname === item.path && !isTasksActive
-                                        ? 'bg-sidebar-accent text-sidebar-accent-foreground border-l-2 border-primary'
-                                        : 'text-sidebar-foreground hover:bg-sidebar-accent/50 border-l-2 border-transparent'
-                                        }`}
-                                >
-                                    <item.icon className={`h-4 w-4 shrink-0 transition-colors ${location.pathname === item.path && !isTasksActive ? 'text-primary' : ''}`} />
-                                    {!isCollapsed && <span className="flex-1 text-left whitespace-nowrap overflow-hidden text-ellipsis">{item.label}</span>}
-                                </button>
-                            </TooltipTrigger>
-                            {isCollapsed && <TooltipContent side="right" sideOffset={10}>{item.label}</TooltipContent>}
-                        </Tooltip>
-                    ))}
+                <nav className="flex-1 p-3 space-y-4 overflow-y-auto overflow-x-hidden">
+                    {(['FastBoard', 'FastEngage', 'Data Enrichment', 'Accounts'] as NavSection[]).map(section => {
+                        const sectionItems = filteredNavItems.filter((item: any) => item.section === section);
+                        const hasEmailItems = section === 'FastEngage' && emailDashboardEnabled;
+                        const hasTasksItems = section === 'FastBoard';
+                        
+                        if (sectionItems.length === 0 && !hasEmailItems && !hasTasksItems) return null;
 
-                    {/* ── Tasks section (below LG Dashboard) ── */}
-                    <div>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <button
-                                    onClick={() => {
-                                        if (isCollapsed) {
-                                            toggleSidebar();
-                                            setTasksExpanded(true);
-                                        } else {
-                                            setTasksExpanded(prev => !prev);
-                                        }
-                                        if (!isTasksActive) navigate(`/dashboard/tasks?tab=${activeTaskTab}`);
-                                    }}
-                                    className={`w-full flex items-center ${isCollapsed ? 'justify-center px-0 flex-col py-1.5' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm transition-colors cursor-pointer relative ${isTasksActive
-                                        ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                                        : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
-                                        }`}
-                                >
-                                    <div className="flex items-center justify-center shrink-0">
-                                        <CheckSquare className="h-4 w-4" />
-                                        {isCollapsed && !tasksLoading && totalTaskCount > 0 && (
-                                            <span className="absolute top-1 right-2 w-2 h-2 rounded-full bg-primary" />
+                        return (
+                            <div key={section} className="space-y-1">
+                                {!isCollapsed && (
+                                    <h3 className="px-3 pb-2 pt-2 text-xs font-semibold text-muted-foreground tracking-wider">
+                                        {section}
+                                    </h3>
+                                )}
+                                
+                                {sectionItems.map((item: any) => (
+                                    <React.Fragment key={item.label}>
+                                        <Tooltip delayDuration={0}>
+                                            <TooltipTrigger asChild>
+                                                <button
+                                                    onClick={() => navigate(item.path)}
+                                                    className={`w-full flex items-center ${isCollapsed ? 'justify-center px-0' : 'gap-3 px-3'} py-2.5 rounded-lg text-sm transition-all duration-200 cursor-pointer ${(location.pathname === item.path && !(isTasksActive && (item.label === 'Dashboard' || item.label === 'LG Dashboard')))
+                                                        ? 'bg-sidebar-accent text-sidebar-accent-foreground border-l-2 border-primary'
+                                                        : 'text-sidebar-foreground hover:bg-sidebar-accent/50 border-l-2 border-transparent'
+                                                        }`}
+                                                >
+                                                    <item.icon className={`h-4 w-4 shrink-0 transition-colors ${(location.pathname === item.path && !(isTasksActive && (item.label === 'Dashboard' || item.label === 'LG Dashboard'))) ? 'text-primary' : ''}`} />
+                                                    {!isCollapsed && <span className="flex-1 text-left whitespace-nowrap overflow-hidden text-ellipsis">{item.label}</span>}
+                                                    {!isCollapsed && item.label === 'Big Data SQL' && (
+                                                        <span className="text-xs bg-emerald-500 text-white px-2 py-0.5 rounded-full shrink-0">New</span>
+                                                    )}
+                                                    {isCollapsed && item.label === 'Big Data SQL' && (
+                                                        <span className="absolute top-1 right-2 w-2 h-2 rounded-full bg-emerald-500" />
+                                                    )}
+                                                </button>
+                                            </TooltipTrigger>
+                                            {isCollapsed && <TooltipContent side="right" sideOffset={10}>{item.label}</TooltipContent>}
+                                        </Tooltip>
+
+                                        {/* Insert Tasks exactly after LG Dashboard */}
+                                        {item.label === 'LG Dashboard' && (
+                                            <div>
+                                                <Tooltip delayDuration={0}>
+                                                    <TooltipTrigger asChild>
+                                                        <button
+                                                            onClick={() => {
+                                                                if (isCollapsed) {
+                                                                    toggleSidebar();
+                                                                    setTasksExpanded(true);
+                                                                } else {
+                                                                    setTasksExpanded(prev => !prev);
+                                                                }
+                                                                if (!isTasksActive) navigate(`/dashboard/tasks?tab=${activeTaskTab}`);
+                                                            }}
+                                                            className={`w-full flex items-center ${isCollapsed ? 'justify-center px-0 flex-col py-1.5' : 'gap-3 px-3 py-2.5'} rounded-lg text-sm transition-colors cursor-pointer relative ${isTasksActive
+                                                                ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                                                                : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
+                                                                }`}
+                                                        >
+                                                            <div className="flex items-center justify-center shrink-0">
+                                                                <CheckSquare className="h-4 w-4" />
+                                                                {isCollapsed && !tasksLoading && totalTaskCount > 0 && (
+                                                                    <span className="absolute top-1 right-2 w-2 h-2 rounded-full bg-primary" />
+                                                                )}
+                                                            </div>
+                                                            {!isCollapsed && <span className="flex-1 text-left whitespace-nowrap overflow-hidden text-ellipsis">Tasks</span>}
+                                                            {!isCollapsed && !tasksLoading && totalTaskCount > 0 && (
+                                                                <span className="text-xs font-bold bg-primary text-primary-foreground rounded-full px-1.5 py-0.5 min-w-[20px] text-center shrink-0">
+                                                                    {totalTaskCount}
+                                                                </span>
+                                                            )}
+                                                            {!isCollapsed && (tasksExpanded ? <ChevronUp className="h-3.5 w-3.5 ml-1 shrink-0" /> : <ChevronDown className="h-3.5 w-3.5 ml-1 shrink-0" />)}
+                                                        </button>
+                                                    </TooltipTrigger>
+                                                    {isCollapsed && <TooltipContent side="right" sideOffset={10}>
+                                                        <div className="flex items-center gap-2">
+                                                            Tasks {!tasksLoading && totalTaskCount > 0 && `(${totalTaskCount})`}
+                                                        </div>
+                                                    </TooltipContent>}
+                                                </Tooltip>
+
+                                                {/* Sub-items */}
+                                                {!isCollapsed && tasksExpanded && (
+                                                    <div className="mt-0.5 ml-3 border-l border-sidebar-border pl-3 space-y-0.5 overflow-hidden">
+                                                        {/** Urgent */}
+                                                        <button
+                                                            onClick={() => navigate('/dashboard/tasks?tab=urgent')}
+                                                            className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-colors cursor-pointer ${isTasksActive && activeTaskTab === 'urgent'
+                                                                ? 'bg-red-500/20 text-red-400'
+                                                                : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
+                                                                }`}
+                                                        >
+                                                            <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                                                            <span className="flex-1 text-left whitespace-nowrap overflow-hidden text-ellipsis">Urgent</span>
+                                                            {!tasksLoading && taskCounts.urgent > 0 && (
+                                                                <span className="text-xs font-bold bg-red-500 text-white rounded-full px-1.5 py-0.5 min-w-[18px] text-center shrink-0">
+                                                                    {taskCounts.urgent}
+                                                                </span>
+                                                            )}
+                                                        </button>
+
+                                                        {/** Today */}
+                                                        <button
+                                                            onClick={() => navigate('/dashboard/tasks?tab=today')}
+                                                            className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-colors cursor-pointer ${isTasksActive && activeTaskTab === 'today'
+                                                                ? 'bg-amber-500/20 text-amber-400'
+                                                                : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
+                                                                }`}
+                                                        >
+                                                            <Clock className="h-3.5 w-3.5 shrink-0" />
+                                                            <span className="flex-1 text-left whitespace-nowrap overflow-hidden text-ellipsis">Today</span>
+                                                            {!tasksLoading && taskCounts.today > 0 && (
+                                                                <span className="text-xs font-bold bg-amber-500 text-white rounded-full px-1.5 py-0.5 min-w-[18px] text-center shrink-0">
+                                                                    {taskCounts.today}
+                                                                </span>
+                                                            )}
+                                                        </button>
+
+                                                        {/** Upcoming */}
+                                                        <button
+                                                            onClick={() => navigate('/dashboard/tasks?tab=upcoming')}
+                                                            className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-colors cursor-pointer ${isTasksActive && activeTaskTab === 'upcoming'
+                                                                ? 'bg-blue-500/20 text-blue-400'
+                                                                : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
+                                                                }`}
+                                                        >
+                                                            <Calendar className="h-3.5 w-3.5 shrink-0" />
+                                                            <span className="flex-1 text-left whitespace-nowrap overflow-hidden text-ellipsis">Upcoming</span>
+                                                            {!tasksLoading && taskCounts.upcoming > 0 && (
+                                                                <span className="text-xs font-bold bg-blue-500 text-white rounded-full px-1.5 py-0.5 min-w-[18px] text-center shrink-0">
+                                                                    {taskCounts.upcoming}
+                                                                </span>
+                                                            )}
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
                                         )}
-                                    </div>
-                                    {!isCollapsed && <span className="flex-1 text-left whitespace-nowrap overflow-hidden text-ellipsis">Tasks</span>}
-                                    {!isCollapsed && !tasksLoading && totalTaskCount > 0 && (
-                                        <span className="text-xs font-bold bg-primary text-primary-foreground rounded-full px-1.5 py-0.5 min-w-[20px] text-center shrink-0">
-                                            {totalTaskCount}
-                                        </span>
-                                    )}
-                                    {!isCollapsed && (tasksExpanded ? <ChevronUp className="h-3.5 w-3.5 ml-1 shrink-0" /> : <ChevronDown className="h-3.5 w-3.5 ml-1 shrink-0" />)}
-                                </button>
-                            </TooltipTrigger>
-                            {isCollapsed && <TooltipContent side="right" sideOffset={10}>
-                                <div className="flex items-center gap-2">
-                                    Tasks {!tasksLoading && totalTaskCount > 0 && `(${totalTaskCount})`}
-                                </div>
-                            </TooltipContent>}
-                        </Tooltip>
+                                    </React.Fragment>
+                                ))}
 
-                        {/* Sub-items */}
-                        {!isCollapsed && tasksExpanded && (
-                            <div className="mt-0.5 ml-3 border-l border-sidebar-border pl-3 space-y-0.5 overflow-hidden">
-                                {/** Urgent */}
-                                <button
-                                    onClick={() => navigate('/dashboard/tasks?tab=urgent')}
-                                    className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-colors cursor-pointer ${isTasksActive && activeTaskTab === 'urgent'
-                                        ? 'bg-red-500/20 text-red-400'
-                                        : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
-                                        }`}
-                                >
-                                    <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-                                    <span className="flex-1 text-left whitespace-nowrap overflow-hidden text-ellipsis">Urgent</span>
-                                    {!tasksLoading && taskCounts.urgent > 0 && (
-                                        <span className="text-xs font-bold bg-red-500 text-white rounded-full px-1.5 py-0.5 min-w-[18px] text-center shrink-0">
-                                            {taskCounts.urgent}
-                                        </span>
-                                    )}
-                                </button>
-
-                                {/** Today */}
-                                <button
-                                    onClick={() => navigate('/dashboard/tasks?tab=today')}
-                                    className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-colors cursor-pointer ${isTasksActive && activeTaskTab === 'today'
-                                        ? 'bg-amber-500/20 text-amber-400'
-                                        : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
-                                        }`}
-                                >
-                                    <Clock className="h-3.5 w-3.5 shrink-0" />
-                                    <span className="flex-1 text-left whitespace-nowrap overflow-hidden text-ellipsis">Today</span>
-                                    {!tasksLoading && taskCounts.today > 0 && (
-                                        <span className="text-xs font-bold bg-amber-500 text-white rounded-full px-1.5 py-0.5 min-w-[18px] text-center shrink-0">
-                                            {taskCounts.today}
-                                        </span>
-                                    )}
-                                </button>
-
-                                {/** Upcoming */}
-                                <button
-                                    onClick={() => navigate('/dashboard/tasks?tab=upcoming')}
-                                    className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-colors cursor-pointer ${isTasksActive && activeTaskTab === 'upcoming'
-                                        ? 'bg-blue-500/20 text-blue-400'
-                                        : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
-                                        }`}
-                                >
-                                    <Calendar className="h-3.5 w-3.5 shrink-0" />
-                                    <span className="flex-1 text-left whitespace-nowrap overflow-hidden text-ellipsis">Upcoming</span>
-                                    {!tasksLoading && taskCounts.upcoming > 0 && (
-                                        <span className="text-xs font-bold bg-blue-500 text-white rounded-full px-1.5 py-0.5 min-w-[18px] text-center shrink-0">
-                                            {taskCounts.upcoming}
-                                        </span>
-                                    )}
-                                </button>
+                                {/* Email nav items - only visible when email dashboard is enabled */}
+                                {hasEmailItems && (
+                                    <>
+                                        <Tooltip delayDuration={0}>
+                                            <TooltipTrigger asChild>
+                                                <button
+                                                    onClick={() => navigate('/dashboard/email')}
+                                                    className={`w-full flex items-center ${isCollapsed ? 'justify-center px-0' : 'gap-3 px-3'} py-2.5 rounded-lg text-sm transition-all duration-200 cursor-pointer ${location.pathname === '/dashboard/email'
+                                                        ? 'bg-sidebar-accent text-sidebar-accent-foreground border-l-2 border-primary'
+                                                        : 'text-sidebar-foreground hover:bg-sidebar-accent/50 border-l-2 border-transparent'
+                                                        }`}
+                                                >
+                                                    <Mail className={`h-4 w-4 shrink-0 transition-colors ${location.pathname === '/dashboard/email' ? 'text-primary' : ''}`} />
+                                                    {!isCollapsed && <span className="flex-1 text-left whitespace-nowrap overflow-hidden text-ellipsis">Email</span>}
+                                                </button>
+                                            </TooltipTrigger>
+                                            {isCollapsed && <TooltipContent side="right" sideOffset={10}>Email</TooltipContent>}
+                                        </Tooltip>
+                                        {isCompanyAdmin && (
+                                            <Tooltip delayDuration={0}>
+                                                <TooltipTrigger asChild>
+                                                    <button
+                                                        onClick={() => navigate('/dashboard/email-settings')}
+                                                        className={`w-full flex items-center ${isCollapsed ? 'justify-center px-0' : 'gap-3 px-3'} py-2.5 rounded-lg text-sm transition-all duration-200 cursor-pointer ${location.pathname === '/dashboard/email-settings'
+                                                            ? 'bg-sidebar-accent text-sidebar-accent-foreground border-l-2 border-primary'
+                                                            : 'text-sidebar-foreground hover:bg-sidebar-accent/50 border-l-2 border-transparent'
+                                                            }`}
+                                                    >
+                                                        <Mail className={`h-4 w-4 shrink-0 transition-colors ${location.pathname === '/dashboard/email-settings' ? 'text-primary' : ''}`} />
+                                                        {!isCollapsed && <span className="flex-1 text-left whitespace-nowrap overflow-hidden text-ellipsis">Email Settings</span>}
+                                                    </button>
+                                                </TooltipTrigger>
+                                                {isCollapsed && <TooltipContent side="right" sideOffset={10}>Email Settings</TooltipContent>}
+                                            </Tooltip>
+                                        )}
+                                    </>
+                                )}
                             </div>
-                        )}
-                    </div>
-
-                    {/* Remaining nav items (index 2+) */}
-                    {filteredNavItems.slice(2).map(item => (
-                        <Tooltip key={item.label}>
-                            <TooltipTrigger asChild>
-                                <button
-                                    onClick={() => navigate(item.path)}
-                                    className={`w-full flex items-center ${isCollapsed ? 'justify-center px-0' : 'gap-3 px-3'} py-2.5 rounded-lg text-sm transition-all duration-200 cursor-pointer ${location.pathname === item.path
-                                        ? 'bg-sidebar-accent text-sidebar-accent-foreground border-l-2 border-primary'
-                                        : 'text-sidebar-foreground hover:bg-sidebar-accent/50 border-l-2 border-transparent'
-                                        }`}
-                                >
-                                    <item.icon className={`h-4 w-4 shrink-0 transition-colors ${location.pathname === item.path ? 'text-primary' : ''}`} />
-                                    {!isCollapsed && <span className="flex-1 text-left whitespace-nowrap overflow-hidden text-ellipsis">{item.label}</span>}
-                                    {!isCollapsed && item.label === 'Bigdata SQL' && (
-                                        <span className="text-xs bg-emerald-500 text-white px-2 py-0.5 rounded-full shrink-0">New</span>
-                                    )}
-                                    {isCollapsed && item.label === 'Bigdata SQL' && (
-                                        <span className="absolute top-1 right-2 w-2 h-2 rounded-full bg-emerald-500" />
-                                    )}
-                                </button>
-                            </TooltipTrigger>
-                            {isCollapsed && <TooltipContent side="right" sideOffset={10}>{item.label}</TooltipContent>}
-                        </Tooltip>
-                    ))}
-
-                    {/* Email nav items - only visible when email dashboard is enabled */}
-                    {emailDashboardEnabled && (
-                        <>
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <button
-                                        onClick={() => navigate('/dashboard/email')}
-                                        className={`w-full flex items-center ${isCollapsed ? 'justify-center px-0' : 'gap-3 px-3'} py-2.5 rounded-lg text-sm transition-all duration-200 cursor-pointer ${location.pathname === '/dashboard/email'
-                                            ? 'bg-sidebar-accent text-sidebar-accent-foreground border-l-2 border-primary'
-                                            : 'text-sidebar-foreground hover:bg-sidebar-accent/50 border-l-2 border-transparent'
-                                            }`}
-                                    >
-                                        <Mail className={`h-4 w-4 shrink-0 transition-colors ${location.pathname === '/dashboard/email' ? 'text-primary' : ''}`} />
-                                        {!isCollapsed && <span className="flex-1 text-left whitespace-nowrap overflow-hidden text-ellipsis">Email</span>}
-                                    </button>
-                                </TooltipTrigger>
-                                {isCollapsed && <TooltipContent side="right" sideOffset={10}>Email</TooltipContent>}
-                            </Tooltip>
-                            {isCompanyAdmin && (
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <button
-                                            onClick={() => navigate('/dashboard/email-settings')}
-                                            className={`w-full flex items-center ${isCollapsed ? 'justify-center px-0' : 'gap-3 px-3'} py-2.5 rounded-lg text-sm transition-all duration-200 cursor-pointer ${location.pathname === '/dashboard/email-settings'
-                                                ? 'bg-sidebar-accent text-sidebar-accent-foreground border-l-2 border-primary'
-                                                : 'text-sidebar-foreground hover:bg-sidebar-accent/50 border-l-2 border-transparent'
-                                                }`}
-                                        >
-                                            <Mail className={`h-4 w-4 shrink-0 transition-colors ${location.pathname === '/dashboard/email-settings' ? 'text-primary' : ''}`} />
-                                            {!isCollapsed && <span className="flex-1 text-left whitespace-nowrap overflow-hidden text-ellipsis">Email Settings</span>}
-                                        </button>
-                                    </TooltipTrigger>
-                                    {isCollapsed && <TooltipContent side="right" sideOffset={10}>Email Settings</TooltipContent>}
-                                </Tooltip>
-                            )}
-                        </>
-                    )}
+                        );
+                    })}
                 </nav>
 
                 <div className="p-4 border-t border-sidebar-border">
