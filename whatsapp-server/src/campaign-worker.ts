@@ -108,8 +108,8 @@ export async function startCampaign(campaignId: string): Promise<{ success: bool
         campaignId,
         companyId: campaign.company_id,
         accountIds,
-        delayMin: campaign.delay_min_seconds || 15,
-        delayMax: campaign.delay_max_seconds || 60,
+        delayMin: campaign.delay_min_seconds || 60,
+        delayMax: campaign.delay_max_seconds || 180,
         isPaused: false,
         isCancelled: false,
     };

@@ -208,6 +208,8 @@ function AIConfigDialogContent({ account, onClose, updateAccountAI }: { account:
     const [aiGoal, setAiGoal] = useState(account.ai_goal || 'sales');
     const [aiKnowledgeBase, setAiKnowledgeBase] = useState(account.ai_knowledge_base || '');
     const [aiPrompt, setAiPrompt] = useState(account.ai_prompt || '');
+    const [aiResponseDelay, setAiResponseDelay] = useState(account.ai_response_delay_seconds ?? 90);
+    const [aiMaxReplies, setAiMaxReplies] = useState(account.ai_max_replies_per_day ?? 20);
     const [isSaving, setIsSaving] = useState(false);
     const [isImprovising, setIsImprovising] = useState(false);
 
@@ -220,6 +222,8 @@ function AIConfigDialogContent({ account, onClose, updateAccountAI }: { account:
                 ai_goal: aiGoal,
                 ai_prompt: aiPrompt,
                 ai_knowledge_base: aiKnowledgeBase,
+                ai_response_delay_seconds: aiResponseDelay,
+                ai_max_replies_per_day: aiMaxReplies,
             });
             onClose();
         } finally {
@@ -327,6 +331,19 @@ Rewrite the instructions to be extremely clear, conversion-focused, and suitable
                         value={aiKnowledgeBase}
                         onChange={e => setAiKnowledgeBase(e.target.value)}
                     />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                        <Label>Minimum Delay before responding</Label>
+                        <p className="text-xs text-muted-foreground">Wait (in seconds) to read incoming texts as a single context batch.</p>
+                        <Input type="number" min={1} value={aiResponseDelay} onChange={e => setAiResponseDelay(Number(e.target.value))} />
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Max Replies / Day</Label>
+                        <p className="text-xs text-muted-foreground">Maximum outbound messages the AI can send to a single contact per day.</p>
+                        <Input type="number" min={1} value={aiMaxReplies} onChange={e => setAiMaxReplies(Number(e.target.value))} />
+                    </div>
                 </div>
 
                 <div className="space-y-2">

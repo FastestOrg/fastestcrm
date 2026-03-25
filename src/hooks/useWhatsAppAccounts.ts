@@ -132,10 +132,10 @@ export function useWhatsAppAccounts() {
     });
 
     const updateAccountAI = useMutation({
-        mutationFn: async ({ accountId, ai_enabled, ai_prompt, ai_goal, ai_knowledge_base }: { accountId: string; ai_enabled: boolean; ai_prompt: string; ai_goal: string; ai_knowledge_base: string }) => {
+        mutationFn: async ({ accountId, ai_enabled, ai_prompt, ai_goal, ai_knowledge_base, ai_response_delay_seconds, ai_max_replies_per_day }: { accountId: string; ai_enabled: boolean; ai_prompt: string; ai_goal: string; ai_knowledge_base: string; ai_response_delay_seconds: number; ai_max_replies_per_day: number }) => {
             const { data, error } = await supabase
                 .from('whatsapp_accounts' as any)
-                .update({ ai_enabled, ai_prompt, ai_goal, ai_knowledge_base })
+                .update({ ai_enabled, ai_prompt, ai_goal, ai_knowledge_base, ai_response_delay_seconds, ai_max_replies_per_day })
                 .eq('id', accountId);
             if (error) throw error;
             return data;

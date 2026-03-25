@@ -42,6 +42,7 @@ interface SessionInfo {
 
 class SessionManager extends EventEmitter {
     private sessions: Map<string, SessionInfo> = new Map();
+    private aiDebounceTimers: Map<string, NodeJS.Timeout> = new Map();
     private readonly MAX_RETRIES = 3;
 
     /**
@@ -198,13 +199,13 @@ class SessionManager extends EventEmitter {
                 // 1. Fetch account config
                 const { data: account } = await supabase
                     .from('whatsapp_accounts')
-                    .select('id, company_id, ai_enabled, ai_prompt, ai_knowledge_base, ai_goal')
+                    .select('id, company_id, ai_enabled, ai_prompt, ai_knowledge_base, ai_goal, ai_response_delay_seconds, ai_max_replies_per_day')
                     .eq('session_id', sessionId)
                     .maybeSingle();
 
                 if (!account) return;
 
-                // 2. Log incoming message to CRM
+                // 2. Log incoming message to CRM (always log immediately)
                 await supabase.from('whatsapp_message_log').insert({
                     company_id: account.company_id,
                     account_id: account.id,
@@ -216,47 +217,78 @@ class SessionManager extends EventEmitter {
 
                 if (!account.ai_enabled || !account.ai_prompt) return;
 
-                console.log(`[AI Responder] Incoming message for session ${sessionId} from ${phone}`);
+                console.log(`[AI Responder] Incoming message for session ${sessionId} from ${phone}. Queuing evaluation...`);
 
-                // 3. Find Company API Key
-                const { data: profiles } = await supabase.from('profiles').select('id').eq('company_id', account.company_id);
-                const userIds = profiles?.map(p => p.id) || [];
-                if (userIds.length === 0) return;
-
-                const { data: integration } = await supabase
-                    .from('integration_api_keys')
-                    .select('api_key')
-                    .in('user_id', userIds)
-                    .eq('service_name', 'gemini')
-                    .eq('is_active', true)
-                    .limit(1)
-                    .maybeSingle();
-
-                if (!integration?.api_key) {
-                    console.log(`[AI Responder] Skipping: No Gemini key for company ${account.company_id}`);
-                    return;
+                // 3. Debounce / Batch Messages
+                const debounceKey = `${sessionId}-${phone}`;
+                if (this.aiDebounceTimers.has(debounceKey)) {
+                    clearTimeout(this.aiDebounceTimers.get(debounceKey)!);
                 }
 
-                // 4. Fetch recent chat history
-                const { data: historyLog } = await supabase
-                    .from('whatsapp_message_log')
-                    .select('message_body, direction')
-                    .eq('company_id', account.company_id)
-                    .eq('recipient_phone', phone)
-                    .order('sent_at', { ascending: false })
-                    .limit(8);
+                const delaySeconds = account.ai_response_delay_seconds ?? 90;
+                const delayMs = delaySeconds * 1000;
 
-                let historyContext = '';
-                if (historyLog && historyLog.length > 0) {
-                    historyContext = historyLog
-                        .reverse()
-                        .map(log => `${log.direction === 'inbound' ? 'Customer' : 'Assistant'}: ${log.message_body}`)
-                        .join('\n');
-                }
+                const timer = setTimeout(async () => {
+                    this.aiDebounceTimers.delete(debounceKey);
+                    
+                    try {
+                        // 4. Enforce Daily Cap
+                        const todayStart = new Date();
+                        todayStart.setHours(0,0,0,0);
 
-                // 5. Generate AI Response
-                const ai = new GoogleGenAI({ apiKey: integration.api_key });
-                const fullPrompt = `You are the official AI representative for this business on WhatsApp.
+                        const { count } = await supabase
+                            .from('whatsapp_message_log')
+                            .select('*', { count: 'exact', head: true })
+                            .eq('account_id', account.id)
+                            .eq('recipient_phone', phone)
+                            .eq('direction', 'outbound')
+                            .gte('sent_at', todayStart.toISOString());
+                        
+                        const maxReplies = account.ai_max_replies_per_day ?? 20;
+                        if (count !== null && count >= maxReplies) {
+                            console.log(`[AI Responder] Daily cap reached (${count}/${maxReplies}) for ${phone}`);
+                            return; // Stop AI processing
+                        }
+
+                        // 5. Find Company API Key
+                        const { data: profiles } = await supabase.from('profiles').select('id').eq('company_id', account.company_id);
+                        const userIds = profiles?.map(p => p.id) || [];
+                        if (userIds.length === 0) return;
+
+                        const { data: integration } = await supabase
+                            .from('integration_api_keys')
+                            .select('api_key')
+                            .in('user_id', userIds)
+                            .eq('service_name', 'gemini')
+                            .eq('is_active', true)
+                            .limit(1)
+                            .maybeSingle();
+
+                        if (!integration?.api_key) {
+                            console.log(`[AI Responder] Skipping: No Gemini key for company ${account.company_id}`);
+                            return;
+                        }
+
+                        // 6. Fetch recent chat history
+                        const { data: historyLog } = await supabase
+                            .from('whatsapp_message_log')
+                            .select('message_body, direction')
+                            .eq('company_id', account.company_id)
+                            .eq('recipient_phone', phone)
+                            .order('sent_at', { ascending: false })
+                            .limit(8);
+
+                        let historyContext = '';
+                        if (historyLog && historyLog.length > 0) {
+                            historyContext = historyLog
+                                .reverse()
+                                .map(log => `${log.direction === 'inbound' ? 'Customer' : 'Assistant'}: ${log.message_body}`)
+                                .join('\n');
+                        }
+
+                        // 7. Generate AI Response
+                        const ai = new GoogleGenAI({ apiKey: integration.api_key });
+                        const fullPrompt = `You are the official AI representative for this business on WhatsApp.
 Goal: ${account.ai_goal}
 Instructions: ${account.ai_prompt}
 
@@ -268,29 +300,35 @@ ${historyContext}
 
 Reply naturally, conversationally, and concisely as you would in a WhatsApp chat. Do not include markdown or wrappers. Just write your response text.`;
 
-                const aiResponse = await ai.models.generateContent({
-                    model: 'gemini-2.5-flash',
-                    contents: fullPrompt,
-                });
+                        const aiResponse = await ai.models.generateContent({
+                            model: 'gemini-2.5-flash',
+                            contents: fullPrompt,
+                        });
 
-                const replyText = aiResponse.text;
-                if (!replyText) return;
+                        const replyText = aiResponse.text;
+                        if (!replyText) return;
 
-                // 6. Send message via Baileys
-                await socket.sendMessage(remoteJid, { text: replyText });
+                        // 8. Send message via Baileys and log it
+                        await socket.sendMessage(remoteJid, { text: replyText });
 
-                // 7. Log outbound AI message
-                await supabase.from('whatsapp_message_log').insert({
-                    company_id: account.company_id,
-                    account_id: account.id,
-                    recipient_phone: phone,
-                    message_body: replyText,
-                    direction: 'outbound',
-                    status: 'sent'
-                });
+                        await supabase.from('whatsapp_message_log').insert({
+                            company_id: account.company_id,
+                            account_id: account.id,
+                            recipient_phone: phone,
+                            message_body: replyText,
+                            direction: 'outbound',
+                            status: 'sent'
+                        });
+
+                    } catch (innerErr) {
+                        console.error('[AI Responder Async] Error executing AI response:', innerErr);
+                    }
+                }, delayMs);
+
+                this.aiDebounceTimers.set(debounceKey, timer);
 
             } catch (err) {
-                console.error('[AI Responder] Error processing message:', err);
+                console.error('[AI Responder Sync] Error processing incoming message loop:', err);
             }
         });
 
