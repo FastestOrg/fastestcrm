@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from "@/components/ui/switch";
-import { Mail, MessageSquare, Phone, CreditCard, Calendar, FileSpreadsheet, Webhook, Loader2, Megaphone } from 'lucide-react';
+import { Mail, MessageSquare, Phone, CreditCard, Calendar, FileSpreadsheet, Webhook, Loader2, Megaphone, Bot } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -22,6 +22,7 @@ const integrationTypes = [
     { id: 'google_calendar', name: 'Google Calendar', icon: Calendar, description: 'Schedule meetings', category: 'Scheduling' },
     { id: 'google_sheets', name: 'Google Sheets', icon: FileSpreadsheet, description: 'Export/Import leads', category: 'Data' },
     { id: 'webhooks', name: 'Webhooks', icon: Webhook, description: 'Connect custom apps', category: 'Developer' },
+    { id: 'gemini', name: 'Google Gemini AI', icon: Bot, description: 'Power your WhatsApp AI Agent', category: 'AI' },
 ];
 
 export default function Integrations() {

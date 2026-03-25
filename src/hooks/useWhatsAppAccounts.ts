@@ -33,6 +33,10 @@ export interface WhatsAppAccount {
     messages_sent_today: number;
     last_connected_at: string | null;
     created_at: string;
+    ai_enabled: boolean;
+    ai_prompt: string | null;
+    ai_goal: string | null;
+    ai_knowledge_base: string | null;
 }
 
 export function useWhatsAppAccounts() {
@@ -127,6 +131,21 @@ export function useWhatsAppAccounts() {
         },
     });
 
+    const updateAccountAI = useMutation({
+        mutationFn: async ({ accountId, ai_enabled, ai_prompt, ai_goal, ai_knowledge_base }: { accountId: string; ai_enabled: boolean; ai_prompt: string; ai_goal: string; ai_knowledge_base: string }) => {
+            const { data, error } = await supabase
+                .from('whatsapp_accounts' as any)
+                .update({ ai_enabled, ai_prompt, ai_goal, ai_knowledge_base })
+                .eq('id', accountId);
+            if (error) throw error;
+            return data;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['whatsapp-accounts'] });
+            toast({ title: 'AI Configuration Saved' });
+        },
+    });
+
     return {
         accounts: accountsQuery.data || [],
         isLoading: accountsQuery.isLoading,
@@ -134,6 +153,7 @@ export function useWhatsAppAccounts() {
         pollQR,
         disconnectSession,
         deleteAccount,
+        updateAccountAI,
         refetch: accountsQuery.refetch,
     };
 }

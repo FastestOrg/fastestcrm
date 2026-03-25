@@ -23,6 +23,7 @@ import makeWASocket, {
 } from '@whiskeysockets/baileys';
 import { supabase } from './supabase';
 import * as QRCode from 'qrcode';
+import { GoogleGenAI } from '@google/genai';
 import { EventEmitter } from 'events';
 import { Boom } from '@hapi/boom';
 
@@ -179,6 +180,119 @@ class SessionManager extends EventEmitter {
         };
 
         this.sessions.set(sessionId, sessionInfo);
+
+        // ─── AI Responder / Incoming Message Handler ─────────────────────────
+        socket.ev.on('messages.upsert', async (m) => {
+            if (m.type !== 'notify') return;
+            const msg = m.messages[0];
+            if (!msg || msg.key.fromMe || !msg.message) return; // Ignore own messages or system events
+
+            const remoteJid = msg.key.remoteJid;
+            if (!remoteJid || remoteJid.includes('@g.us')) return; // Ignore groups for now
+            const phone = remoteJid.split('@')[0];
+
+            const messageText = msg.message.conversation || msg.message.extendedTextMessage?.text;
+            if (!messageText) return; // Only process text
+
+            try {
+                // 1. Fetch account config
+                const { data: account } = await supabase
+                    .from('whatsapp_accounts')
+                    .select('id, company_id, ai_enabled, ai_prompt, ai_knowledge_base, ai_goal')
+                    .eq('session_id', sessionId)
+                    .maybeSingle();
+
+                if (!account) return;
+
+                // 2. Log incoming message to CRM
+                await supabase.from('whatsapp_message_log').insert({
+                    company_id: account.company_id,
+                    account_id: account.id,
+                    recipient_phone: phone,
+                    message_body: messageText,
+                    direction: 'inbound',
+                    status: 'delivered'
+                });
+
+                if (!account.ai_enabled || !account.ai_prompt) return;
+
+                console.log(`[AI Responder] Incoming message for session ${sessionId} from ${phone}`);
+
+                // 3. Find Company API Key
+                const { data: profiles } = await supabase.from('profiles').select('id').eq('company_id', account.company_id);
+                const userIds = profiles?.map(p => p.id) || [];
+                if (userIds.length === 0) return;
+
+                const { data: integration } = await supabase
+                    .from('integration_api_keys')
+                    .select('api_key')
+                    .in('user_id', userIds)
+                    .eq('service_name', 'gemini')
+                    .eq('is_active', true)
+                    .limit(1)
+                    .maybeSingle();
+
+                if (!integration?.api_key) {
+                    console.log(`[AI Responder] Skipping: No Gemini key for company ${account.company_id}`);
+                    return;
+                }
+
+                // 4. Fetch recent chat history
+                const { data: historyLog } = await supabase
+                    .from('whatsapp_message_log')
+                    .select('message_body, direction')
+                    .eq('company_id', account.company_id)
+                    .eq('recipient_phone', phone)
+                    .order('sent_at', { ascending: false })
+                    .limit(8);
+
+                let historyContext = '';
+                if (historyLog && historyLog.length > 0) {
+                    historyContext = historyLog
+                        .reverse()
+                        .map(log => `${log.direction === 'inbound' ? 'Customer' : 'Assistant'}: ${log.message_body}`)
+                        .join('\n');
+                }
+
+                // 5. Generate AI Response
+                const ai = new GoogleGenAI({ apiKey: integration.api_key });
+                const fullPrompt = `You are the official AI representative for this business on WhatsApp.
+Goal: ${account.ai_goal}
+Instructions: ${account.ai_prompt}
+
+Knowledge Base (use this to answer questions):
+${account.ai_knowledge_base || '(No knowledge base provided)'}
+
+--- Chat History ---
+${historyContext}
+
+Reply naturally, conversationally, and concisely as you would in a WhatsApp chat. Do not include markdown or wrappers. Just write your response text.`;
+
+                const aiResponse = await ai.models.generateContent({
+                    model: 'gemini-2.5-flash',
+                    contents: fullPrompt,
+                });
+
+                const replyText = aiResponse.text;
+                if (!replyText) return;
+
+                // 6. Send message via Baileys
+                await socket.sendMessage(remoteJid, { text: replyText });
+
+                // 7. Log outbound AI message
+                await supabase.from('whatsapp_message_log').insert({
+                    company_id: account.company_id,
+                    account_id: account.id,
+                    recipient_phone: phone,
+                    message_body: replyText,
+                    direction: 'outbound',
+                    status: 'sent'
+                });
+
+            } catch (err) {
+                console.error('[AI Responder] Error processing message:', err);
+            }
+        });
 
         // ── Connection updates ────────────────────────────────────────────
 

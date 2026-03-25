@@ -6,7 +6,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { MessageCircle, Users, Activity, Settings, Plus, QrCode, Play, Pause, Trash2, StopCircle, Loader2 } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { MessageCircle, Users, Activity, Settings, Plus, QrCode, Play, Pause, Trash2, StopCircle, Loader2, Bot, Wand2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -17,11 +18,12 @@ import { format } from 'date-fns';
 
 // ─── Accounts Tab ────────────────────────────────────────────────────────────
 function AccountsTab() {
-    const { accounts, isLoading, createSession, disconnectSession, deleteAccount, pollQR } = useWhatsAppAccounts();
+    const { accounts, isLoading, createSession, disconnectSession, deleteAccount, pollQR, updateAccountAI } = useWhatsAppAccounts();
     const [isConnecting, setIsConnecting] = useState(false);
     const [qrCode, setQrCode] = useState<string | null>(null);
     const [newSessionName, setNewSessionName] = useState('');
     const [qrStatus, setQrStatus] = useState<'idle' | 'loading' | 'waiting_scan' | 'connected'>('idle');
+    const [aiConfigAccount, setAiConfigAccount] = useState<any>(null);
     const pollInterval = React.useRef<any>(null);
     
     React.useEffect(() => {
@@ -100,14 +102,19 @@ function AccountsTab() {
                                     {acc.messages_sent_today} / {acc.daily_limit}
                                 </span>
                             </div>
-                            <div className="mt-4 flex gap-2">
+                            <div className="mt-4 flex flex-col gap-2">
                                 {acc.status === 'connected' ? (
-                                    <Button variant="outline" size="sm" className="w-full" onClick={() => disconnectSession.mutate(acc.session_id)}>
-                                        Disconnect
-                                    </Button>
+                                    <>
+                                        <Button variant="secondary" size="sm" className="w-full" onClick={() => setAiConfigAccount(acc)}>
+                                            <Bot className="w-4 h-4 mr-2" /> AI Agent Config
+                                        </Button>
+                                        <Button variant="outline" size="sm" className="w-full text-muted-foreground" onClick={() => disconnectSession.mutate(acc.session_id)}>
+                                            Disconnect
+                                        </Button>
+                                    </>
                                 ) : (
-                                    <Button variant="outline" size="sm" className="w-full" onClick={() => deleteAccount.mutate(acc.id)}>
-                                        Remove
+                                    <Button variant="outline" size="sm" className="w-full text-destructive hover:text-destructive" onClick={() => deleteAccount.mutate(acc.id)}>
+                                        Remove Account
                                     </Button>
                                 )}
                             </div>
@@ -179,9 +186,144 @@ function AccountsTab() {
                     )}
                 </DialogContent>
             </Dialog>
+
+            {/* AI Config Dialog */}
+            <Dialog open={!!aiConfigAccount} onOpenChange={(open) => !open && setAiConfigAccount(null)}>
+                {aiConfigAccount && (
+                    <AIConfigDialogContent 
+                        account={aiConfigAccount} 
+                        onClose={() => setAiConfigAccount(null)} 
+                        updateAccountAI={updateAccountAI} 
+                    />
+                )}
+            </Dialog>
         </div>
     );
 }
+
+// ─── AI Config Dialog Internal Component ─────────────────────────────────────
+function AIConfigDialogContent({ account, onClose, updateAccountAI }: { account: any, onClose: () => void, updateAccountAI: any }) {
+    const [aiEnabled, setAiEnabled] = useState(account.ai_enabled || false);
+    const [aiGoal, setAiGoal] = useState(account.ai_goal || 'sales');
+    const [aiKnowledgeBase, setAiKnowledgeBase] = useState(account.ai_knowledge_base || '');
+    const [aiPrompt, setAiPrompt] = useState(account.ai_prompt || '');
+    const [isSaving, setIsSaving] = useState(false);
+    const [isImprovising, setIsImprovising] = useState(false);
+
+    const handleSave = async () => {
+        setIsSaving(true);
+        try {
+            await updateAccountAI.mutateAsync({
+                accountId: account.id,
+                ai_enabled: aiEnabled,
+                ai_goal: aiGoal,
+                ai_prompt: aiPrompt,
+                ai_knowledge_base: aiKnowledgeBase,
+            });
+            onClose();
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const handleImprovise = async () => {
+        setIsImprovising(true);
+        try {
+            // Calling server endpoint to hit Gemini and improvise the prompt
+            const res = await fetch(`${import.meta.env.VITE_WHATSAPP_SERVER_URL || 'http://localhost:3001'}/api/ai/improvise-prompt`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-api-key': import.meta.env.VITE_WHATSAPP_API_KEY || '' },
+                body: JSON.stringify({ companyId: account.company_id, currentPrompt: aiPrompt, goal: aiGoal })
+            });
+            
+            if (!res.ok) throw new Error('Failed to improvise prompt. Ensure your Gemini Integration is active.');
+            
+            const data = await res.json();
+            if (data.improvedPrompt) {
+                setAiPrompt(data.improvedPrompt);
+            }
+        } catch (e: any) {
+            alert(e.message);
+        } finally {
+            setIsImprovising(false);
+        }
+    };
+
+    return (
+        <DialogContent className="max-w-2xl">
+            <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                    <Bot className="w-5 h-5 text-primary" />
+                    Configure AI Agent
+                </DialogTitle>
+                <DialogDescription>
+                    Set up an auto-responder for {account.display_name || account.phone_number}. 
+                    The AI will magically read new chats and CRM Lead details to answer intelligently.
+                </DialogDescription>
+            </DialogHeader>
+
+            <div className="grid gap-6 py-4 max-h-[70vh] overflow-y-auto px-2">
+                <div className="flex items-center justify-between border p-4 rounded-lg bg-muted/30">
+                    <div className="space-y-0.5">
+                        <Label className="text-base">Enable AI Responder</Label>
+                        <p className="text-sm text-muted-foreground">Turn this on to let AI automatically reply to incoming messages.</p>
+                    </div>
+                    <Switch checked={aiEnabled} onCheckedChange={setAiEnabled} />
+                </div>
+
+                <div className="space-y-2">
+                    <Label>End Goal</Label>
+                    <Select value={aiGoal} onValueChange={setAiGoal}>
+                        <SelectTrigger><SelectValue placeholder="Select business goal" /></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="sales">Sales & Qualification</SelectItem>
+                            <SelectItem value="meeting_booking">Meeting Booking</SelectItem>
+                            <SelectItem value="support">Customer Support</SelectItem>
+                            <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+
+                <div className="space-y-2">
+                    <Label>Knowledge Base</Label>
+                    <p className="text-xs text-muted-foreground">Paste your FAQs, product details, operating hours, prices, etc.</p>
+                    <Textarea 
+                        className="min-h-[120px]" 
+                        placeholder="We are open 9am to 6pm. Our premium package costs $99/mo..."
+                        value={aiKnowledgeBase}
+                        onChange={e => setAiKnowledgeBase(e.target.value)}
+                    />
+                </div>
+
+                <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                        <Label>Core Instructions / Prompt</Label>
+                        <Button variant="ghost" size="sm" className="h-8 text-primary group" onClick={handleImprovise} disabled={isImprovising || !aiPrompt.trim()}>
+                            {isImprovising ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Wand2 className="w-3 h-3 mr-1 group-hover:text-primary transition-colors" />}
+                            Improvise Prompt
+                        </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Tell the AI how to act, what tone to use, and how to respond.</p>
+                    <Textarea 
+                        className="min-h-[160px] font-mono whitespace-pre-wrap text-sm" 
+                        placeholder="You are a helpful sales assistant for FastestCRM..."
+                        value={aiPrompt}
+                        onChange={e => setAiPrompt(e.target.value)}
+                    />
+                </div>
+            </div>
+
+            <DialogFooter>
+                <Button variant="outline" onClick={onClose} disabled={isSaving}>Cancel</Button>
+                <Button onClick={handleSave} disabled={isSaving}>
+                    {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Save Configuration
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+    );
+}
+
 
 // ─── Campaigns Tab ───────────────────────────────────────────────────────────
 function CampaignsTab() {
