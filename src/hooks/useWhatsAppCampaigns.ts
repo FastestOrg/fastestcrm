@@ -131,6 +131,7 @@ export function useWhatsAppCampaigns() {
             accountIds: string[];
             delayMinSeconds?: number;
             delayMaxSeconds?: number;
+            scheduledAt?: string | null;
             leads: any[];
             phoneField: string;
         }) => {
@@ -144,8 +145,10 @@ export function useWhatsAppCampaigns() {
                     message_template: params.messageTemplate,
                     account_ids: params.accountIds,
                     recipient_count: params.leads.length,
-                    delay_min_seconds: params.delayMinSeconds || 15,
-                    delay_max_seconds: params.delayMaxSeconds || 60,
+                    delay_min_seconds: params.delayMinSeconds || 60,
+                    delay_max_seconds: params.delayMaxSeconds || 180,
+                    scheduled_at: params.scheduledAt || null,
+                    status: params.scheduledAt ? 'scheduled' : 'draft',
                 })
                 .select()
                 .single();
@@ -184,6 +187,46 @@ export function useWhatsAppCampaigns() {
                 description: error.message,
                 variant: 'destructive',
             });
+        },
+    });
+
+    const updateCampaign = useMutation({
+        mutationFn: async (params: {
+            campaignId: string;
+            name: string;
+            messageTemplate: string;
+            accountIds: string[];
+            delayMinSeconds: number;
+            delayMaxSeconds: number;
+            scheduledAt: string | null;
+        }) => {
+            // Fetch current status
+            const { data } = await supabase.from('whatsapp_campaigns' as any).select('status').eq('id', params.campaignId).single();
+            const curr = data as any;
+            
+            const updates: any = {
+                name: params.name,
+                message_template: params.messageTemplate,
+                account_ids: params.accountIds,
+                delay_min_seconds: params.delayMinSeconds,
+                delay_max_seconds: params.delayMaxSeconds,
+                scheduled_at: params.scheduledAt,
+            };
+
+            // Switch between draft and scheduled if appropriate
+            if (curr && (curr.status === 'draft' || curr.status === 'scheduled')) {
+                updates.status = params.scheduledAt ? 'scheduled' : 'draft';
+            }
+
+            const { error } = await supabase
+                .from('whatsapp_campaigns' as any)
+                .update(updates)
+                .eq('id', params.campaignId);
+            if (error) throw error;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['whatsapp-campaigns'] });
+            toast({ title: 'Campaign updated!' });
         },
     });
 
@@ -294,6 +337,7 @@ export function useWhatsAppCampaigns() {
         leadColumns: leadColumnsQuery.data || [],
         fetchLeads,
         createCampaign,
+        updateCampaign,
         startCampaign,
         pauseCampaign,
         resumeCampaign,

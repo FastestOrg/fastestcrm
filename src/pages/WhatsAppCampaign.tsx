@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { MessageCircle, Users, Activity, Settings, Plus, QrCode, Play, Pause, Trash2, StopCircle, Loader2, Bot, Wand2 } from 'lucide-react';
+import { MessageCircle, Users, Activity, Settings, Plus, QrCode, Play, Pause, Trash2, StopCircle, Loader2, Bot, Wand2, Edit2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -15,6 +15,7 @@ import { useWhatsAppAccounts } from '@/hooks/useWhatsAppAccounts';
 import { useWhatsAppCampaigns } from '@/hooks/useWhatsAppCampaigns';
 import { useLeadStatuses } from '@/hooks/useLeadStatuses';
 import { format } from 'date-fns';
+import { supabase } from '@/integrations/supabase/client';
 
 // ─── Accounts Tab ────────────────────────────────────────────────────────────
 function AccountsTab() {
@@ -229,18 +230,51 @@ function AIConfigDialogContent({ account, onClose, updateAccountAI }: { account:
     const handleImprovise = async () => {
         setIsImprovising(true);
         try {
-            // Calling server endpoint to hit Gemini and improvise the prompt
-            const res = await fetch(`${import.meta.env.VITE_WHATSAPP_SERVER_URL || 'http://localhost:3001'}/api/ai/improvise-prompt`, {
+            // Get user IDs linked to this company
+            const { data: profiles, error: pErr } = await supabase.from('profiles').select('id').eq('company_id', account.company_id);
+            if (pErr) throw pErr;
+            const userIds = profiles?.map((p: any) => p.id) || [];
+            if (userIds.length === 0) throw new Error('Company profiles not found');
+
+            // Find Gemini integration key
+            const { data: integration, error: iErr } = await supabase
+                .from('integration_api_keys')
+                .select('api_key')
+                .in('user_id', userIds)
+                .eq('service_name', 'gemini')
+                .eq('is_active', true)
+                .limit(1)
+                .maybeSingle();
+                
+            if (iErr) throw iErr;
+            if (!integration?.api_key) throw new Error('Gemini integration not found or inactive. Please add it in the Integrations tab.');
+
+            // Call Gemini API directly (REST)
+            const systemPrompt = `You are an expert AI sales director. Your job is to improve the following basic instructions into a detailed, professional AI agent prompt.
+Goal: ${aiGoal || 'Assist the customer'}
+Current Basic Instructions: ${aiPrompt}
+
+Rewrite the instructions to be extremely clear, conversion-focused, and suitable to act as the exact system prompt for a WhatsApp auto-responder AI. Define tone, guardrails, and structure. Return ONLY the final rewritten prompt text, without any markdown formatting wrappers or conversational filler.`;
+
+            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${integration.api_key}`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'x-api-key': import.meta.env.VITE_WHATSAPP_API_KEY || '' },
-                body: JSON.stringify({ companyId: account.company_id, currentPrompt: aiPrompt, goal: aiGoal })
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: systemPrompt }] }]
+                })
             });
-            
-            if (!res.ok) throw new Error('Failed to improvise prompt. Ensure your Gemini Integration is active.');
-            
+
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                throw new Error('Gemini API Error: ' + (errData.error?.message || res.statusText));
+            }
+
             const data = await res.json();
-            if (data.improvedPrompt) {
-                setAiPrompt(data.improvedPrompt);
+            const improvedText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (improvedText) {
+                setAiPrompt(improvedText.trim());
+            } else {
+                throw new Error('No improvement generated from Gemini API.');
             }
         } catch (e: any) {
             alert(e.message);
@@ -327,7 +361,7 @@ function AIConfigDialogContent({ account, onClose, updateAccountAI }: { account:
 
 // ─── Campaigns Tab ───────────────────────────────────────────────────────────
 function CampaignsTab() {
-    const { campaigns, isLoading, startCampaign, pauseCampaign, resumeCampaign, deleteCampaign, fetchLeads, leadColumns, createCampaign } = useWhatsAppCampaigns();
+    const { campaigns, isLoading, startCampaign, pauseCampaign, resumeCampaign, deleteCampaign, fetchLeads, leadColumns, createCampaign, updateCampaign } = useWhatsAppCampaigns();
     const { accounts } = useWhatsAppAccounts();
     const { statuses } = useLeadStatuses();
     const [isCreating, setIsCreating] = useState(false);
@@ -338,31 +372,68 @@ function CampaignsTab() {
     const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
     const [leadStatus, setLeadStatus] = useState('all');
     const [phoneField, setPhoneField] = useState('phone');
+    const [delayMin, setDelayMin] = useState(60);
+    const [delayMax, setDelayMax] = useState(180);
+    const [scheduledAt, setScheduledAt] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [editingCampaignId, setEditingCampaignId] = useState<string | null>(null);
+
+    const openEdit = (campaign: any) => {
+        setEditingCampaignId(campaign.id);
+        setName(campaign.name);
+        setMessageTemplate(campaign.message_template);
+        setSelectedAccounts(campaign.account_ids || []);
+        setDelayMin(campaign.delay_min_seconds || 60);
+        setDelayMax(campaign.delay_max_seconds || 180);
+        setScheduledAt(campaign.scheduled_at ? new Date(campaign.scheduled_at).toISOString().slice(0, 16) : '');
+        setLeadStatus('all'); // Usually can't change leads easily on edit
+        setIsCreating(true);
+    };
 
     const handleCreateCampaign = async () => {
         setIsSubmitting(true);
         try {
-            const leads = await fetchLeads(leadStatus);
-            if (leads.length === 0) {
-                alert('No leads found for the selected status.');
-                setIsSubmitting(false);
-                return;
-            }
+            const scheduledIso = scheduledAt ? new Date(scheduledAt).toISOString() : null;
             
-            await createCampaign.mutateAsync({
-                name,
-                messageTemplate,
-                accountIds: selectedAccounts,
-                leads,
-                phoneField
-            });
+            if (editingCampaignId) {
+                await updateCampaign.mutateAsync({
+                    campaignId: editingCampaignId,
+                    name,
+                    messageTemplate,
+                    accountIds: selectedAccounts,
+                    delayMinSeconds: delayMin,
+                    delayMaxSeconds: delayMax,
+                    scheduledAt: scheduledIso,
+                });
+            } else {
+                const leads = await fetchLeads(leadStatus);
+                if (leads.length === 0) {
+                    alert('No leads found for the selected status.');
+                    setIsSubmitting(false);
+                    return;
+                }
+                
+                await createCampaign.mutateAsync({
+                    name,
+                    messageTemplate,
+                    accountIds: selectedAccounts,
+                    leads,
+                    phoneField,
+                    delayMinSeconds: delayMin,
+                    delayMaxSeconds: delayMax,
+                    scheduledAt: scheduledIso,
+                });
+            }
             
             setIsCreating(false);
             // Reset
+            setEditingCampaignId(null);
             setName('');
             setMessageTemplate('');
             setSelectedAccounts([]);
+            setDelayMin(60);
+            setDelayMax(180);
+            setScheduledAt('');
         } finally {
             setIsSubmitting(false);
         }
@@ -405,19 +476,42 @@ function CampaignsTab() {
                             </div>
                             
                             <div className="flex items-center gap-2">
-                                {camp.status === 'draft' && (
-                                    <Button variant="outline" size="sm" onClick={() => startCampaign.mutate(camp.id)}>
-                                        <Play className="mr-2 h-4 w-4" /> Start
+                                {(camp.status === 'draft' || camp.status === 'scheduled') && (
+                                    <Button 
+                                        variant="outline" 
+                                        size="sm" 
+                                        onClick={() => startCampaign.mutate(camp.id)}
+                                        disabled={startCampaign.isPending}
+                                    >
+                                        {startCampaign.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />}
+                                        Start
                                     </Button>
                                 )}
                                 {camp.status === 'running' && (
-                                    <Button variant="outline" size="sm" onClick={() => pauseCampaign.mutate(camp.id)}>
-                                        <Pause className="mr-2 h-4 w-4" /> Pause
+                                    <Button 
+                                        variant="outline" 
+                                        size="sm" 
+                                        onClick={() => pauseCampaign.mutate(camp.id)}
+                                        disabled={pauseCampaign.isPending}
+                                    >
+                                        {pauseCampaign.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Pause className="mr-2 h-4 w-4" />}
+                                        Pause
                                     </Button>
                                 )}
                                 {camp.status === 'paused' && (
-                                    <Button variant="outline" size="sm" onClick={() => resumeCampaign.mutate(camp.id)}>
-                                        <Play className="mr-2 h-4 w-4" /> Resume
+                                    <Button 
+                                        variant="outline" 
+                                        size="sm" 
+                                        onClick={() => resumeCampaign.mutate(camp.id)}
+                                        disabled={resumeCampaign.isPending}
+                                    >
+                                        {resumeCampaign.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />}
+                                        Resume
+                                    </Button>
+                                )}
+                                {(camp.status === 'paused' || camp.status === 'draft' || camp.status === 'scheduled') && (
+                                    <Button variant="outline" size="sm" onClick={() => openEdit(camp)}>
+                                        <Edit2 className="mr-2 h-4 w-4" /> Edit
                                     </Button>
                                 )}
                                 <Button variant="ghost" size="icon" className="text-destructive" onClick={() => deleteCampaign.mutate(camp.id)}>
@@ -429,10 +523,21 @@ function CampaignsTab() {
                 ))}
             </div>
 
-            <Dialog open={isCreating} onOpenChange={setIsCreating}>
+            <Dialog open={isCreating} onOpenChange={(val) => {
+                setIsCreating(val);
+                if (!val) {
+                    setEditingCampaignId(null);
+                    setName('');
+                    setMessageTemplate('');
+                    setSelectedAccounts([]);
+                    setDelayMin(60);
+                    setDelayMax(180);
+                    setScheduledAt('');
+                }
+            }}>
                 <DialogContent className="max-w-2xl">
                     <DialogHeader>
-                        <DialogTitle>Create WhatsApp Campaign</DialogTitle>
+                        <DialogTitle>{editingCampaignId ? 'Edit WhatsApp Campaign' : 'Create WhatsApp Campaign'}</DialogTitle>
                         <DialogDescription>
                             Configure your campaign, select sender accounts, and write your message.
                         </DialogDescription>
@@ -466,30 +571,53 @@ function CampaignsTab() {
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">
+                            {!editingCampaignId && (
+                                <>
+                                    <div className="space-y-2">
+                                        <Label>Recipient CRM Leads</Label>
+                                        <Select value={leadStatus} onValueChange={setLeadStatus}>
+                                            <SelectTrigger><SelectValue placeholder="Select segment" /></SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="all">All Leads</SelectItem>
+                                                {statuses.map(s => (
+                                                    <SelectItem key={s.value} value={s.value}>
+                                                        {s.label}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Phone Number Field</Label>
+                                        <Select value={phoneField} onValueChange={setPhoneField}>
+                                            <SelectTrigger><SelectValue placeholder="Select field" /></SelectTrigger>
+                                            <SelectContent>
+                                                {leadColumns.map(col => (
+                                                    <SelectItem key={col} value={col}>{col}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
-                                <Label>Recipient CRM Leads</Label>
-                                <Select value={leadStatus} onValueChange={setLeadStatus}>
-                                    <SelectTrigger><SelectValue placeholder="Select segment" /></SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">All Leads</SelectItem>
-                                        {statuses.map(s => (
-                                            <SelectItem key={s.value} value={s.value}>
-                                                {s.label}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                <Label>Schedule Time (Optional, Default: Now)</Label>
+                                <Input 
+                                    type="datetime-local" 
+                                    value={scheduledAt} 
+                                    onChange={e => setScheduledAt(e.target.value)} 
+                                />
                             </div>
                             <div className="space-y-2">
-                                <Label>Phone Number Field</Label>
-                                <Select value={phoneField} onValueChange={setPhoneField}>
-                                    <SelectTrigger><SelectValue placeholder="Select field" /></SelectTrigger>
-                                    <SelectContent>
-                                        {leadColumns.map(col => (
-                                            <SelectItem key={col} value={col}>{col}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                <Label>Random Interval (Min & Max seconds)</Label>
+                                <div className="flex items-center gap-2">
+                                    <Input type="number" value={delayMin} onChange={e => setDelayMin(Number(e.target.value))} className="w-full" min={1} />
+                                    <span className="text-muted-foreground">to</span>
+                                    <Input type="number" value={delayMax} onChange={e => setDelayMax(Number(e.target.value))} className="w-full" min={1} max={3600} />
+                                </div>
                             </div>
                         </div>
 
@@ -529,7 +657,7 @@ function CampaignsTab() {
                             disabled={isSubmitting || !name || !messageTemplate || selectedAccounts.length === 0}
                         >
                             {isSubmitting ? <Loader2 className="mr-2 w-4 h-4 animate-spin" /> : null}
-                            Create Campaign
+                            {editingCampaignId ? 'Save Changes' : 'Create Campaign'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

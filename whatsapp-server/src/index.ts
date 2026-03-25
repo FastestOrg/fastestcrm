@@ -173,57 +173,6 @@ app.post('/api/campaigns/:campaignId/resume', (req, res) => {
     res.json({ ok: result });
 });
 
-// ─── AI Routes ───────────────────────────────────────────────────────────────
-
-/**
- * POST /api/ai/improvise-prompt
- * Body: { companyId, currentPrompt, goal }
- */
-app.post('/api/ai/improvise-prompt', async (req, res) => {
-    try {
-        const { companyId, currentPrompt, goal } = req.body;
-        if (!companyId || !currentPrompt) {
-            return res.status(400).json({ error: 'companyId and currentPrompt are required' });
-        }
-
-        // Find the Gemini API key for this company
-        const { data: profiles } = await supabase.from('profiles').select('id').eq('company_id', companyId);
-        const userIds = profiles?.map(p => p.id) || [];
-        
-        if (userIds.length === 0) return res.status(404).json({ error: 'Company profiles not found' });
-
-        const { data: integration } = await supabase
-            .from('integration_api_keys')
-            .select('api_key')
-            .in('user_id', userIds)
-            .eq('service_name', 'gemini')
-            .eq('is_active', true)
-            .limit(1)
-            .maybeSingle();
-
-        if (!integration?.api_key) {
-            return res.status(400).json({ error: 'Gemini integration not found or inactive.' });
-        }
-
-        const ai = new GoogleGenAI({ apiKey: integration.api_key });
-        const systemPrompt = `You are an expert AI sales director. Your job is to improve the following basic instructions into a detailed, professional AI agent prompt.
-Goal: ${goal || 'Assist the customer'}
-Current Basic Instructions: ${currentPrompt}
-
-Rewrite the instructions to be extremely clear, conversion-focused, and suitable to act as the exact system prompt for a WhatsApp auto-responder AI. Define tone, guardrails, and structure. Return ONLY the final rewritten prompt text, without any markdown formatting wrappers or conversational filler.`;
-
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: systemPrompt,
-        });
-
-        res.json({ improvedPrompt: response.text });
-    } catch (err: any) {
-        console.error('AI Improvise error:', err);
-        res.status(500).json({ error: err.message });
-    }
-});
-
 // ─── Start Server ────────────────────────────────────────────────────────────
 
 app.listen(PORT, async () => {
@@ -236,4 +185,28 @@ app.listen(PORT, async () => {
     } catch (err) {
         console.error('Session restore failed:', err);
     }
+
+    // Poll for scheduled campaigns every 60 seconds
+    setInterval(async () => {
+        try {
+            const now = new Date().toISOString();
+            const { data: scheduledCampaigns, error } = await supabase
+                .from('whatsapp_campaigns')
+                .select('id')
+                .eq('status', 'scheduled')
+                .lte('scheduled_at', now);
+                
+            if (error) {
+                console.error('Error polling scheduled campaigns:', error);
+                return;
+            }
+            
+            for (const camp of scheduledCampaigns || []) {
+                console.log(`Auto-starting scheduled campaign ${camp.id}`);
+                await startCampaign(camp.id);
+            }
+        } catch (err) {
+            console.error('Polling scheduled campaigns exception:', err);
+        }
+    }, 60000);
 });
