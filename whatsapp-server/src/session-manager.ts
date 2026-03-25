@@ -137,11 +137,23 @@ class SessionManager extends EventEmitter {
         const { state, saveCreds } = await this.createSupabaseAuthState(sessionId);
         const { version } = await fetchLatestBaileysVersion();
 
+        // Mock logger to satisfy ILogger interface expectations of Baileys
+        const logger = {
+            level: 'silent',
+            child: () => logger,
+            info: () => {},
+            error: console.error,
+            warn: console.warn,
+            debug: () => {},
+            trace: () => {},
+            fatal: console.error
+        } as any;
+
         const socket = makeWASocket({
             version,
             auth: {
                 creds: state.creds,
-                keys: makeCacheableSignalKeyStore(state.keys as any, console),
+                keys: makeCacheableSignalKeyStore(state.keys as any, logger),
             },
             printQRInTerminal: false,
             generateHighQualityLinkPreview: false,
