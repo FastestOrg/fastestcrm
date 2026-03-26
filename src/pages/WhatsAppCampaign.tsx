@@ -114,8 +114,16 @@ function AccountsTab() {
                                         </Button>
                                     </>
                                 ) : (
-                                    <Button variant="outline" size="sm" className="w-full text-destructive hover:text-destructive" onClick={() => deleteAccount.mutate(acc.id)}>
-                                        Remove Account
+                                    <Button 
+                                        variant="outline" 
+                                        size="sm" 
+                                        className="w-full text-destructive hover:text-destructive" 
+                                        disabled={deleteAccount.isPending && deleteAccount.variables === acc.id}
+                                        onClick={() => deleteAccount.mutate(acc.id)}
+                                    >
+                                        {deleteAccount.isPending && deleteAccount.variables === acc.id ? (
+                                            <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Removing...</>
+                                        ) : 'Remove Account'}
                                     </Button>
                                 )}
                             </div>
