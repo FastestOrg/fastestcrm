@@ -49,18 +49,24 @@ app.get('/health', (_req, res) => {
  */
 app.post('/api/sessions/create', async (req, res) => {
     try {
-        const { sessionId, companyId } = req.body;
+        const { sessionId, companyId, userId } = req.body;
         if (!sessionId || !companyId) {
             return res.status(400).json({ error: 'sessionId and companyId are required' });
         }
 
+        const payload: any = {
+            session_id: sessionId,
+            company_id: companyId,
+            status: 'connecting',
+        };
+        
+        if (userId) {
+            payload.user_id = userId;
+        }
+
         // Upsert the account record in Supabase
         await supabase.from('whatsapp_accounts').upsert(
-            {
-                session_id: sessionId,
-                company_id: companyId,
-                status: 'connecting',
-            },
+            payload,
             { onConflict: 'session_id' }
         );
 

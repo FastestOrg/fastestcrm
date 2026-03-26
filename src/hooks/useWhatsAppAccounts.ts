@@ -63,12 +63,16 @@ export function useWhatsAppAccounts() {
     const createSession = useMutation({
         mutationFn: async ({ sessionId }: { sessionId: string }) => {
             if (!company?.id) throw new Error('No company context');
+            
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error('Not authenticated');
 
             // Create in Supabase first
             await supabase.from('whatsapp_accounts' as any).upsert(
                 {
                     session_id: sessionId,
                     company_id: company.id,
+                    user_id: user.id,
                     status: 'connecting',
                 },
                 { onConflict: 'session_id' }
@@ -77,7 +81,7 @@ export function useWhatsAppAccounts() {
             // Request QR from WhatsApp server
             const result = await waFetch('/api/sessions/create', {
                 method: 'POST',
-                body: JSON.stringify({ sessionId, companyId: company.id }),
+                body: JSON.stringify({ sessionId, companyId: company.id, userId: user.id }),
             });
 
             return result;

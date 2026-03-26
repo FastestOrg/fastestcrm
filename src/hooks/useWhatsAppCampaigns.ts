@@ -137,10 +137,14 @@ export function useWhatsAppCampaigns() {
         }) => {
             if (!company?.id) throw new Error('No company context');
 
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error('Not authenticated');
+
             const { data: campaign, error } = await supabase
                 .from('whatsapp_campaigns' as any)
                 .insert({
                     company_id: company.id,
+                    created_by: user.id,
                     name: params.name,
                     message_template: params.messageTemplate,
                     account_ids: params.accountIds,
