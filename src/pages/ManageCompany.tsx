@@ -80,6 +80,11 @@ export default function ManageCompany() {
   const [slugError, setSlugError] = useState('');
   const [maskLeads, setMaskLeads] = useState(false);
 
+  // Data Sync
+  const [syncCountryCode, setSyncCountryCode] = useState('91');
+  const [syncTotalDigits, setSyncTotalDigits] = useState('10');
+  const [syncingLeads, setSyncingLeads] = useState(false);
+
   // Domain
   const [savingDomain, setSavingDomain] = useState(false);
   const [verifyingDomain, setVerifyingDomain] = useState(false);
@@ -230,6 +235,31 @@ export default function ManageCompany() {
       toast({ title: 'Error', description: 'Failed to save settings', variant: 'destructive' });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSyncLeads = async () => {
+    if (!company) return;
+    if (!syncCountryCode || !syncTotalDigits) {
+      toast({ title: "Error", description: "Please enter both country code and total digits.", variant: "destructive" });
+      return;
+    }
+
+    if (!confirm(`Are you sure you want to run this synchronization? It will update all leads in the database and mark non-matching lengths as 'Wrong Number'.`)) return;
+
+    setSyncingLeads(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('sync-leads-phone', {
+        body: { countryCode: syncCountryCode, phoneDigits: syncTotalDigits }
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      toast({ title: 'Synchronization Complete', description: data.message });
+    } catch (err: any) {
+      toast({ title: 'Sync Failed', description: err.message, variant: 'destructive' });
+    } finally {
+      setSyncingLeads(false);
     }
   };
 
@@ -972,6 +1002,48 @@ export default function ManageCompany() {
                     onCheckedChange={setMaskLeads}
                   />
                 </div>
+                <Separator />
+                
+                <div className="space-y-4 py-2">
+                  <div className="space-y-1">
+                    <Label className="text-base text-primary">Data Synchronisation</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Standardize phone numbers across all leads. This will prepend the specified country code to any number matching the exact total digits. If the number has fewer digits than required, it will be marked as "Wrong Number".
+                    </p>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Country Code</Label>
+                      <Input 
+                        placeholder="e.g. 91" 
+                        value={syncCountryCode} 
+                        onChange={(e) => setSyncCountryCode(e.target.value)} 
+                        type="number"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Total Digits Allowed (without code)</Label>
+                      <Input 
+                        placeholder="e.g. 10" 
+                        value={syncTotalDigits} 
+                        onChange={(e) => setSyncTotalDigits(e.target.value)} 
+                        type="number"
+                      />
+                    </div>
+                  </div>
+                  
+                  <Button 
+                    variant="secondary" 
+                    onClick={handleSyncLeads} 
+                    disabled={syncingLeads}
+                    className="w-full sm:w-auto"
+                  >
+                    {syncingLeads ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : <RefreshCw className="mr-2 h-4 w-4" />} 
+                    Synchronise Leads Data
+                  </Button>
+                </div>
+
                 <Separator />
                 <div className="flex justify-end">
                   <Button onClick={handleSaveSettings} disabled={saving}>

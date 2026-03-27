@@ -280,34 +280,36 @@ async function executeCampaign(job: CampaignJob): Promise<void> {
 /**
  * Pause a running campaign.
  */
-export function pauseCampaign(campaignId: string): boolean {
+export async function pauseCampaign(campaignId: string): Promise<boolean> {
     const job = activeCampaigns.get(campaignId);
-    if (!job) return false;
-    job.isPaused = true;
-    supabase
+    if (job) {
+        job.isPaused = true;
+    }
+    
+    await supabase
         .from('whatsapp_campaigns')
         .update({ status: 'paused' })
-        .eq('id', campaignId)
-        .then(() => {});
+        .eq('id', campaignId);
+        
     return true;
 }
 
 /**
  * Resume a paused campaign.
  */
-export function resumeCampaign(campaignId: string): boolean {
+export async function resumeCampaign(campaignId: string): Promise<boolean> {
     const job = activeCampaigns.get(campaignId);
     if (!job) {
         // If job not in memory, restart it
-        startCampaign(campaignId);
+        await startCampaign(campaignId);
         return true;
     }
     job.isPaused = false;
-    supabase
+    await supabase
         .from('whatsapp_campaigns')
         .update({ status: 'running' })
-        .eq('id', campaignId)
-        .then(() => {});
+        .eq('id', campaignId);
+        
     return true;
 }
 

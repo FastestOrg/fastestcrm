@@ -166,16 +166,16 @@ app.get('/api/campaigns/:campaignId/status', async (req, res) => {
 /**
  * POST /api/campaigns/:campaignId/pause
  */
-app.post('/api/campaigns/:campaignId/pause', (req, res) => {
-    const result = pauseCampaign(req.params.campaignId);
+app.post('/api/campaigns/:campaignId/pause', async (req, res) => {
+    const result = await pauseCampaign(req.params.campaignId);
     res.json({ ok: result });
 });
 
 /**
  * POST /api/campaigns/:campaignId/resume
  */
-app.post('/api/campaigns/:campaignId/resume', (req, res) => {
-    const result = resumeCampaign(req.params.campaignId);
+app.post('/api/campaigns/:campaignId/resume', async (req, res) => {
+    const result = await resumeCampaign(req.params.campaignId);
     res.json({ ok: result });
 });
 
