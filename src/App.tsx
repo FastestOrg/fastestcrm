@@ -62,6 +62,9 @@ import PublicBooking from "./pages/PublicBooking";
 import EmailDashboard from "./pages/EmailDashboard";
 import ManageEmailAliases from "./pages/ManageEmailAliases";
 import WhatsAppCampaign from "./pages/WhatsAppCampaign";
+import RealEstateCRM from "./pages/RealEstateCRM";
+import EdTechCRM from "./pages/EdTechCRM";
+import SaasCRM from "./pages/SaasCRM";
 
 import { isAndroidWebView } from "@/lib/platform";
 
@@ -176,6 +179,9 @@ function AppRoutes() {
       <Route path="/meta-oauth-callback" element={<MetaOAuthCallback />} />
       <Route path="/blog" element={<Blog />} />
       <Route path="/blog/:slug" element={<BlogPost />} />
+      <Route path="/crm-for-real-estate" element={<RealEstateCRM />} />
+      <Route path="/crm-for-edtech" element={<EdTechCRM />} />
+      <Route path="/crm-for-saas" element={<SaasCRM />} />
       <Route path="/app" element={<RedirectToApp />} />
       <Route path="/documentation" element={<Documentation />} />
       <Route path="/book/:slug" element={<PublicBooking />} />

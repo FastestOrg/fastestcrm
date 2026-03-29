@@ -35,6 +35,8 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import SEO from '@/components/SEO';
+import { BreadcrumbSchema } from '@/components/SchemaMarkup';
 
 interface DocSection {
   id: string;
@@ -484,6 +486,17 @@ export default function Documentation() {
 
   return (
     <div className="min-h-screen bg-background">
+      <SEO 
+        title={selectedSection ? `${selectedSection.title} | Documentation` : "Documentation | Fastest CRM"}
+        description={selectedSection ? selectedSection.description : "Comprehensive guide to using Fastest CRM. Learn about lead management, automations, auto-dialer, and more."}
+        keywords="CRM documentation, user guide, help center, lead management guide, sales automation help"
+        canonical={activeSection ? `https://fastestcrm.com/documentation?section=${activeSection}` : "https://fastestcrm.com/documentation"}
+      />
+      <BreadcrumbSchema items={[
+        { name: 'Home', item: 'https://fastestcrm.com' },
+        { name: 'Documentation', item: 'https://fastestcrm.com/documentation' },
+        ...(selectedSection ? [{ name: selectedSection.title, item: `https://fastestcrm.com/documentation?section=${selectedSection.id}` }] : [])
+      ]} />
       {/* Header */}
       <header className="sticky top-0 z-50 border-b bg-card/80 backdrop-blur-md">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6">

@@ -5,6 +5,8 @@ import {
   Users, Phone, CreditCard, Workflow,
   Brain, ArrowRight, Zap, Target, TrendingUp, Menu, X, ChevronDown
 } from 'lucide-react';
+import SEO from '@/components/SEO';
+import { FAQSchema, SoftwareAppSchema, OrganizationSchema } from '@/components/SchemaMarkup';
 
 const features = [
   {
@@ -54,12 +56,12 @@ const faqs = [
 ];
 
 const industries = [
-  { name: 'Real Estate', icon: '🏢' },
-  { name: 'EdTech', icon: '🎓' },
+  { name: 'Real Estate', icon: '🏢', path: '/crm-for-real-estate' },
+  { name: 'EdTech', icon: '🎓', path: '/crm-for-edtech' },
   { name: 'Training Institutes', icon: '📚' },
   { name: 'Travel & Hospitality', icon: '✈️' },
   { name: 'Finance & Loans', icon: '💰' },
-  { name: 'SaaS & B2B', icon: '💻' },
+  { name: 'SaaS & B2B', icon: '💻', path: '/crm-for-saas' },
   { name: 'Healthcare & Clinics', icon: '🏥' },
   { name: 'Consultancy', icon: '🤝' }
 ];
@@ -73,6 +75,14 @@ export default function Landing() {
 
   return (
     <div className="min-h-screen bg-background text-foreground" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+      <SEO 
+        title="India's #1 AI-Powered CRM for Sales Teams | Fastest CRM"
+        description="Transform your sales with India's most advanced AI CRM. Unified lead management, automated calling, and Razorpay payments. Built for Real Estate, EdTech, SaaS, and high-growth Indian startups."
+        keywords="best AI CRM India, sales CRM for startups, real estate lead management, edtech sales software, saas crm india, auto dialer crm, fastest crm, sales automation tool india"
+      />
+      <SoftwareAppSchema />
+      <OrganizationSchema />
+      <FAQSchema faqs={faqs.map(f => ({ question: f.q, answer: f.a }))} />
 
       {/* ── Navigation ── */}
       <nav className="fixed top-0 left-0 right-0 z-50 glass border-b border-border/50">
@@ -167,7 +177,7 @@ export default function Landing() {
             className="text-5xl md:text-7xl lg:text-8xl font-bold mb-8 tracking-tight animate-in fade-in slide-in-from-bottom-6 duration-700"
             style={{ fontFamily: "'Syne', sans-serif", letterSpacing: '-0.03em' }}
           >
-            The Fastest AI CRM for{' '}
+            India's #1 AI CRM for{' '}
             <span className="gradient-text block mt-2">
               Leads • Calls • Payments
             </span>
@@ -270,17 +280,32 @@ export default function Landing() {
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {industries.map((industry) => (
-              <div
-                key={industry.name}
-                className="flex flex-col items-center justify-center p-5 rounded-xl bg-background border border-border/50 hover:border-primary/50 hover:bg-primary/4 transition-all duration-300 group cursor-default card-hover"
-              >
-                <span className="text-3xl mb-3 group-hover:scale-110 transition-transform duration-300" role="img" aria-label={industry.name}>
-                  {industry.icon}
-                </span>
-                <span className="font-semibold text-foreground/80 group-hover:text-primary transition-colors text-sm text-center">
-                  {industry.name}
-                </span>
-              </div>
+              industry.path ? (
+                <Link
+                  key={industry.name}
+                  to={industry.path}
+                  className="flex flex-col items-center justify-center p-5 rounded-xl bg-background border border-border/50 hover:border-primary/50 hover:bg-primary/4 transition-all duration-300 group cursor-pointer card-hover"
+                >
+                  <span className="text-3xl mb-3 group-hover:scale-110 transition-transform duration-300" role="img" aria-label={industry.name}>
+                    {industry.icon}
+                  </span>
+                  <span className="font-semibold text-foreground/80 group-hover:text-primary transition-colors text-sm text-center">
+                    {industry.name}
+                  </span>
+                </Link>
+              ) : (
+                <div
+                  key={industry.name}
+                  className="flex flex-col items-center justify-center p-5 rounded-xl bg-background border border-border/50 hover:border-primary/40 opacity-70 transition-all duration-300 group cursor-default"
+                >
+                  <span className="text-3xl mb-3" role="img" aria-label={industry.name}>
+                    {industry.icon}
+                  </span>
+                  <span className="font-semibold text-foreground/80 text-sm text-center">
+                    {industry.name}
+                  </span>
+                </div>
+              )
             ))}
           </div>
         </div>

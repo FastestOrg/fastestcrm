@@ -278,4 +278,40 @@
   .nav-item-active .nav-icon {
     color: hsl(var(--primary));
   }
+
+  /* ── Blog TOC & Content ── */
+  .toc {
+    @apply bg-card/40 border border-border/50 rounded-2xl p-6 my-10 backdrop-blur-sm shadow-sm;
+  }
+
+  .toc h2 {
+    @apply text-xl font-bold mb-4 mt-0 border-none pb-0 !important;
+    color: hsl(var(--foreground));
+  }
+
+  .toc ul {
+    @apply grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2 list-none p-0 m-0 !important;
+  }
+
+  .toc li {
+    @apply text-sm m-0 p-0 !important;
+  }
+
+  .toc a {
+    @apply text-muted-foreground hover:text-primary transition-colors duration-200 no-underline font-medium flex items-center gap-2;
+  }
+
+  .toc a::before {
+    content: "→";
+    @apply text-primary/40 text-xs;
+  }
+
+  /* Ensure prose list items are spaced */
+  .prose ul li, .prose ol li {
+    @apply my-4;
+  }
+
+  .prose h2, .prose h3 {
+    @apply scroll-mt-24; /* Adjust for fixed header */
+  }
 }

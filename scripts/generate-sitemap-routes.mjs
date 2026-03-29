@@ -21,6 +21,9 @@ const routes = [
   '/reset-password',
   '/blog',
   '/documentation',
+  '/crm-for-real-estate',
+  '/crm-for-edtech',
+  '/crm-for-saas',
   ...slugs
 ];
 

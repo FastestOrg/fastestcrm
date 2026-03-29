@@ -109,7 +109,93 @@ export default {
         "slide-in-left": "slide-in-left 0.5s ease-out forwards",
         "pulse-glow": "pulse-glow 2s ease-in-out infinite",
       },
+      typography: (theme) => ({
+        DEFAULT: {
+          css: {
+            color: 'hsl(var(--foreground))',
+            maxWidth: 'none',
+            hr: {
+              borderColor: 'hsl(var(--border))',
+              marginTop: '3em',
+              marginBottom: '3em',
+            },
+            'h1, h2, h3, h4': {
+              color: 'hsl(var(--foreground))',
+              fontWeight: '700',
+              fontFamily: theme('fontFamily.display').join(', '),
+              letterSpacing: '-0.02em',
+              marginTop: '1.6em',
+              marginBottom: '0.6em',
+              lineHeight: '1.1',
+            },
+            h1: {
+              fontSize: '2.25em',
+            },
+            h2: {
+              fontSize: '1.875em',
+              borderBottom: '1px solid hsl(var(--border) / 0.5)',
+              paddingBottom: '0.4em',
+            },
+            h3: {
+              fontSize: '1.5em',
+            },
+            p: {
+              marginTop: '1.25em',
+              marginBottom: '1.25em',
+              lineHeight: '1.8',
+              color: 'hsl(var(--muted-foreground))',
+            },
+            'ul, ol': {
+              marginTop: '1.25em',
+              marginBottom: '1.25em',
+              paddingLeft: '1.5em',
+            },
+            li: {
+              marginTop: '0.5em',
+              marginBottom: '0.5em',
+            },
+            'li > p': {
+              marginTop: '0.25em',
+              marginBottom: '0.25em',
+            },
+            strong: {
+              color: 'hsl(var(--foreground))',
+              fontWeight: '600',
+            },
+            a: {
+              color: 'hsl(var(--primary))',
+              textDecoration: 'none',
+              fontWeight: '600',
+              '&:hover': {
+                textDecoration: 'underline',
+              },
+            },
+            blockquote: {
+              borderLeftColor: 'hsl(var(--primary))',
+              backgroundColor: 'hsl(var(--muted) / 0.3)',
+              padding: '1em 1.5em',
+              borderRadius: theme('borderRadius.lg'),
+              fontStyle: 'italic',
+              color: 'hsl(var(--foreground))',
+            },
+          },
+        },
+        invert: {
+          css: {
+            color: 'hsl(var(--foreground))',
+            'h1, h2, h3, h4, strong, blockquote': {
+              color: 'hsl(var(--foreground))',
+            },
+            p: {
+              color: 'hsl(var(--muted-foreground))',
+            },
+          },
+        },
+      }),
     },
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins: [
+    require("tailwindcss-animate"),
+    require("@tailwindcss/typography"),
+  ],
 } satisfies Config;

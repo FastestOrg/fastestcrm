@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button';
 import { blogs } from '@/data/blogs';
 import { ArrowLeft, Clock, Calendar, User, Share2 } from 'lucide-react';
 import { format } from 'date-fns';
+import SEO from '@/components/SEO';
+import { BreadcrumbSchema, ArticleSchema } from '@/components/SchemaMarkup';
 
 export default function BlogPost() {
     const { slug } = useParams();
@@ -23,6 +25,27 @@ export default function BlogPost() {
 
     return (
         <div className="min-h-screen bg-background text-foreground">
+            <SEO 
+                title={blog.title}
+                description={blog.excerpt}
+                ogType="article"
+                ogImage={blog.image}
+                keywords={`${blog.category}, ${blog.title.split(' ').join(', ')}, Fastest CRM`}
+                canonical={`https://fastestcrm.com/blog/${blog.slug}`}
+            />
+            <BreadcrumbSchema items={[
+                { name: 'Home', item: 'https://fastestcrm.com' },
+                { name: 'Blog', item: 'https://fastestcrm.com/blog' },
+                { name: blog.title, item: `https://fastestcrm.com/blog/${blog.slug}` }
+            ]} />
+            <ArticleSchema 
+                title={blog.title}
+                description={blog.excerpt}
+                image={blog.image}
+                author={blog.author}
+                datePublished={blog.date}
+                url={`https://fastestcrm.com/blog/${blog.slug}`}
+            />
             {/* Navigation */}
             <nav className="fixed top-0 left-0 right-0 z-50 glass border-b border-border/50">
                 <div className="container mx-auto px-6 py-4 flex items-center justify-between">

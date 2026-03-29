@@ -2,10 +2,22 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { blogs } from '@/data/blogs';
 import { ArrowLeft, ArrowRight, User } from 'lucide-react';
+import SEO from '@/components/SEO';
+import { BreadcrumbSchema } from '@/components/SchemaMarkup';
 
 export default function Blog() {
     return (
         <div className="min-h-screen bg-background text-foreground">
+            <SEO 
+                title="Sales & CRM Insights | Fastest CRM Blog"
+                description="Expert tips, strategies, and trends in AI CRM, lead generation, and sales automation to help your Indian sales team grow faster."
+                keywords="sales tips, CRM blog, lead generation strategies, sales automation trends, AI in sales, CRM best practices"
+                canonical="https://fastestcrm.com/blog"
+            />
+            <BreadcrumbSchema items={[
+                { name: 'Home', item: 'https://fastestcrm.com' },
+                { name: 'Blog', item: 'https://fastestcrm.com/blog' }
+            ]} />
             {/* Navigation */}
             <nav className="fixed top-0 left-0 right-0 z-50 glass border-b border-border/50">
                 <div className="container mx-auto px-6 py-4 flex items-center justify-between">
