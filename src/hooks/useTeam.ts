@@ -172,7 +172,7 @@ export function useTeam() {
       // 2. Fetch profiles for THIS company
       let profilesQuery = supabase
         .from('profiles')
-        .select('id, full_name, email, phone, avatar_url, manager_id, created_at, is_deactivated')
+        .select('id, full_name, email, phone, avatar_url, manager_id, created_at')
         .order('created_at', { ascending: true });
 
       if (myCompanyId) {
