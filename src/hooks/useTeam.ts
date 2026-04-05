@@ -215,7 +215,7 @@ export function useTeam() {
         manager_id: profile.manager_id,
         created_at: profile.created_at,
         role: roleMap.get(profile.id) || 'bde',
-        is_deactivated: profile.is_deactivated ?? false,
+        is_deactivated: (profile as any).is_deactivated ?? false,
       }));
 
       // Populate valid manager objects
