@@ -40,6 +40,10 @@ function AccountsTab() {
     const [testRecipient, setTestRecipient] = useState('');
     const [dailyLimit, setDailyLimit] = useState(50);
     const [warmupEnabled, setWarmupEnabled] = useState(true);
+    
+    // Testing existing account state
+    const [isTestingExisting, setIsTestingExisting] = useState(false);
+    const [testingAccountId, setTestingAccountId] = useState<string | null>(null);
 
     // Auto-fill defaults
     React.useEffect(() => {
@@ -170,12 +174,12 @@ function AccountsTab() {
                                     variant="outline" 
                                     size="sm" 
                                     className="w-full" 
-                                    disabled={testConnection.isPending && testConnection.variables === acc.id}
-                                    onClick={() => testConnection.mutate(acc.id)}
+                                    onClick={() => {
+                                        setTestingAccountId(acc.id);
+                                        setIsTestingExisting(true);
+                                    }}
                                 >
-                                    {testConnection.isPending && testConnection.variables === acc.id ? (
-                                        <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Testing...</>
-                                    ) : 'Test Connection'}
+                                    Test Connection
                                 </Button>
                                 <Button 
                                     variant="ghost" 
@@ -191,6 +195,47 @@ function AccountsTab() {
                     </Card>
                 ))}
             </div>
+
+            <Dialog open={isTestingExisting} onOpenChange={setIsTestingExisting}>
+                <DialogContent className="sm:max-w-[400px]">
+                    <DialogHeader>
+                        <DialogTitle>Test Email Connection</DialogTitle>
+                        <DialogDescription>
+                            Enter a recipient email to send a real test message from this account.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4 space-y-4">
+                        <div className="space-y-2">
+                            <Label>Recipient Email</Label>
+                            <Input 
+                                placeholder="name@example.com" 
+                                type="email" 
+                                value={testRecipient} 
+                                onChange={e => setTestRecipient(e.target.value)} 
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter className="gap-2 sm:gap-0">
+                        <Button variant="outline" onClick={() => setIsTestingExisting(false)}>Cancel</Button>
+                        <Button 
+                            onClick={async () => {
+                                if (!testingAccountId || !testRecipient) return;
+                                try {
+                                    await sendTestEmail.mutateAsync({
+                                        accountId: testingAccountId,
+                                        to: testRecipient
+                                    });
+                                    setIsTestingExisting(false);
+                                } catch (e) {}
+                            }}
+                            disabled={sendTestEmail.isPending || !testRecipient}
+                        >
+                            {sendTestEmail.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Send Test Email
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             <Dialog open={isConnecting} onOpenChange={setIsConnecting}>
                 <DialogContent>
