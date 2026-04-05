@@ -98,3 +98,18 @@ verify_jwt = false
 verify_jwt = false
 [functions.toggle-user-status]  
 verify_jwt = false  
+
+[functions.fastsend-oauth]
+verify_jwt = false
+
+[functions.fastsend-account]
+verify_jwt = false
+
+[functions.fastsend-send]
+verify_jwt = false
+
+[functions.fastsend-campaign]
+verify_jwt = false
+
+[functions.fastsend-track]
+verify_jwt = false
