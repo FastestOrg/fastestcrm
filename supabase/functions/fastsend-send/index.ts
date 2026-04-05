@@ -2,7 +2,7 @@
  * fastsend-send — Edge function for sending emails via SMTP
  * 
  * Handles individual email delivery with tracking pixel injection.
- * Uses raw SMTP commands via Deno.connect for maximum compatibility.
+ * Supports AUTH LOGIN and XOAUTH2 (Gmail) with automatic token refresh.
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -16,6 +16,55 @@ const corsHeaders = {
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+// ─── Token Refresh ────────────────────────────────────────────────────────────
+
+async function refreshGoogleAccessToken(account: any, adminClient: any): Promise<string> {
+  const clientId = Deno.env.get("GOOGLE_CLIENT_ID");
+  const clientSecret = Deno.env.get("GOOGLE_CLIENT_SECRET");
+  if (!clientId || !clientSecret || !account.refresh_token) {
+    throw new Error("Cannot refresh token: missing credentials or refresh_token");
+  }
+
+  const res = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: clientId,
+      client_secret: clientSecret,
+      refresh_token: account.refresh_token,
+      grant_type: "refresh_token",
+    }),
+  });
+
+  const data = await res.json();
+  if (!res.ok) throw new Error("Token refresh failed: " + (data.error_description || data.error));
+
+  const expiresAt = new Date(Date.now() + (data.expires_in || 3599) * 1000).toISOString();
+
+  await adminClient
+    .from("email_accounts")
+    .update({
+      access_token: data.access_token,
+      token_expires_at: expiresAt,
+      status: "connected",
+    })
+    .eq("id", account.id);
+
+  return data.access_token;
+}
+
+async function getValidAccessToken(account: any, adminClient: any): Promise<string> {
+  // If token expires within 5 minutes, refresh it
+  if (account.token_expires_at) {
+    const expiresAt = new Date(account.token_expires_at).getTime();
+    const fiveMinutes = 5 * 60 * 1000;
+    if (Date.now() > expiresAt - fiveMinutes) {
+      return await refreshGoogleAccessToken(account, adminClient);
+    }
+  }
+  return account.access_token;
+}
 
 // ─── SMTP Helper ──────────────────────────────────────────────────────────────
 
@@ -66,7 +115,7 @@ async function sendEmailViaSMTP(account: any, to: string, subject: string, htmlB
 
     // Authenticate
     if (account.access_token) {
-      // XOAUTH2
+      // XOAUTH2 for Gmail/OAuth accounts
       const xoauth2Str = `user=${account.email_address}\x01auth=Bearer ${account.access_token}\x01\x01`;
       const base64Str = base64Encode(new TextEncoder().encode(xoauth2Str));
       response = await sendCommand(conn, `AUTH XOAUTH2 ${base64Str}`);
@@ -201,6 +250,23 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "Daily send limit reached", limitReached: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    // Auto-refresh Google token if needed
+    if (account.access_token && account.provider === "gmail") {
+      try {
+        const freshToken = await getValidAccessToken(account, adminClient);
+        account.access_token = freshToken;
+      } catch (refreshErr: any) {
+        // Mark account as error if refresh fails
+        await adminClient.from("email_accounts").update({
+          status: "error",
+          last_error: "Token refresh failed: " + refreshErr.message,
+        }).eq("id", account.id);
+        return new Response(JSON.stringify({ error: "Gmail token expired and refresh failed. Please re-connect the account." }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
     // Generate tracking pixel ID
