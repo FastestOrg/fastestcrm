@@ -11,6 +11,7 @@ import dotenv from 'dotenv';
 import { sessionManager } from './session-manager';
 import { startCampaign, pauseCampaign, resumeCampaign, getCampaignProgress } from './campaign-worker';
 import { supabase } from './supabase';
+import { startImapWorkers } from './email-imap-worker';
 import { GoogleGenAI } from '@google/genai';
 
 dotenv.config();
@@ -190,6 +191,13 @@ app.listen(PORT, async () => {
         console.log('Session restore complete.');
     } catch (err) {
         console.error('Session restore failed:', err);
+    }
+
+    // Start IMAP email workers
+    try {
+        await startImapWorkers();
+    } catch (err) {
+        console.error('IMAP workers failed to start:', err);
     }
 
     // Poll for scheduled campaigns every 60 seconds

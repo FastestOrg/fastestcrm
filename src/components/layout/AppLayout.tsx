@@ -87,6 +87,11 @@ const navItems: NavItem[] = [{
     path: '/dashboard/forms',
     section: 'FastEngage'
 }, {
+    icon: Mail,
+    label: 'FastSend',
+    path: '/dashboard/fastsend',
+    section: 'FastEngage'
+}, {
     icon: MessageCircle,
     label: 'WhatsApp Campaign',
     path: '/dashboard/whatsapp',

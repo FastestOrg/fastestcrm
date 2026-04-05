@@ -61,7 +61,9 @@ import CalendarPage from "./pages/CalendarPage";
 import PublicBooking from "./pages/PublicBooking";
 import EmailDashboard from "./pages/EmailDashboard";
 import ManageEmailAliases from "./pages/ManageEmailAliases";
+import GoogleOAuthCallback from "./pages/GoogleOAuthCallback";
 import WhatsAppCampaign from "./pages/WhatsAppCampaign";
+import FastSend from "./pages/FastSend";
 import RealEstateCRM from "./pages/RealEstateCRM";
 import EdTechCRM from "./pages/EdTechCRM";
 import SaasCRM from "./pages/SaasCRM";
@@ -177,6 +179,7 @@ function AppRoutes() {
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/form/:id" element={<PublicForm />} />
       <Route path="/meta-oauth-callback" element={<MetaOAuthCallback />} />
+      <Route path="/google-oauth-callback" element={<GoogleOAuthCallback />} />
       <Route path="/blog" element={<Blog />} />
       <Route path="/blog/:slug" element={<BlogPost />} />
       <Route path="/crm-for-real-estate" element={<RealEstateCRM />} />
@@ -220,6 +223,7 @@ function AppRoutes() {
         <Route path="/dashboard/calendar" element={<CalendarPage />} />
         <Route path="/dashboard/email" element={<EmailDashboard />} />
         <Route path="/dashboard/email-settings" element={<ManageEmailAliases />} />
+        <Route path="/dashboard/fastsend" element={<FastSend />} />
         <Route path="/dashboard/whatsapp" element={<WhatsAppCampaign />} />
       </Route>
 
