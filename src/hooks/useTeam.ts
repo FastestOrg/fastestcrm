@@ -172,7 +172,7 @@ export function useTeam() {
       // 2. Fetch profiles for THIS company
       let profilesQuery = supabase
         .from('profiles')
-        .select('id, full_name, email, phone, avatar_url, manager_id, created_at, is_deactivated')
+        .select('id, full_name, email, phone, avatar_url, manager_id, created_at')
         .order('created_at', { ascending: true });
 
       if (myCompanyId) {
@@ -215,7 +215,7 @@ export function useTeam() {
         manager_id: profile.manager_id,
         created_at: profile.created_at,
         role: roleMap.get(profile.id) || 'bde',
-        is_deactivated: profile.is_deactivated ?? false,
+        is_deactivated: (profile as any).is_deactivated ?? false,
       }));
 
       // Populate valid manager objects

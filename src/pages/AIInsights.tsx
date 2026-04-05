@@ -13,6 +13,7 @@ import {
     BarChart3, 
     ArrowRight,
     Loader2,
+    Clock,
     RefreshCw,
     Frown,
     Smile

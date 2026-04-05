@@ -757,6 +757,110 @@ export type Database = {
           },
         ]
       }
+      email_accounts: {
+        Row: {
+          access_token: string | null
+          company_id: string
+          created_at: string | null
+          daily_limit: number | null
+          display_name: string | null
+          email_address: string
+          emails_sent_today: number | null
+          id: string
+          imap_host: string | null
+          imap_password: string | null
+          imap_port: number | null
+          imap_user: string | null
+          last_error: string | null
+          protocol: string
+          provider: string
+          refresh_token: string | null
+          smtp_host: string | null
+          smtp_password: string | null
+          smtp_port: number | null
+          smtp_secure: boolean | null
+          smtp_user: string | null
+          status: string | null
+          token_expires_at: string | null
+          updated_at: string | null
+          user_id: string
+          warmup_current_day: number | null
+          warmup_daily_target: number | null
+          warmup_enabled: boolean | null
+          warmup_ramp_per_day: number | null
+        }
+        Insert: {
+          access_token?: string | null
+          company_id: string
+          created_at?: string | null
+          daily_limit?: number | null
+          display_name?: string | null
+          email_address: string
+          emails_sent_today?: number | null
+          id?: string
+          imap_host?: string | null
+          imap_password?: string | null
+          imap_port?: number | null
+          imap_user?: string | null
+          last_error?: string | null
+          protocol?: string
+          provider?: string
+          refresh_token?: string | null
+          smtp_host?: string | null
+          smtp_password?: string | null
+          smtp_port?: number | null
+          smtp_secure?: boolean | null
+          smtp_user?: string | null
+          status?: string | null
+          token_expires_at?: string | null
+          updated_at?: string | null
+          user_id: string
+          warmup_current_day?: number | null
+          warmup_daily_target?: number | null
+          warmup_enabled?: boolean | null
+          warmup_ramp_per_day?: number | null
+        }
+        Update: {
+          access_token?: string | null
+          company_id?: string
+          created_at?: string | null
+          daily_limit?: number | null
+          display_name?: string | null
+          email_address?: string
+          emails_sent_today?: number | null
+          id?: string
+          imap_host?: string | null
+          imap_password?: string | null
+          imap_port?: number | null
+          imap_user?: string | null
+          last_error?: string | null
+          protocol?: string
+          provider?: string
+          refresh_token?: string | null
+          smtp_host?: string | null
+          smtp_password?: string | null
+          smtp_port?: number | null
+          smtp_secure?: boolean | null
+          smtp_user?: string | null
+          status?: string | null
+          token_expires_at?: string | null
+          updated_at?: string | null
+          user_id?: string
+          warmup_current_day?: number | null
+          warmup_daily_target?: number | null
+          warmup_enabled?: boolean | null
+          warmup_ramp_per_day?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_accounts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       email_aliases: {
         Row: {
           alias_email: string
@@ -788,6 +892,285 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "email_aliases_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_campaign_logs: {
+        Row: {
+          campaign_id: string | null
+          clicked_at: string | null
+          company_id: string
+          error_message: string | null
+          id: string
+          opened_at: string | null
+          recipient_email: string | null
+          recipient_id: string | null
+          replied_at: string | null
+          sent_at: string | null
+          sent_by_account_id: string | null
+          sequence_step_id: string | null
+          status: string | null
+          subject: string | null
+          tracking_pixel_id: string | null
+        }
+        Insert: {
+          campaign_id?: string | null
+          clicked_at?: string | null
+          company_id: string
+          error_message?: string | null
+          id?: string
+          opened_at?: string | null
+          recipient_email?: string | null
+          recipient_id?: string | null
+          replied_at?: string | null
+          sent_at?: string | null
+          sent_by_account_id?: string | null
+          sequence_step_id?: string | null
+          status?: string | null
+          subject?: string | null
+          tracking_pixel_id?: string | null
+        }
+        Update: {
+          campaign_id?: string | null
+          clicked_at?: string | null
+          company_id?: string
+          error_message?: string | null
+          id?: string
+          opened_at?: string | null
+          recipient_email?: string | null
+          recipient_id?: string | null
+          replied_at?: string | null
+          sent_at?: string | null
+          sent_by_account_id?: string | null
+          sequence_step_id?: string | null
+          status?: string | null
+          subject?: string | null
+          tracking_pixel_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_campaign_logs_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "email_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_campaign_logs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_campaign_logs_recipient_id_fkey"
+            columns: ["recipient_id"]
+            isOneToOne: false
+            referencedRelation: "email_campaign_recipients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_campaign_logs_sent_by_account_id_fkey"
+            columns: ["sent_by_account_id"]
+            isOneToOne: false
+            referencedRelation: "email_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_campaign_logs_sequence_step_id_fkey"
+            columns: ["sequence_step_id"]
+            isOneToOne: false
+            referencedRelation: "email_campaign_sequences"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_campaign_recipients: {
+        Row: {
+          campaign_id: string
+          clicked_at: string | null
+          created_at: string | null
+          current_step: number | null
+          id: string
+          last_sent_at: string | null
+          lead_data: Json | null
+          lead_email: string
+          lead_id: string | null
+          lead_name: string | null
+          lead_table: string | null
+          opened_at: string | null
+          replied_at: string | null
+          status: string | null
+        }
+        Insert: {
+          campaign_id: string
+          clicked_at?: string | null
+          created_at?: string | null
+          current_step?: number | null
+          id?: string
+          last_sent_at?: string | null
+          lead_data?: Json | null
+          lead_email: string
+          lead_id?: string | null
+          lead_name?: string | null
+          lead_table?: string | null
+          opened_at?: string | null
+          replied_at?: string | null
+          status?: string | null
+        }
+        Update: {
+          campaign_id?: string
+          clicked_at?: string | null
+          created_at?: string | null
+          current_step?: number | null
+          id?: string
+          last_sent_at?: string | null
+          lead_data?: Json | null
+          lead_email?: string
+          lead_id?: string | null
+          lead_name?: string | null
+          lead_table?: string | null
+          opened_at?: string | null
+          replied_at?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_campaign_recipients_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "email_campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_campaign_sequences: {
+        Row: {
+          ai_generated: boolean | null
+          body_html: string
+          body_text: string | null
+          campaign_id: string
+          created_at: string | null
+          delay_after_ms: number | null
+          id: string
+          send_condition: string | null
+          step_number: number
+          subject: string
+          updated_at: string | null
+        }
+        Insert: {
+          ai_generated?: boolean | null
+          body_html: string
+          body_text?: string | null
+          campaign_id: string
+          created_at?: string | null
+          delay_after_ms?: number | null
+          id?: string
+          send_condition?: string | null
+          step_number?: number
+          subject: string
+          updated_at?: string | null
+        }
+        Update: {
+          ai_generated?: boolean | null
+          body_html?: string
+          body_text?: string | null
+          campaign_id?: string
+          created_at?: string | null
+          delay_after_ms?: number | null
+          id?: string
+          send_condition?: string | null
+          step_number?: number
+          subject?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_campaign_sequences_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "email_campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_campaigns: {
+        Row: {
+          account_ids: string[] | null
+          ai_generated: boolean | null
+          ai_perspective: string | null
+          campaign_goal: string | null
+          campaign_mode: string | null
+          company_id: string
+          completed_at: string | null
+          created_at: string | null
+          created_by: string | null
+          daily_limit: number | null
+          delay_between_emails_ms: number | null
+          id: string
+          name: string
+          recipient_count: number | null
+          recipient_filter: Json | null
+          scheduled_at: string | null
+          started_at: string | null
+          status: string | null
+          updated_at: string | null
+          warmup_enabled: boolean | null
+          warmup_ramp_per_day: number | null
+        }
+        Insert: {
+          account_ids?: string[] | null
+          ai_generated?: boolean | null
+          ai_perspective?: string | null
+          campaign_goal?: string | null
+          campaign_mode?: string | null
+          company_id: string
+          completed_at?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          daily_limit?: number | null
+          delay_between_emails_ms?: number | null
+          id?: string
+          name: string
+          recipient_count?: number | null
+          recipient_filter?: Json | null
+          scheduled_at?: string | null
+          started_at?: string | null
+          status?: string | null
+          updated_at?: string | null
+          warmup_enabled?: boolean | null
+          warmup_ramp_per_day?: number | null
+        }
+        Update: {
+          account_ids?: string[] | null
+          ai_generated?: boolean | null
+          ai_perspective?: string | null
+          campaign_goal?: string | null
+          campaign_mode?: string | null
+          company_id?: string
+          completed_at?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          daily_limit?: number | null
+          delay_between_emails_ms?: number | null
+          id?: string
+          name?: string
+          recipient_count?: number | null
+          recipient_filter?: Json | null
+          scheduled_at?: string | null
+          started_at?: string | null
+          status?: string | null
+          updated_at?: string | null
+          warmup_enabled?: boolean | null
+          warmup_ramp_per_day?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_campaigns_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
@@ -1067,6 +1450,7 @@ export type Database = {
           revenue_projected: number | null
           revenue_received: number | null
           sales_owner_id: string | null
+          send_web_push: boolean
           state: string | null
           status: string
           total_recovered: number | null
@@ -1108,6 +1492,7 @@ export type Database = {
           revenue_projected?: number | null
           revenue_received?: number | null
           sales_owner_id?: string | null
+          send_web_push?: boolean
           state?: string | null
           status?: string
           total_recovered?: number | null
@@ -1149,6 +1534,7 @@ export type Database = {
           revenue_projected?: number | null
           revenue_received?: number | null
           sales_owner_id?: string | null
+          send_web_push?: boolean
           state?: string | null
           status?: string
           total_recovered?: number | null
@@ -1636,6 +2022,7 @@ export type Database = {
           revenue_projected: number | null
           revenue_received: number | null
           sales_owner_id: string | null
+          send_web_push: boolean
           site_visit_photos: Json | null
           status: string
           status_metadata: Json | null
@@ -1680,6 +2067,7 @@ export type Database = {
           revenue_projected?: number | null
           revenue_received?: number | null
           sales_owner_id?: string | null
+          send_web_push?: boolean
           site_visit_photos?: Json | null
           status?: string
           status_metadata?: Json | null
@@ -1724,6 +2112,7 @@ export type Database = {
           revenue_projected?: number | null
           revenue_received?: number | null
           sales_owner_id?: string | null
+          send_web_push?: boolean
           site_visit_photos?: Json | null
           status?: string
           status_metadata?: Json | null
@@ -2206,6 +2595,7 @@ export type Database = {
           revenue_projected: number | null
           revenue_received: number | null
           sales_owner_id: string | null
+          send_web_push: boolean
           state: string | null
           status: string
           total_recovered: number | null
@@ -2246,6 +2636,7 @@ export type Database = {
           revenue_projected?: number | null
           revenue_received?: number | null
           sales_owner_id?: string | null
+          send_web_push?: boolean
           state?: string | null
           status?: string
           total_recovered?: number | null
@@ -2286,6 +2677,7 @@ export type Database = {
           revenue_projected?: number | null
           revenue_received?: number | null
           sales_owner_id?: string | null
+          send_web_push?: boolean
           state?: string | null
           status?: string
           total_recovered?: number | null
@@ -2557,9 +2949,11 @@ export type Database = {
           avatar_url: string | null
           company_id: string | null
           created_at: string
+          deactivated_at: string | null
           email: string | null
           full_name: string | null
           id: string
+          is_deactivated: boolean
           manager_id: string | null
           phone: string | null
           updated_at: string
@@ -2568,9 +2962,11 @@ export type Database = {
           avatar_url?: string | null
           company_id?: string | null
           created_at?: string
+          deactivated_at?: string | null
           email?: string | null
           full_name?: string | null
           id: string
+          is_deactivated?: boolean
           manager_id?: string | null
           phone?: string | null
           updated_at?: string
@@ -2579,9 +2975,11 @@ export type Database = {
           avatar_url?: string | null
           company_id?: string | null
           created_at?: string
+          deactivated_at?: string | null
           email?: string | null
           full_name?: string | null
           id?: string
+          is_deactivated?: boolean
           manager_id?: string | null
           phone?: string | null
           updated_at?: string
@@ -2621,6 +3019,36 @@ export type Database = {
           id?: string
           name?: string
           price?: number
+        }
+        Relationships: []
+      }
+      push_subscriptions: {
+        Row: {
+          auth: string
+          created_at: string
+          endpoint: string
+          id: string
+          p256dh: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          auth: string
+          created_at?: string
+          endpoint: string
+          id?: string
+          p256dh: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          auth?: string
+          created_at?: string
+          endpoint?: string
+          id?: string
+          p256dh?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -2792,6 +3220,271 @@ export type Database = {
           },
         ]
       }
+      whatsapp_accounts: {
+        Row: {
+          ai_enabled: boolean | null
+          ai_goal: string | null
+          ai_knowledge_base: string | null
+          ai_max_replies_per_day: number | null
+          ai_prompt: string | null
+          ai_response_delay_seconds: number | null
+          auth_creds: Json | null
+          company_id: string
+          created_at: string
+          daily_limit: number
+          display_name: string | null
+          id: string
+          last_connected_at: string | null
+          messages_sent_today: number
+          phone_number: string | null
+          session_id: string
+          status: string
+          user_id: string | null
+        }
+        Insert: {
+          ai_enabled?: boolean | null
+          ai_goal?: string | null
+          ai_knowledge_base?: string | null
+          ai_max_replies_per_day?: number | null
+          ai_prompt?: string | null
+          ai_response_delay_seconds?: number | null
+          auth_creds?: Json | null
+          company_id: string
+          created_at?: string
+          daily_limit?: number
+          display_name?: string | null
+          id?: string
+          last_connected_at?: string | null
+          messages_sent_today?: number
+          phone_number?: string | null
+          session_id: string
+          status?: string
+          user_id?: string | null
+        }
+        Update: {
+          ai_enabled?: boolean | null
+          ai_goal?: string | null
+          ai_knowledge_base?: string | null
+          ai_max_replies_per_day?: number | null
+          ai_prompt?: string | null
+          ai_response_delay_seconds?: number | null
+          auth_creds?: Json | null
+          company_id?: string
+          created_at?: string
+          daily_limit?: number
+          display_name?: string | null
+          id?: string
+          last_connected_at?: string | null
+          messages_sent_today?: number
+          phone_number?: string | null
+          session_id?: string
+          status?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_accounts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_accounts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whatsapp_campaign_recipients: {
+        Row: {
+          campaign_id: string
+          created_at: string
+          error_message: string | null
+          id: string
+          lead_data: Json | null
+          lead_id: string | null
+          lead_table: string | null
+          phone_number: string
+          resolved_message: string | null
+          sent_at: string | null
+          sent_by_account_id: string | null
+          status: string
+        }
+        Insert: {
+          campaign_id: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          lead_data?: Json | null
+          lead_id?: string | null
+          lead_table?: string | null
+          phone_number: string
+          resolved_message?: string | null
+          sent_at?: string | null
+          sent_by_account_id?: string | null
+          status?: string
+        }
+        Update: {
+          campaign_id?: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          lead_data?: Json | null
+          lead_id?: string | null
+          lead_table?: string | null
+          phone_number?: string
+          resolved_message?: string | null
+          sent_at?: string | null
+          sent_by_account_id?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_campaign_recipients_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_campaign_recipients_sent_by_account_id_fkey"
+            columns: ["sent_by_account_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whatsapp_campaigns: {
+        Row: {
+          account_ids: string[]
+          company_id: string
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          delay_max_seconds: number
+          delay_min_seconds: number
+          id: string
+          message_template: string
+          name: string
+          recipient_count: number
+          recipient_filter: Json | null
+          scheduled_at: string | null
+          started_at: string | null
+          status: string
+        }
+        Insert: {
+          account_ids?: string[]
+          company_id: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          delay_max_seconds?: number
+          delay_min_seconds?: number
+          id?: string
+          message_template?: string
+          name: string
+          recipient_count?: number
+          recipient_filter?: Json | null
+          scheduled_at?: string | null
+          started_at?: string | null
+          status?: string
+        }
+        Update: {
+          account_ids?: string[]
+          company_id?: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          delay_max_seconds?: number
+          delay_min_seconds?: number
+          id?: string
+          message_template?: string
+          name?: string
+          recipient_count?: number
+          recipient_filter?: Json | null
+          scheduled_at?: string | null
+          started_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_campaigns_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_campaigns_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whatsapp_message_log: {
+        Row: {
+          account_id: string | null
+          campaign_id: string | null
+          company_id: string
+          direction: string
+          id: string
+          message_body: string | null
+          recipient_phone: string
+          sent_at: string
+          status: string
+        }
+        Insert: {
+          account_id?: string | null
+          campaign_id?: string | null
+          company_id: string
+          direction?: string
+          id?: string
+          message_body?: string | null
+          recipient_phone: string
+          sent_at?: string
+          status?: string
+        }
+        Update: {
+          account_id?: string | null
+          campaign_id?: string | null
+          company_id?: string
+          direction?: string
+          id?: string
+          message_body?: string | null
+          recipient_phone?: string
+          sent_at?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_message_log_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_message_log_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_message_log_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -2947,9 +3640,17 @@ export type Database = {
         }
         Returns: boolean
       }
+      increment_email_sent: {
+        Args: { account_uuid: string }
+        Returns: undefined
+      }
       increment_used_licenses: {
         Args: { _company_id: string }
         Returns: boolean
+      }
+      increment_wa_messages_sent: {
+        Args: { account_id: string }
+        Returns: undefined
       }
       is_company_admin: { Args: { _user_id: string }; Returns: boolean }
       is_in_hierarchy: {
@@ -2965,6 +3666,7 @@ export type Database = {
         Args: { attribute_name: string; input_company_id: string }
         Returns: Json
       }
+      reset_email_daily_counters: { Args: never; Returns: undefined }
       reset_monthly_xp: { Args: never; Returns: undefined }
       toggle_lead_unique_constraint: {
         Args: {
