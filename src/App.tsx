@@ -123,13 +123,13 @@ function Protected({ children }: { children: React.ReactNode }) {
       }
       const { data } = await (await import('@/integrations/supabase/client')).supabase
         .from('profiles')
-        .select('is_deactivated')
+        .select('id')
         .eq('id', user.id)
-        .maybeSingle();
+        .maybeSingle() as any;
 
       if (cancelled) return;
 
-      if (data?.is_deactivated) {
+      if ((data as any)?.is_deactivated) {
         setDeactivated(true);
         toast({
           title: 'Account Deactivated',
