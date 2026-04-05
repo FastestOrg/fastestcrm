@@ -19,11 +19,13 @@ import { useLeadStatuses } from '@/hooks/useLeadStatuses';
 import { generateFullDripCampaign, GeneratedEmail } from '@/services/emailAIService';
 import { useCompany } from '@/hooks/useCompany';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 // ─── Accounts Tab ─────────────────────────────────────────────────────────────
 function AccountsTab() {
     const { accounts, isLoading, createAccount, testConnection, deleteAccount, updateAccount, sendTestEmail } = useEmailAccounts();
     const [isConnecting, setIsConnecting] = useState(false);
+    const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
     
     // Form state
     const [provider, setProvider] = useState('gmail');
@@ -63,15 +65,13 @@ function AccountsTab() {
 
     const handleConnect = async () => {
         if (provider === 'gmail') {
-            // Initiate OAuth flow
-            const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-            if (!clientId) {
-                toast.error('Google Client ID is missing in environment variables');
-                return;
-            }
+            // Use the Google Client ID provided by user
+            const clientId = '1033874890501-p253hb5at1qb077rcoitv6pjc9elf75n.apps.googleusercontent.com';
+            
             const redirectUri = window.location.origin + '/google-oauth-callback';
             const scope = encodeURIComponent('https://mail.google.com/ https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email');
-            const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}&access_type=offline&prompt=consent`;
+            const state = encodeURIComponent(window.location.pathname);
+            const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}&access_type=offline&prompt=consent&state=${state}`;
             
             window.location.href = authUrl;
             return;
@@ -140,11 +140,13 @@ function AccountsTab() {
                             <div className="space-y-2 text-sm">
                                 <div className="flex justify-between items-center">
                                     <span className="text-muted-foreground">Provider Details</span>
-                                    <span className="font-medium">{acc.provider === 'gmail' && (acc.smtp_host === 'smtp.gmail.com')}</span>
+                                    <span className="font-medium">{acc.provider === 'gmail' ? 'smtp.gmail.com' : acc.smtp_host || 'Not set'}</span>
                                 </div>
                                 <div className="flex justify-between items-center">
-                                    <span className="text-muted-foreground">Requires OAuth</span>
-                                    <span className="font-medium text-destructive">Yes - Go to Integrations to setup App Password</span>
+                                    <span className="text-muted-foreground">Connection Mode</span>
+                                    <span className={`font-medium ${acc.provider === 'gmail' ? 'text-green-600' : 'text-blue-600'}`}>
+                                        {acc.provider === 'gmail' ? 'Google OAuth 2.0' : 'Standard SMTP'}
+                                    </span>
                                 </div>
                                 <div className="flex justify-between items-center">
                                     <span className="text-muted-foreground">Sent Today</span>
@@ -357,7 +359,10 @@ function AccountsTab() {
 
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setIsConnecting(false)}>Cancel</Button>
-                        <Button onClick={handleConnect} disabled={createAccount.isPending || !email || !password}>
+                        <Button 
+                            onClick={handleConnect} 
+                            disabled={createAccount.isPending || (provider !== 'gmail' && (!email || !password))}
+                        >
                             {createAccount.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                             Connect Email
                         </Button>

@@ -48,6 +48,25 @@ export function EmailIntegrationDialog({ isOpen, onOpenChange }: EmailIntegratio
     return () => window.removeEventListener('message', handler);
   }, [queryClient]);
 
+  const handleConnectGmail = async () => {
+    setConnecting(true);
+    try {
+      // Use the Google Client ID provided by user
+      const clientId = '1033874890501-p253hb5at1qb077rcoitv6pjc9elf75n.apps.googleusercontent.com';
+      
+      const redirectUri = window.location.origin + '/google-oauth-callback';
+      const scope = encodeURIComponent('https://mail.google.com/ https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email');
+      const state = encodeURIComponent(window.location.pathname);
+      const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}&access_type=offline&prompt=consent&state=${state}`;
+      
+      // We can use a popup for consistency with Outlook or just redirect. Let's use redirect as in FastSend.
+      window.location.href = authUrl;
+    } catch (err: any) {
+      toast.error(err.message || 'Connection failed');
+      setConnecting(false);
+    }
+  };
+
   const handleConnectOutlook = async () => {
     setConnecting(true);
     try {
@@ -98,15 +117,30 @@ export function EmailIntegrationDialog({ isOpen, onOpenChange }: EmailIntegratio
 
         <div className="space-y-4 pt-2">
           {/* Gmail option */}
-          <div className="flex items-center gap-4 p-4 rounded-lg border border-border opacity-60">
+          <div className="flex items-center gap-4 p-4 rounded-lg border border-border bg-card">
             <div className="w-10 h-10 rounded-lg bg-red-500/10 flex items-center justify-center">
               <Mail className="h-5 w-5 text-red-500" />
             </div>
             <div className="flex-1">
               <p className="font-medium text-foreground">Gmail</p>
-              <p className="text-xs text-muted-foreground">Google Workspace integration</p>
+              <p className="text-xs text-muted-foreground">
+                {isConnected && integration?.provider === 'gmail' ? `Connected as ${integration?.admin_email}` : 'Google Workspace integration'}
+              </p>
             </div>
-            <Badge variant="outline" className="text-xs">Coming Soon</Badge>
+            {isConnected && integration?.provider === 'gmail' ? (
+              <Badge className="bg-green-500 hover:bg-green-600">
+                <Check className="h-3 w-3 mr-1" /> Connected
+              </Badge>
+            ) : (
+              <Button
+                size="sm"
+                onClick={handleConnectGmail}
+                disabled={connecting || !isCompanyAdmin}
+              >
+                {connecting ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <ExternalLink className="h-4 w-4 mr-1" />}
+                Connect
+              </Button>
+            )}
           </div>
 
           {/* Outlook option */}

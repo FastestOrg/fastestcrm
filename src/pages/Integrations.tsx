@@ -12,6 +12,7 @@ import { AddIntegrationDialog } from '@/components/integrations/AddIntegrationDi
 import { PerformanceMarketingDialog } from '@/components/integrations/PerformanceMarketingDialog';
 import { EmailIntegrationDialog } from '@/components/integrations/EmailIntegrationDialog';
 import { useCompany } from '@/hooks/useCompany';
+import { useEmailAccounts } from '@/hooks/useEmailAccounts';
 
 const integrationTypes = [
     { id: 'performance_marketing', name: 'Performance Marketing', icon: Megaphone, description: 'Meta, Google & LinkedIn Ads', category: 'Lead Generation', isSpecial: true },
@@ -32,6 +33,9 @@ export default function Integrations() {
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [isPerformanceMarketingOpen, setIsPerformanceMarketingOpen] = useState(false);
     const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
+    
+    // Unified email account check
+    const { accounts: emailAccounts } = useEmailAccounts();
 
     const { data: connectedKeys, isLoading } = useQuery({
         queryKey: ['integration-keys', user?.id],
@@ -83,7 +87,8 @@ export default function Integrations() {
             return (pmIntegrations?.length || 0) > 0;
         }
         if (serviceId === 'gmail') {
-            return emailIntegration?.is_active || false;
+            const hasGmail = emailAccounts.some(acc => acc.provider === 'gmail' && acc.status === 'connected');
+            return hasGmail || emailIntegration?.is_active || false;
         }
         return connectedKeys?.some(key => key.service_name === serviceId && key.is_active);
     };

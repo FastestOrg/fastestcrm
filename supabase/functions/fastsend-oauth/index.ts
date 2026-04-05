@@ -47,8 +47,14 @@ Deno.serve(async (req) => {
     const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     const body = await req.json();
     const { action, code, companyId, redirectUri } = body;
+    const usedRedirectUri = redirectUri || REDIRECT_URI; 
 
-    const usedRedirectUri = redirectUri || REDIRECT_URI; // Accept explicit redirect URI from client (needed for standard web OAuth flow)
+    // Publicly returning the client ID is safe (it's part of the login URL anyway)
+    if (action === "get-config") {
+      return new Response(JSON.stringify({ clientId: CLIENT_ID }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     if (action === "exchange") {
       if (!CLIENT_ID || !CLIENT_SECRET) {

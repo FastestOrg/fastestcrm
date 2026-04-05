@@ -21,15 +21,16 @@ export default function GoogleOAuthCallback() {
             const params = new URLSearchParams(location.search);
             const code = params.get('code');
             const error = params.get('error');
+            const state = params.get('state') || '/dashboard/fastsend';
 
             if (error) {
                 toast.error(`OAuth Error: ${error}`);
-                navigate('/dashboard/fastsend');
+                navigate(state);
                 return;
             }
 
             if (!code) {
-                navigate('/dashboard/fastsend');
+                navigate(state);
                 return;
             }
 
@@ -59,10 +60,10 @@ export default function GoogleOAuthCallback() {
                 if (data.error) throw new Error(data.error);
                 
                 toast.success('Gmail account connected successfully!');
-                navigate('/dashboard/fastsend');
+                navigate(state);
             } catch (err: any) {
                 toast.error(err.message || 'Failed to connect Gmail');
-                navigate('/dashboard/fastsend');
+                navigate(state);
             }
         }
 
