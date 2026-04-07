@@ -102,6 +102,10 @@ export default function Integrations() {
             setIsEmailDialogOpen(true);
             return;
         }
+        if (integration.id === 'google_calendar') {
+            window.location.href = '/dashboard/calendar';
+            return;
+        }
         setSelectedIntegration(integration);
         setIsDialogOpen(true);
     };

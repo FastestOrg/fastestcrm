@@ -73,16 +73,22 @@ export function useCreateBookingPage() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (config: { title: string; description?: string; durations: number[]; availability: any; slug: string; bufferMinutes?: number }) => {
+    mutationFn: async (config: { title: string; description?: string; durations: number[]; availability: any; slug: string; bufferMinutes?: number; id?: string }) => {
       if (!user?.id || !company?.id) throw new Error('Not authenticated');
       const { data, error } = await supabase
         .from('booking_pages' as any)
         .upsert({
+          id: config.id, // Primary key for matching
           user_id: user.id,
           company_id: company.id,
-          ...config,
+          title: config.title,
+          description: config.description,
+          durations: config.durations,
+          availability: config.availability,
+          slug: config.slug,
+          buffer_minutes: config.bufferMinutes,
           updated_at: new Date().toISOString(),
-        }, { onConflict: 'slug' })
+        })
         .select()
         .single();
       if (error) throw error;

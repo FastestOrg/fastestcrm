@@ -83,7 +83,7 @@ export interface CampaignGenerationParams {
     tone?: string;             // professional, friendly, casual
 }
 
-// ─── Genetic Mode (Full Campaign Generation) ──────────────────────────────────
+// ─── Agentic Mode (Full Campaign Generation) ──────────────────────────────────
 
 export async function generateFullDripCampaign(
     params: CampaignGenerationParams

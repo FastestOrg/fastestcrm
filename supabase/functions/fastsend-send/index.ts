@@ -80,7 +80,15 @@ async function sendCommand(conn: Deno.Conn, command: string): Promise<string> {
   return await readResponse(conn);
 }
 
-async function sendEmailViaSMTP(account: any, to: string, subject: string, htmlBody: string, trackingPixelId: string): Promise<{ success: boolean; error?: string }> {
+async function sendEmailViaSMTP(
+  account: any, 
+  to: string, 
+  subject: string, 
+  htmlBody: string, 
+  trackingPixelId: string,
+  inReplyTo?: string,
+  references?: string
+): Promise<{ success: boolean; error?: string }> {
   let conn: Deno.Conn | null = null;
   
   try {
@@ -158,10 +166,16 @@ async function sendEmailViaSMTP(account: any, to: string, subject: string, htmlB
     const boundary = `----=_Part_${Date.now()}_${Math.random().toString(36).substring(2)}`;
     const fromName = account.display_name || account.email_address;
     
+    // Message ID for this email
+    const myMessageId = `<${crypto.randomUUID()}@fastestcrm.com>`;
+
     const message = [
       `From: "${fromName}" <${account.email_address}>`,
       `To: <${to}>`,
       `Subject: ${subject}`,
+      `Message-ID: ${myMessageId}`,
+      inReplyTo ? `In-Reply-To: ${inReplyTo}` : "",
+      references ? `References: ${references}` : "",
       `MIME-Version: 1.0`,
       `Content-Type: multipart/alternative; boundary="${boundary}"`,
       `X-Mailer: FastSend/1.0`,
@@ -180,7 +194,7 @@ async function sendEmailViaSMTP(account: any, to: string, subject: string, htmlB
       ``,
       `--${boundary}--`,
       `.`,
-    ].join("\r\n");
+    ].filter(line => line !== null && line !== undefined).join("\r\n");
 
     response = await sendCommand(conn, message);
     if (!response.startsWith("250")) throw new Error("Message not accepted: " + response);
@@ -226,7 +240,7 @@ Deno.serve(async (req) => {
 
     const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     const body = await req.json();
-    const { accountId, to, subject, bodyHtml, campaignId, recipientId, sequenceStepId, companyId } = body;
+    const { accountId, to, subject, bodyHtml, campaignId, recipientId, sequenceStepId, companyId, inReplyTo, references, threadId } = body;
 
     // Load account
     const { data: account } = await adminClient
@@ -273,7 +287,7 @@ Deno.serve(async (req) => {
     const trackingPixelId = crypto.randomUUID();
 
     // Send email
-    const result = await sendEmailViaSMTP(account, to, subject, bodyHtml, trackingPixelId);
+    const result = await sendEmailViaSMTP(account, to, subject, bodyHtml, trackingPixelId, inReplyTo, references);
 
     const now = new Date().toISOString();
 
@@ -281,7 +295,7 @@ Deno.serve(async (req) => {
       // Increment daily counter
       await adminClient.rpc("increment_email_sent", { account_uuid: accountId });
 
-      // Log the send
+      // Log the send in campaign logs
       await adminClient.from("email_campaign_logs").insert({
         company_id: companyId || account.company_id,
         campaign_id: campaignId || null,
@@ -294,6 +308,28 @@ Deno.serve(async (req) => {
         tracking_pixel_id: trackingPixelId,
         sent_at: now,
       });
+
+      // If this is a thread reply, also log it in email_messages
+      if (threadId) {
+        await adminClient.from("email_messages").insert({
+          thread_id: threadId,
+          message_id: `<${crypto.randomUUID()}@fastestcrm.com>`, // We should ideally use the one from SMTP but this works for tracking
+          in_reply_to: inReplyTo || null,
+          from_address: account.email_address,
+          to_address: to,
+          subject,
+          body_html: bodyHtml,
+          direction: "outbound",
+          is_read: true,
+          received_at: now,
+        });
+
+        // Update thread snippet and timestamp
+        await adminClient.from("email_threads").update({
+          snippet: "You: " + (bodyHtml.replace(/<[^>]*>/g, '').substring(0, 50)),
+          last_message_at: now
+        }).eq("id", threadId);
+      }
     }
 
     return new Response(

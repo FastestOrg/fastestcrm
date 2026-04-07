@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -7,17 +7,20 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { Mail, Users, Activity, Settings, Plus, Play, Pause, Trash2, Loader2, Bot, Wand2, Edit2, BarChart, AlignLeft, CalendarClock } from 'lucide-react';
+import { Mail, Users, Activity, Settings, Plus, Play, Pause, Trash2, Loader2, Bot, Wand2, Edit2, BarChart, AlignLeft, CalendarClock, Inbox, RefreshCcw, Reply, ArrowLeft, Search, Eye, MousePointerClick, Send, TrendingUp, Clock, ChevronRight, Zap, Target, Brain, Sparkles, ArrowUpRight, Filter, Hash, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { format } from 'date-fns';
 import { useEmailAccounts, EmailAccount } from '@/hooks/useEmailAccounts';
 import { useEmailCampaigns, EmailCampaign, CampaignSequenceStep } from '@/hooks/useEmailCampaigns';
+import { useEmailInbox, EmailThread, EmailMessage } from '@/hooks/useEmailInbox';
 import { useLeadStatuses } from '@/hooks/useLeadStatuses';
 import { generateFullDripCampaign, GeneratedEmail } from '@/services/emailAIService';
 import { useCompany } from '@/hooks/useCompany';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -43,6 +46,13 @@ function AccountsTab() {
     const [dailyLimit, setDailyLimit] = useState(50);
     const [warmupEnabled, setWarmupEnabled] = useState(true);
     
+    // IMAP State
+    const [protocol, setProtocol] = useState<'smtp_only' | 'imap_smtp'>('smtp_only');
+    const [imapHost, setImapHost] = useState('');
+    const [imapPort, setImapPort] = useState(993);
+    const [imapUser, setImapUser] = useState('');
+    const [imapPassword, setImapPassword] = useState('');
+    
     // Testing existing account state
     const [isTestingExisting, setIsTestingExisting] = useState(false);
     const [testingAccountId, setTestingAccountId] = useState<string | null>(null);
@@ -53,13 +63,19 @@ function AccountsTab() {
             setSmtpHost('smtp-mail.outlook.com');
             setSmtpPort(587);
             setSmtpSecure(true);
+            setImapHost('outlook.office365.com');
+            setImapPort(993);
         } else if (provider === 'zoho') {
             setSmtpHost('smtp.zoho.com');
             setSmtpPort(587);
             setSmtpSecure(true);
+            setImapHost('imap.zoho.com');
+            setImapPort(993);
         } else if (provider === 'gmail') {
             setSmtpHost('smtp.gmail.com');
             setSmtpPort(587);
+            setImapHost('imap.gmail.com');
+            setImapPort(993);
         }
     }, [provider]);
 
@@ -87,12 +103,16 @@ function AccountsTab() {
                 provider,
                 email_address: email,
                 display_name: displayName,
-                protocol: 'smtp_only',
+                protocol: protocol,
                 smtp_host: smtpHost,
                 smtp_port: smtpPort,
                 smtp_user: smtpUser || email,
                 smtp_password: password,
                 smtp_secure: smtpSecure,
+                imap_host: protocol === 'imap_smtp' ? imapHost : null,
+                imap_port: protocol === 'imap_smtp' ? imapPort : null,
+                imap_user: protocol === 'imap_smtp' ? (imapUser || email) : null,
+                imap_password: protocol === 'imap_smtp' ? (imapPassword || password) : null,
                 daily_limit: dailyLimit,
                 warmup_enabled: warmupEnabled,
                 warmup_daily_target: 5,
@@ -258,9 +278,23 @@ function AccountsTab() {
                                     <SelectItem value="gmail">Gmail (OAuth)</SelectItem>
                                     <SelectItem value="outlook">Outlook / Office 365</SelectItem>
                                     <SelectItem value="zoho">Zoho Mail</SelectItem>
-                                    <SelectItem value="custom">Custom SMTP (Advanced)</SelectItem>
+                                    <SelectItem value="custom">Custom SMTP / IMAP</SelectItem>
                                 </SelectContent>
                             </Select>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label>Mode</Label>
+                            <Select value={protocol} onValueChange={(val: any) => setProtocol(val)}>
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="smtp_only">Send Only (SMTP)</SelectItem>
+                                    <SelectItem value="imap_smtp">Send & Receive (SMTP + IMAP)</SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <p className="text-[10px] text-muted-foreground uppercase font-bold px-1">
+                                {protocol === 'imap_smtp' ? 'Enables inbox and two-way communication' : 'Optimized for outbound campaigns only'}
+                            </p>
                         </div>
 
                         {provider !== 'gmail' && (
@@ -310,33 +344,88 @@ function AccountsTab() {
                                     </div>
                                 </div>
 
+                                {protocol === 'imap_smtp' && (
+                                    <div className="border-t pt-4 mt-2 space-y-4">
+                                        <h4 className="text-sm font-medium flex items-center gap-2">
+                                            <Inbox className="w-4 h-4" /> IMAP Settings
+                                        </h4>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-2">
+                                                <Label>IMAP Host</Label>
+                                                <Input placeholder="imap.example.com" value={imapHost} onChange={e => setImapHost(e.target.value)} />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label>IMAP Port</Label>
+                                                <Input type="number" value={imapPort} onChange={e => setImapPort(Number(e.target.value))} />
+                                            </div>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>IMAP Username</Label>
+                                            <Input placeholder="Usually same as email" value={imapUser} onChange={e => setImapUser(e.target.value)} />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>IMAP Password</Label>
+                                            <Input type="password" placeholder="Usually same as SMTP passwd" value={imapPassword} onChange={e => setImapPassword(e.target.value)} />
+                                        </div>
+                                    </div>
+                                )}
+
                                 <div className="border-t pt-4 mt-2 bg-blue-50/50 p-3 rounded-lg border border-blue-100">
                                     <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
                                         <Play className="w-4 h-4 text-blue-600" /> Test Configuration
                                     </h4>
-                                    <div className="flex gap-2">
-                                        <Input 
-                                            placeholder="Recipient for test email" 
-                                            type="email" 
-                                            value={testRecipient} 
-                                            onChange={e => setTestRecipient(e.target.value)} 
-                                            className="bg-white"
-                                        />
+                                    <div className="flex flex-col gap-3">
+                                        <div className="flex gap-2">
+                                            <Input 
+                                                placeholder="Recipient for test email" 
+                                                type="email" 
+                                                value={testRecipient} 
+                                                onChange={e => setTestRecipient(e.target.value)} 
+                                                className="bg-white"
+                                            />
+                                            <Button 
+                                                onClick={() => sendTestEmail.mutate({
+                                                    to: testRecipient,
+                                                    smtp_host: smtpHost,
+                                                    smtp_port: smtpPort,
+                                                    smtp_user: smtpUser || email,
+                                                    smtp_password: password,
+                                                    smtp_secure: smtpSecure,
+                                                    email_address: email
+                                                })}
+                                                disabled={sendTestEmail.isPending || !testRecipient || !email || !password || !smtpHost}
+                                                variant="secondary"
+                                                size="sm"
+                                            >
+                                                {sendTestEmail.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Send Test Email"}
+                                            </Button>
+                                        </div>
+                                        
                                         <Button 
-                                            onClick={() => sendTestEmail.mutate({
-                                                to: testRecipient,
-                                                smtp_host: smtpHost,
-                                                smtp_port: smtpPort,
-                                                smtp_user: smtpUser || email,
-                                                smtp_password: password,
-                                                smtp_secure: smtpSecure,
-                                                email_address: email
-                                            })}
-                                            disabled={sendTestEmail.isPending || !testRecipient || !email || !password || !smtpHost}
-                                            variant="secondary"
-                                            size="sm"
+                                            variant="outline" 
+                                            size="sm" 
+                                            className="w-full bg-white border-blue-200 text-blue-600 hover:bg-blue-50"
+                                            onClick={() => testConnection.mutate({
+                                                provider,
+                                                email,
+                                                protocol,
+                                                smtpHost,
+                                                smtpPort,
+                                                smtpUser: smtpUser || email,
+                                                smtpPassword: password,
+                                                smtpSecure,
+                                                imapHost,
+                                                imapPort,
+                                                imapUser: imapUser || email,
+                                                imapPassword: imapPassword || password
+                                            } as any)}
+                                            disabled={testConnection.isPending || !email || !password}
                                         >
-                                            {sendTestEmail.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Send Test"}
+                                            {testConnection.isPending ? (
+                                                <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Testing...</>
+                                            ) : (
+                                                <><Activity className="w-4 h-4 mr-2" /> Test Credentials (SMTP + IMAP)</>
+                                            )}
                                         </Button>
                                     </div>
                                 </div>
@@ -374,34 +463,39 @@ function AccountsTab() {
 }
 
 // ─── Campaigns Tab ────────────────────────────────────────────────────────────
-function CampaignsTab(props: { onEdit: (campaign: any) => void }) {
+function CampaignsTab(props: { onEdit: (campaign: any) => void; onOpenDetail: (campaign: any) => void }) {
     const { campaigns, isLoading, startCampaign, pauseCampaign, resumeCampaign, deleteCampaign } = useEmailCampaigns();
 
-    if (isLoading) return <div>Loading campaigns...</div>;
+    if (isLoading) return <div className="flex justify-center py-12"><Loader2 className="animate-spin h-6 w-6 text-primary" /></div>;
 
     return (
         <div className="space-y-4">
             <div className="grid gap-4">
                 {campaigns.map(camp => (
-                    <Card key={camp.id}>
+                    <Card key={camp.id} className="group hover:border-primary/40 transition-all duration-300 cursor-pointer hover:shadow-lg hover:shadow-primary/5" onClick={() => props.onOpenDetail(camp)}>
                         <CardContent className="flex flex-col md:flex-row items-start md:items-center justify-between p-6 gap-4">
-                            <div className="space-y-1 flex-1">
-                                <div className="flex items-center gap-2">
+                            <div className="space-y-2 flex-1">
+                                <div className="flex items-center gap-2 flex-wrap">
                                     <h4 className="font-semibold text-lg">{camp.name}</h4>
                                     <Badge variant={camp.status === 'active' ? 'default' : camp.status === 'completed' ? 'secondary' : 'outline'} className={camp.status === 'active' ? 'bg-green-500' : ''}>
                                         {camp.status.toUpperCase()}
                                     </Badge>
                                     <Badge variant="outline" className="capitalize">{camp.campaign_mode} AI</Badge>
+                                    {(camp as any).ai_auto_reply_enabled && (
+                                        <Badge variant="outline" className="border-purple-400/50 text-purple-400 gap-1 animate-pulse">
+                                            <Bot className="h-3 w-3" /> AI Autopilot
+                                        </Badge>
+                                    )}
                                 </div>
-                                <div className="text-sm text-muted-foreground flex gap-4">
-                                    <span>Recipients: {camp.recipient_count}</span>
-                                    <span>Goal: {camp.campaign_goal.replace('_', ' ')}</span>
-                                    <span>Created: {format(new Date(camp.created_at), 'MMM d, yyyy')}</span>
+                                <div className="text-sm text-muted-foreground flex gap-4 flex-wrap">
+                                    <span className="flex items-center gap-1"><Users className="h-3.5 w-3.5" /> Recipients: {camp.recipient_count}</span>
+                                    <span className="flex items-center gap-1"><Target className="h-3.5 w-3.5" /> Goal: {camp.campaign_goal.replace('_', ' ')}</span>
+                                    <span className="flex items-center gap-1"><CalendarClock className="h-3.5 w-3.5" /> {format(new Date(camp.created_at), 'MMM d, yyyy')}</span>
                                 </div>
                             </div>
                             
-                            <div className="flex items-center gap-2 w-full md:w-auto">
-                                <CampaignAnalyticsBadge campaignId={camp.id} />
+                            <div className="flex items-center gap-2 w-full md:w-auto" onClick={e => e.stopPropagation()}>
+                                <CampaignAnalyticsBadge campaignId={camp.id} recipientCount={camp.recipient_count} />
 
                                 {(camp.status === 'draft' || camp.status === 'scheduled') && (
                                     <Button size="sm" onClick={() => startCampaign.mutate(camp.id)} disabled={startCampaign.isPending}>
@@ -426,6 +520,7 @@ function CampaignsTab(props: { onEdit: (campaign: any) => void }) {
                                 }}>
                                     <Trash2 className="h-4 w-4" />
                                 </Button>
+                                <ChevronRight className="h-5 w-5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                             </div>
                         </CardContent>
                     </Card>
@@ -444,21 +539,26 @@ function CampaignsTab(props: { onEdit: (campaign: any) => void }) {
 }
 
 // Mini component to fetch and show analytics on the campaign card
-function CampaignAnalyticsBadge({ campaignId }: { campaignId: string }) {
+function CampaignAnalyticsBadge({ campaignId, recipientCount }: { campaignId: string; recipientCount: number }) {
     const { useCampaignAnalytics } = useEmailCampaigns();
     const { data: stats } = useCampaignAnalytics(campaignId);
 
     if (!stats) return null;
 
     return (
-        <div className="flex gap-4 px-4 py-2 bg-muted/30 rounded-lg mr-2 text-sm border">
-            <div>
-                <span className="text-muted-foreground">Open</span>
-                <p className="font-semibold text-blue-600">{stats.openRate}%</p>
+        <div className="flex gap-3 px-4 py-2 bg-muted/30 rounded-lg mr-2 text-sm border items-center">
+            <div className="text-center">
+                <span className="text-[10px] uppercase tracking-wider text-muted-foreground block">Sent</span>
+                <p className="font-bold text-primary">{stats.sent}<span className="text-muted-foreground font-normal">/{recipientCount}</span></p>
             </div>
-            <div>
-                <span className="text-muted-foreground">Reply</span>
-                <p className="font-semibold text-green-600">{stats.replyRate}%</p>
+            <div className="w-px h-8 bg-border" />
+            <div className="text-center">
+                <span className="text-[10px] uppercase tracking-wider text-muted-foreground block">Open</span>
+                <p className="font-semibold text-blue-500">{stats.openRate}%</p>
+            </div>
+            <div className="text-center">
+                <span className="text-[10px] uppercase tracking-wider text-muted-foreground block">Reply</span>
+                <p className="font-semibold text-green-500">{stats.replyRate}%</p>
             </div>
         </div>
     );
@@ -486,6 +586,7 @@ function BuilderTab({ onCancel }: { onCancel: () => void }) {
     const [productInfo, setProductInfo] = useState('');
     const [stepsCount, setStepsCount] = useState(4);
     const [isGenerating, setIsGenerating] = useState(false);
+    const [autopilotEnabled, setAutopilotEnabled] = useState(false);
     
     // Sequences state
     const [sequences, setSequences] = useState<any[]>([]);
@@ -493,7 +594,7 @@ function BuilderTab({ onCancel }: { onCancel: () => void }) {
     // Settings state
     const [delayMs, setDelayMs] = useState(60000); // 1 min between emails
 
-    const handleGenerateGenetic = async () => {
+    const handleGenerateAgentic = async () => {
         if (!company?.id) return;
         setIsGenerating(true);
         try {
@@ -529,11 +630,14 @@ function BuilderTab({ onCancel }: { onCancel: () => void }) {
             await createCampaign.mutateAsync({
                 name,
                 campaignGoal: goal,
-                campaignMode: 'genetic',
+                campaignMode: 'agentic',
                 accountIds: selectedAccounts,
                 delayBetweenEmailsMs: delayMs,
                 aiGenerated: true,
                 aiPerspective: perspective,
+                aiAutoReplyEnabled: autopilotEnabled,
+                aiAutoReplyGoal: goal,
+                aiAutoReplyPerspective: perspective,
                 sequences,
                 leads,
                 emailField,
@@ -699,7 +803,7 @@ function BuilderTab({ onCancel }: { onCancel: () => void }) {
                             <CardTitle className="text-lg flex items-center gap-2">
                                 <Bot className="h-5 w-5 text-primary" /> AI Matrix Generator
                             </CardTitle>
-                            <CardDescription>Genetic mode writes the entire campaign at once</CardDescription>
+                            <CardDescription>Agentic mode writes the entire campaign at once</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4 pt-4">
                             <div className="space-y-2">
@@ -749,10 +853,25 @@ function BuilderTab({ onCancel }: { onCancel: () => void }) {
                                 />
                             </div>
 
-                            <div className="pt-4 border-t">
+                            <div className="flex flex-row items-center justify-between rounded-lg border p-4 bg-primary/5 border-primary/20 mt-4">
+                                <div className="space-y-0.5">
+                                    <Label className="text-base text-primary flex items-center gap-2">
+                                        <Bot className="h-4 w-4" /> AI Autopilot
+                                    </Label>
+                                    <p className="text-xs text-muted-foreground">
+                                        Let Gemini fully negotiate and reply to incoming leads automatically to reach your goal.
+                                    </p>
+                                </div>
+                                <Switch
+                                    checked={autopilotEnabled}
+                                    onCheckedChange={setAutopilotEnabled}
+                                />
+                            </div>
+
+                            <div className="pt-4 border-t mt-4">
                                 <Button 
                                     className="w-full font-semibold" 
-                                    onClick={handleGenerateGenetic}
+                                    onClick={handleGenerateAgentic}
                                     disabled={isGenerating || !perspective}
                                 >
                                     {isGenerating ? (
@@ -771,17 +890,370 @@ function BuilderTab({ onCancel }: { onCancel: () => void }) {
     );
 }
 
+// ─── Campaign Detail View (Full Analytics Dashboard) ─────────────────────────
+function CampaignDetailView({ campaign, onBack }: { campaign: EmailCampaign; onBack: () => void }) {
+    const { useCampaignAnalytics, useCampaignRecipients, useCampaignLogs, useCampaignSequences, startCampaign, pauseCampaign, resumeCampaign } = useEmailCampaigns();
+    const { data: stats, isLoading: statsLoading } = useCampaignAnalytics(campaign.id);
+    const { data: recipients } = useCampaignRecipients(campaign.id);
+    const { data: logs } = useCampaignLogs({ campaignId: campaign.id });
+    const { data: sequences } = useCampaignSequences(campaign.id);
+    const [recipientFilter, setRecipientFilter] = useState('all');
+    const [recipientSearch, setRecipientSearch] = useState('');
+    const [activeTab, setActiveTab] = useState('overview');
+
+    const filteredRecipients = useMemo(() => {
+        if (!recipients) return [];
+        let filtered = recipients as any[];
+        if (recipientFilter !== 'all') filtered = filtered.filter(r => r.status === recipientFilter);
+        if (recipientSearch) {
+            const q = recipientSearch.toLowerCase();
+            filtered = filtered.filter(r => (r.lead_name || '').toLowerCase().includes(q) || (r.lead_email || '').toLowerCase().includes(q));
+        }
+        return filtered;
+    }, [recipients, recipientFilter, recipientSearch]);
+
+    const statusColors: Record<string, string> = {
+        pending: 'bg-gray-500/20 text-gray-400',
+        in_progress: 'bg-blue-500/20 text-blue-400',
+        completed: 'bg-emerald-500/20 text-emerald-400',
+        replied: 'bg-green-500/20 text-green-400',
+        bounced: 'bg-orange-500/20 text-orange-400',
+        failed: 'bg-red-500/20 text-red-400',
+        unsubscribed: 'bg-yellow-500/20 text-yellow-400',
+    };
+
+    return (
+        <div className="flex-1 space-y-6 p-4 md:p-8 pt-6 animate-in fade-in slide-in-from-right-4 duration-300">
+            {/* Header */}
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                    <Button variant="ghost" size="icon" onClick={onBack} className="rounded-full"><ArrowLeft className="h-5 w-5" /></Button>
+                    <div>
+                        <div className="flex items-center gap-3">
+                            <h2 className="text-2xl font-bold tracking-tight">{campaign.name}</h2>
+                            <Badge variant={campaign.status === 'active' ? 'default' : 'outline'} className={campaign.status === 'active' ? 'bg-green-500' : ''}>
+                                {campaign.status.toUpperCase()}
+                            </Badge>
+                            {(campaign as any).ai_auto_reply_enabled && (
+                                <Badge variant="outline" className="border-purple-400/50 text-purple-400 gap-1">
+                                    <Bot className="h-3 w-3 animate-pulse" /> AI Autopilot Active
+                                </Badge>
+                            )}
+                        </div>
+                        <p className="text-sm text-muted-foreground mt-1">
+                            Created {format(new Date(campaign.created_at), 'MMM d, yyyy')} • Goal: {campaign.campaign_goal.replace('_', ' ')} • {campaign.campaign_mode} AI
+                        </p>
+                    </div>
+                </div>
+                <div className="flex gap-2">
+                    {campaign.status === 'active' && (
+                        <Button variant="outline" size="sm" onClick={() => pauseCampaign.mutate(campaign.id)}><Pause className="mr-2 h-4 w-4" /> Pause</Button>
+                    )}
+                    {campaign.status === 'paused' && (
+                        <Button size="sm" onClick={() => resumeCampaign.mutate(campaign.id)}><Play className="mr-2 h-4 w-4" /> Resume</Button>
+                    )}
+                    {(campaign.status === 'draft' || campaign.status === 'scheduled') && (
+                        <Button size="sm" onClick={() => startCampaign.mutate(campaign.id)}><Zap className="mr-2 h-4 w-4" /> Launch Campaign</Button>
+                    )}
+                </div>
+            </div>
+
+            {/* Hero Stats */}
+            {stats && (
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                    {[
+                        { label: 'Recipients', value: stats.total, icon: Users, color: 'text-foreground' },
+                        { label: 'Emails Sent', value: stats.sent, icon: Send, color: 'text-primary' },
+                        { label: 'Opened', value: stats.opened, icon: Eye, color: 'text-blue-500', sub: `${stats.openRate}%` },
+                        { label: 'Replied', value: stats.replied, icon: Reply, color: 'text-green-500', sub: `${stats.replyRate}%` },
+                        { label: 'Clicked', value: stats.clicked, icon: MousePointerClick, color: 'text-purple-500', sub: `${stats.clickRate}%` },
+                        { label: 'Failed', value: stats.bounced + stats.failed, icon: XCircle, color: 'text-red-500' },
+                    ].map((stat) => (
+                        <Card key={stat.label} className="border-border/50 bg-card/50 backdrop-blur">
+                            <CardContent className="p-4">
+                                <div className="flex items-center justify-between mb-2">
+                                    <stat.icon className={`h-4 w-4 ${stat.color} opacity-70`} />
+                                    {stat.sub && <span className={`text-xs font-semibold ${stat.color}`}>{stat.sub}</span>}
+                                </div>
+                                <div className={`text-2xl font-bold ${stat.color}`}>{stat.value}</div>
+                                <p className="text-[11px] text-muted-foreground mt-1 uppercase tracking-wider">{stat.label}</p>
+                            </CardContent>
+                        </Card>
+                    ))}
+                </div>
+            )}
+
+            {/* Sending Progress */}
+            {stats && stats.total > 0 && (
+                <Card className="border-border/50">
+                    <CardContent className="p-4">
+                        <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-medium">Campaign Progress</span>
+                            <span className="text-xs text-muted-foreground">{stats.sent} of {stats.total} emails sent ({Math.round((stats.sent / Math.max(stats.total, 1)) * 100)}%)</span>
+                        </div>
+                        <Progress value={(stats.sent / Math.max(stats.total, 1)) * 100} className="h-2" />
+                    </CardContent>
+                </Card>
+            )}
+
+            {/* Tabs: Overview / Recipients / Activity */}
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+                <TabsList className="bg-muted/50">
+                    <TabsTrigger value="overview" className="gap-2"><BarChart className="h-3.5 w-3.5" /> Overview</TabsTrigger>
+                    <TabsTrigger value="recipients" className="gap-2"><Users className="h-3.5 w-3.5" /> Recipients ({stats?.total || 0})</TabsTrigger>
+                    <TabsTrigger value="activity" className="gap-2"><Activity className="h-3.5 w-3.5" /> Activity Log</TabsTrigger>
+                </TabsList>
+
+                {/* OVERVIEW Tab */}
+                <TabsContent value="overview" className="mt-4 space-y-6">
+                    <div className="grid lg:grid-cols-[1fr_380px] gap-6">
+                        {/* Sequence Steps */}
+                        <Card>
+                            <CardHeader className="pb-4">
+                                <CardTitle className="text-base flex items-center gap-2"><AlignLeft className="h-4 w-4" /> Sequence Performance</CardTitle>
+                                <CardDescription>{stats?.totalSteps || 0} email steps in this campaign</CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                {stats?.stepStats?.map((step, idx) => (
+                                    <div key={idx} className="relative border rounded-lg p-4 bg-muted/20">
+                                        <div className="flex items-start justify-between mb-3">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-7 h-7 rounded-full bg-primary flex items-center justify-center text-white text-xs font-bold">{step.stepNumber}</div>
+                                                <div>
+                                                    <p className="font-medium text-sm line-clamp-1">{step.subject}</p>
+                                                    <p className="text-[10px] text-muted-foreground uppercase">{step.condition.replace('_', ' ')}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-4 gap-3 text-center text-xs">
+                                            <div><span className="font-bold text-lg text-primary block">{step.sent}</span><span className="text-muted-foreground">Sent</span></div>
+                                            <div><span className="font-bold text-lg text-blue-500 block">{step.opened}</span><span className="text-muted-foreground">Opened</span></div>
+                                            <div><span className="font-bold text-lg text-green-500 block">{step.replied}</span><span className="text-muted-foreground">Replied</span></div>
+                                            <div><span className="font-bold text-lg text-purple-500 block">{step.clicked}</span><span className="text-muted-foreground">Clicked</span></div>
+                                        </div>
+                                        {step.sent > 0 && (
+                                            <div className="mt-3 flex gap-1">
+                                                <div className="h-1.5 rounded-full bg-blue-500/80" style={{ width: `${(step.opened / step.sent) * 100}%` }} />
+                                                <div className="h-1.5 rounded-full bg-green-500/80" style={{ width: `${(step.replied / step.sent) * 100}%` }} />
+                                                <div className="h-1.5 rounded-full bg-muted flex-1" />
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                                {(!stats?.stepStats || stats.stepStats.length === 0) && (
+                                    <p className="text-center text-muted-foreground py-8">No sequence data yet</p>
+                                )}
+                            </CardContent>
+                        </Card>
+
+                        {/* AI Agent Panel */}
+                        <div className="space-y-4">
+                            <Card className="border-purple-500/20 bg-gradient-to-br from-purple-500/5 to-transparent">
+                                <CardHeader className="pb-3">
+                                    <CardTitle className="text-base flex items-center gap-2">
+                                        <Brain className="h-4 w-4 text-purple-400" /> AI Agent Intelligence
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border">
+                                        <div className="flex items-center gap-2">
+                                            <div className={`w-2 h-2 rounded-full ${(campaign as any).ai_auto_reply_enabled ? 'bg-green-500 animate-pulse' : 'bg-gray-500'}`} />
+                                            <span className="text-sm font-medium">Autopilot Mode</span>
+                                        </div>
+                                        <Badge variant={(campaign as any).ai_auto_reply_enabled ? 'default' : 'secondary'}>
+                                            {(campaign as any).ai_auto_reply_enabled ? 'ACTIVE' : 'OFF'}
+                                        </Badge>
+                                    </div>
+                                    <div className="space-y-3 text-sm">
+                                        <div>
+                                            <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Campaign Goal</span>
+                                            <p className="font-medium capitalize mt-1">{campaign.campaign_goal.replace('_', ' ')}</p>
+                                        </div>
+                                        {(campaign as any).ai_perspective && (
+                                            <div>
+                                                <span className="text-[10px] uppercase tracking-widest text-muted-foreground">AI Perspective</span>
+                                                <p className="text-muted-foreground mt-1 line-clamp-3">{(campaign as any).ai_perspective}</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                    {(campaign as any).ai_auto_reply_enabled && (
+                                        <div className="p-3 rounded-lg bg-purple-500/10 border border-purple-500/20">
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <Sparkles className="h-3.5 w-3.5 text-purple-400" />
+                                                <span className="text-xs font-semibold text-purple-400">AI STATUS</span>
+                                            </div>
+                                            <p className="text-xs text-muted-foreground">
+                                                AI is autonomously engaging with leads who reply. Gemini analyzes conversation context and responds to move toward your campaign goal.
+                                            </p>
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+
+                            {/* Status Breakdown */}
+                            {stats && (
+                                <Card>
+                                    <CardHeader className="pb-3">
+                                        <CardTitle className="text-base">Recipient Status</CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="space-y-2">
+                                        {[
+                                            { label: 'Pending', count: stats.pending, color: 'bg-gray-500' },
+                                            { label: 'In Progress', count: stats.in_progress, color: 'bg-blue-500' },
+                                            { label: 'Completed', count: stats.completed, color: 'bg-emerald-500' },
+                                            { label: 'Replied', count: stats.replied, color: 'bg-green-500' },
+                                            { label: 'Bounced', count: stats.bounced, color: 'bg-orange-500' },
+                                            { label: 'Failed', count: stats.failed, color: 'bg-red-500' },
+                                        ].filter(s => s.count > 0).map(s => (
+                                            <div key={s.label} className="flex items-center justify-between text-sm">
+                                                <div className="flex items-center gap-2">
+                                                    <div className={`w-2.5 h-2.5 rounded-full ${s.color}`} />
+                                                    <span>{s.label}</span>
+                                                </div>
+                                                <span className="font-semibold">{s.count}</span>
+                                            </div>
+                                        ))}
+                                    </CardContent>
+                                </Card>
+                            )}
+                        </div>
+                    </div>
+                </TabsContent>
+
+                {/* RECIPIENTS Tab */}
+                <TabsContent value="recipients" className="mt-4">
+                    <Card>
+                        <CardHeader className="pb-4">
+                            <div className="flex flex-col sm:flex-row justify-between gap-3">
+                                <CardTitle className="text-base">Recipients</CardTitle>
+                                <div className="flex gap-2">
+                                    <div className="relative">
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                        <Input placeholder="Search name or email..." className="pl-9 h-9 w-[250px]" value={recipientSearch} onChange={e => setRecipientSearch(e.target.value)} />
+                                    </div>
+                                    <Select value={recipientFilter} onValueChange={setRecipientFilter}>
+                                        <SelectTrigger className="w-[150px] h-9"><Filter className="h-3.5 w-3.5 mr-2" /><SelectValue /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">All Status</SelectItem>
+                                            <SelectItem value="pending">Pending</SelectItem>
+                                            <SelectItem value="in_progress">In Progress</SelectItem>
+                                            <SelectItem value="completed">Completed</SelectItem>
+                                            <SelectItem value="replied">Replied</SelectItem>
+                                            <SelectItem value="failed">Failed</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="p-0">
+                            <div className="overflow-x-auto">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Name</TableHead>
+                                            <TableHead>Email</TableHead>
+                                            <TableHead>Status</TableHead>
+                                            <TableHead className="text-center">Step</TableHead>
+                                            <TableHead className="text-center">Opened</TableHead>
+                                            <TableHead className="text-center">Replied</TableHead>
+                                            <TableHead>Last Sent</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {filteredRecipients.slice(0, 100).map((r: any) => (
+                                            <TableRow key={r.id} className="text-sm">
+                                                <TableCell className="font-medium">{r.lead_name || '—'}</TableCell>
+                                                <TableCell className="text-muted-foreground">{r.lead_email}</TableCell>
+                                                <TableCell>
+                                                    <Badge variant="outline" className={statusColors[r.status] || ''}>{r.status}</Badge>
+                                                </TableCell>
+                                                <TableCell className="text-center">{r.current_step}/{stats?.totalSteps || '?'}</TableCell>
+                                                <TableCell className="text-center">{r.opened_at ? <Eye className="h-4 w-4 text-blue-500 mx-auto" /> : <span className="text-muted-foreground">—</span>}</TableCell>
+                                                <TableCell className="text-center">{r.replied_at ? <CheckCircle2 className="h-4 w-4 text-green-500 mx-auto" /> : <span className="text-muted-foreground">—</span>}</TableCell>
+                                                <TableCell className="text-muted-foreground text-xs">{r.last_sent_at ? format(new Date(r.last_sent_at), 'MMM d, h:mm a') : '—'}</TableCell>
+                                            </TableRow>
+                                        ))}
+                                        {filteredRecipients.length === 0 && (
+                                            <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No recipients match your filters</TableCell></TableRow>
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                            {filteredRecipients.length > 100 && (
+                                <p className="text-center py-3 text-xs text-muted-foreground border-t">Showing 100 of {filteredRecipients.length} recipients</p>
+                            )}
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                {/* ACTIVITY LOG Tab */}
+                <TabsContent value="activity" className="mt-4">
+                    <Card>
+                        <CardHeader className="pb-4">
+                            <CardTitle className="text-base flex items-center gap-2"><Clock className="h-4 w-4" /> Email Activity Log</CardTitle>
+                            <CardDescription>Recent email sends and tracking events</CardDescription>
+                        </CardHeader>
+                        <CardContent className="p-0">
+                            <div className="divide-y max-h-[600px] overflow-y-auto">
+                                {(logs || []).slice(0, 50).map((log: any) => (
+                                    <div key={log.id} className="flex items-center gap-4 px-6 py-3 hover:bg-muted/30 transition-colors">
+                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
+                                            log.status === 'opened' ? 'bg-blue-500/20 text-blue-400' :
+                                            log.status === 'replied' ? 'bg-green-500/20 text-green-400' :
+                                            log.status === 'clicked' ? 'bg-purple-500/20 text-purple-400' :
+                                            log.status === 'bounced' || log.status === 'failed' ? 'bg-red-500/20 text-red-400' :
+                                            'bg-primary/20 text-primary'
+                                        }`}>
+                                            {log.status === 'opened' ? <Eye className="h-4 w-4" /> :
+                                             log.status === 'replied' ? <Reply className="h-4 w-4" /> :
+                                             log.status === 'clicked' ? <MousePointerClick className="h-4 w-4" /> :
+                                             log.status === 'failed' || log.status === 'bounced' ? <XCircle className="h-4 w-4" /> :
+                                             <Send className="h-4 w-4" />}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-sm font-medium truncate">{log.recipient_email}</p>
+                                            <p className="text-xs text-muted-foreground truncate">{log.subject || 'No subject'}</p>
+                                        </div>
+                                        <div className="text-right shrink-0">
+                                            <Badge variant="outline" className="text-[10px]">{log.status}</Badge>
+                                            <p className="text-[10px] text-muted-foreground mt-1">{log.sent_at ? format(new Date(log.sent_at), 'MMM d, h:mm a') : ''}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                                {(!logs || logs.length === 0) && (
+                                    <p className="text-center py-12 text-muted-foreground">No activity yet. Start the campaign to see email sends here.</p>
+                                )}
+                            </div>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+            </Tabs>
+        </div>
+    );
+}
+
 // ─── Analytics & Logs Tabs ──────────────────────────────────────────────────
 function AnalyticsTab() {
     const { campaigns, isLoading } = useEmailCampaigns();
 
-    if (isLoading) return <div>Loading...</div>;
+    if (isLoading) return <div className="flex justify-center py-12"><Loader2 className="animate-spin h-6 w-6 text-primary" /></div>;
+
+    const activeCampaigns = campaigns.filter(c => c.status !== 'draft');
 
     return (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {campaigns.filter(c => c.status !== 'draft').map(camp => (
-                <AnalyticsCard key={camp.id} campaign={camp} />
-            ))}
+        <div className="space-y-6">
+            {activeCampaigns.length === 0 && (
+                <div className="text-center py-12 border rounded-lg bg-card">
+                    <BarChart className="mx-auto h-12 w-12 text-muted-foreground opacity-50 mb-4" />
+                    <h3 className="font-medium text-lg">No analytics yet</h3>
+                    <p className="text-muted-foreground">Start a campaign to see analytics here.</p>
+                </div>
+            )}
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                {activeCampaigns.map(camp => (
+                    <AnalyticsCard key={camp.id} campaign={camp} />
+                ))}
+            </div>
         </div>
     );
 }
@@ -790,73 +1262,275 @@ function AnalyticsCard({ campaign }: { campaign: any }) {
     const { useCampaignAnalytics } = useEmailCampaigns();
     const { data: stats } = useCampaignAnalytics(campaign.id);
 
-    if (!stats) return <Card><CardContent className="p-6">Loading stats for {campaign.name}...</CardContent></Card>;
+    if (!stats) return <Card><CardContent className="p-6"><Loader2 className="animate-spin h-4 w-4" /></CardContent></Card>;
 
     return (
-        <Card>
+        <Card className="hover:border-primary/30 transition-colors">
             <CardHeader className="pb-2">
-                <CardTitle className="text-base truncate" title={campaign.name}>{campaign.name}</CardTitle>
-                <CardDescription>Sent via {campaign.account_ids?.length || 0} accounts</CardDescription>
+                <div className="flex items-center justify-between">
+                    <CardTitle className="text-base truncate" title={campaign.name}>{campaign.name}</CardTitle>
+                    <Badge variant={campaign.status === 'active' ? 'default' : 'secondary'} className={campaign.status === 'active' ? 'bg-green-500' : ''}>
+                        {campaign.status}
+                    </Badge>
+                </div>
+                <CardDescription className="flex items-center gap-1"><Send className="h-3 w-3" />{stats.sent} emails sent</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4 pt-2">
-                    <div className="space-y-1">
-                        <span className="text-xs text-muted-foreground">Open Rate</span>
-                        <div className="flex items-center gap-2">
-                            <span className="text-2xl font-bold">{stats.openRate}%</span>
-                        </div>
-                        <Progress value={stats.openRate} className="h-1.5" />
+                <div className="grid grid-cols-3 gap-4 pt-2">
+                    <div className="space-y-1 text-center">
+                        <div className="text-2xl font-bold text-blue-500">{stats.openRate}%</div>
+                        <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Open Rate</span>
+                        <Progress value={stats.openRate} className="h-1" />
                     </div>
-                    <div className="space-y-1">
-                        <span className="text-xs text-muted-foreground">Reply Rate</span>
-                        <div className="flex items-center gap-2">
-                            <span className="text-2xl font-bold">{stats.replyRate}%</span>
-                        </div>
-                        <Progress value={stats.replyRate} className="h-1.5" />
+                    <div className="space-y-1 text-center">
+                        <div className="text-2xl font-bold text-green-500">{stats.replyRate}%</div>
+                        <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Reply Rate</span>
+                        <Progress value={stats.replyRate} className="h-1" />
+                    </div>
+                    <div className="space-y-1 text-center">
+                        <div className="text-2xl font-bold text-purple-500">{stats.clickRate}%</div>
+                        <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Click Rate</span>
+                        <Progress value={stats.clickRate} className="h-1" />
                     </div>
                 </div>
                 
                 <div className="grid grid-cols-4 gap-2 pt-4 border-t text-center text-xs">
-                    <div>
-                        <div className="font-semibold">{stats.total}</div>
-                        <div className="text-muted-foreground">Total</div>
-                    </div>
-                    <div>
-                        <div className="font-semibold text-blue-600">{stats.completed}</div>
-                        <div className="text-muted-foreground">Sent</div>
-                    </div>
-                    <div>
-                        <div className="font-semibold text-green-600">{stats.opened}</div>
-                        <div className="text-muted-foreground">Opens</div>
-                    </div>
-                    <div>
-                        <div className="font-semibold text-red-600">{stats.bounced + stats.failed}</div>
-                        <div className="text-muted-foreground">Failed</div>
-                    </div>
+                    <div><div className="font-semibold">{stats.total}</div><div className="text-muted-foreground">Total</div></div>
+                    <div><div className="font-semibold text-primary">{stats.sent}</div><div className="text-muted-foreground">Sent</div></div>
+                    <div><div className="font-semibold text-blue-500">{stats.opened}</div><div className="text-muted-foreground">Opens</div></div>
+                    <div><div className="font-semibold text-red-500">{stats.bounced + stats.failed}</div><div className="text-muted-foreground">Failed</div></div>
                 </div>
             </CardContent>
         </Card>
     );
 }
 
+// ─── Inbox Tab ─────────────────────────────────────────────────────────────
+function InboxTab() {
+    const { threads, isLoadingThreads, useMessages, syncEmails, markAsRead } = useEmailInbox();
+    const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
+    const { data: messages, isLoading: isLoadingMessages } = useMessages(selectedThreadId);
+    const [replyText, setReplyText] = useState('');
+    const { company } = useCompany();
+    const { accounts } = useEmailAccounts();
+    const queryClient = useQueryClient();
+    
+    const sendReply = useMutation({
+        mutationFn: async () => {
+            const thread = threads.find(t => t.id === selectedThreadId);
+            if (!thread || !replyText.trim()) return;
+
+            const { data: sessionData } = await supabase.auth.getSession();
+            const token = sessionData.session?.access_token;
+            const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+
+            // Get the last inbound message to get message_id for threading
+            const lastInbound = [...(messages || [])].reverse().find(m => m.direction === 'inbound');
+
+            const res = await fetch(`https://${projectId}.supabase.co/functions/v1/fastsend-send`, {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    accountId: thread.email_account_id,
+                    to: lastInbound?.from_address || thread.subject.match(/<(.+?)>/)?.[1] || '',
+                    subject: thread.subject.startsWith('Re:') ? thread.subject : `Re: ${thread.subject}`,
+                    bodyHtml: `<p>${replyText.replace(/\n/g, '<br/>')}</p>`,
+                    companyId: company?.id,
+                    threadId: thread.id,
+                    inReplyTo: lastInbound?.message_id || null,
+                    references: lastInbound?.message_id || null
+                }),
+            });
+
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.error || 'Failed to send reply');
+            }
+            return res.json();
+        },
+        onSuccess: () => {
+            toast.success('Reply sent!');
+            setReplyText('');
+            queryClient.invalidateQueries({ queryKey: ['email-messages', selectedThreadId] });
+            queryClient.invalidateQueries({ queryKey: ['email-threads'] });
+        },
+        onError: (err: any) => {
+            toast.error(err.message);
+        }
+    });
+
+    // Auto-mark as read when thread is selected
+    React.useEffect(() => {
+        if (selectedThreadId) {
+            const thread = threads.find(t => t.id === selectedThreadId);
+            if (thread && !thread.is_read) {
+                markAsRead.mutate(selectedThreadId);
+            }
+        }
+    }, [selectedThreadId, threads, markAsRead]);
+
+    if (isLoadingThreads) return <div className="flex justify-center p-12"><Loader2 className="animate-spin" /></div>;
+
+    return (
+        <div className="grid lg:grid-cols-[350px_1fr] gap-0 border rounded-xl bg-card overflow-hidden h-[calc(100vh-280px)] min-h-[500px]">
+            {/* Sidebar: Thread List */}
+            <div className="border-r flex flex-col bg-muted/10">
+                <div className="p-4 border-b flex justify-between items-center bg-card">
+                    <h3 className="font-semibold flex items-center gap-2"><Inbox className="h-4 w-4" /> Inbox</h3>
+                    <Button variant="ghost" size="icon" onClick={() => syncEmails.mutate()} disabled={syncEmails.isPending}>
+                        <RefreshCcw className={`h-4 w-4 ${syncEmails.isPending ? 'animate-spin' : ''}`} />
+                    </Button>
+                </div>
+                
+                <div className="flex-1 overflow-y-auto">
+                    {threads.length === 0 ? (
+                        <div className="p-8 text-center text-muted-foreground text-sm">
+                            No messages found. Click refresh to sync.
+                        </div>
+                    ) : (
+                        threads.map(thread => (
+                            <div 
+                                key={thread.id} 
+                                onClick={() => { setSelectedThreadId(thread.id); setReplyText(''); }}
+                                className={`p-4 border-b cursor-pointer transition-colors hover:bg-muted/50 ${selectedThreadId === thread.id ? 'bg-primary/5 border-l-4 border-l-primary' : ''} ${!thread.is_read ? 'bg-blue-50/30' : ''}`}
+                            >
+                                <div className="flex justify-between items-start mb-1">
+                                    <span className={`text-sm truncate pr-2 ${!thread.is_read ? 'font-bold' : 'font-medium'}`}>
+                                        {thread.subject}
+                                    </span>
+                                    <span className="text-[10px] text-muted-foreground shrink-0 mt-0.5">
+                                        {format(new Date(thread.last_message_at), 'MMM d')}
+                                    </span>
+                                </div>
+                                <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
+                                    {thread.snippet || 'No preview available'}
+                                </p>
+                            </div>
+                        ))
+                    )}
+                </div>
+            </div>
+
+            {/* Main: Message View */}
+            <div className="flex flex-col bg-card overflow-hidden">
+                {selectedThreadId ? (
+                    <>
+                        <div className="p-4 border-b flex justify-between items-center bg-muted/5">
+                            <div className="flex items-center gap-3">
+                                <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setSelectedThreadId(null)}>
+                                    <ArrowLeft className="h-4 w-4" />
+                                </Button>
+                                <div>
+                                    <h4 className="font-bold text-base leading-none">
+                                        {threads.find(t => t.id === selectedThreadId)?.subject}
+                                    </h4>
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                        Thread ID: {selectedThreadId}
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex gap-2">
+                                <Button variant="outline" size="sm" className="gap-2">
+                                    <Users className="h-3.5 w-3.5" /> View Lead
+                                </Button>
+                                <Button size="sm" className="gap-2">
+                                    <Reply className="h-3.5 w-3.5" /> Reply
+                                </Button>
+                            </div>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-muted/5">
+                            {isLoadingMessages ? (
+                                <div className="flex justify-center py-12"><Loader2 className="animate-spin text-primary" /></div>
+                            ) : (
+                                messages?.map(msg => (
+                                    <div key={msg.id} className={`flex ${msg.direction === 'outbound' ? 'justify-end' : 'justify-start'}`}>
+                                        <div className={`max-w-[85%] rounded-2xl p-4 shadow-sm border ${msg.direction === 'outbound' ? 'bg-primary text-primary-foreground border-primary' : 'bg-card border-border'}`}>
+                                            <div className="flex justify-between items-center mb-2 gap-4">
+                                                <span className="text-xs font-bold opacity-80">
+                                                    {msg.direction === 'outbound' ? 'You' : msg.from_address}
+                                                </span>
+                                                <span className="text-[10px] opacity-60">
+                                                    {format(new Date(msg.received_at), 'MMM d, h:mm a')}
+                                                </span>
+                                            </div>
+                                            <div 
+                                                className={`text-sm leading-relaxed prose prose-sm max-w-none ${msg.direction === 'outbound' ? 'text-white prose-invert' : 'text-foreground'}`}
+                                                dangerouslySetInnerHTML={{ __html: msg.body_html || `<p>${msg.body_text}</p>` }}
+                                            />
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+
+                        <div className="p-4 border-t bg-muted/5">
+                            <div className="relative group">
+                                <Textarea 
+                                    placeholder="Type your reply here..." 
+                                    className="min-h-[100px] pr-12 focus-visible:ring-primary shadow-inner"
+                                    value={replyText}
+                                    onChange={(e) => setReplyText(e.target.value)}
+                                    disabled={sendReply.isPending}
+                                />
+                                <Button 
+                                    size="icon" 
+                                    className="absolute bottom-3 right-3 h-8 w-8 shadow-md"
+                                    onClick={() => sendReply.mutate()}
+                                    disabled={!replyText.trim() || sendReply.isPending}
+                                >
+                                    {sendReply.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Reply className="h-4 w-4" />}
+                                </Button>
+                            </div>
+                        </div>
+                    </>
+                ) : (
+                    <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-12">
+                        <div className="w-20 h-20 rounded-full bg-muted/50 flex items-center justify-center mb-6">
+                            <Mail className="h-10 w-10 opacity-20" />
+                        </div>
+                        <h3 className="text-xl font-semibold text-foreground mb-2">Select a thread</h3>
+                        <p className="max-w-[300px] text-center text-sm">
+                            Choose a conversation from the left to view the full message history and reply.
+                        </p>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
 // ─── Main Page Component ───────────────────────────────────────────────────
 export default function FastSend() {
-    const [viewMode, setViewMode] = useState<'list' | 'builder'>('list');
+    const [viewMode, setViewMode] = useState<'list' | 'builder' | 'detail'>('list');
+    const [selectedCampaign, setSelectedCampaign] = useState<EmailCampaign | null>(null);
 
     if (viewMode === 'builder') {
         return <div className="p-4 md:p-8 pt-6"><BuilderTab onCancel={() => setViewMode('list')} /></div>;
+    }
+
+    if (viewMode === 'detail' && selectedCampaign) {
+        return <CampaignDetailView campaign={selectedCampaign} onBack={() => { setViewMode('list'); setSelectedCampaign(null); }} />;
     }
 
     return (
         <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
             <div className="flex items-center justify-between space-y-2 mb-6">
                 <div>
-                    <h2 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">FastSend Email Engine</h2>
-                    <p className="text-muted-foreground">AI-powered drip campaigns and outreach automation</p>
+                    <div className="flex items-center gap-3">
+                        <h2 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary via-purple-500 to-blue-600 bg-clip-text text-transparent">FastSend AI</h2>
+                        <Badge variant="outline" className="border-purple-400/50 text-purple-400 gap-1.5 text-xs">
+                            <Bot className="h-3 w-3" /> Agentic Platform
+                        </Badge>
+                    </div>
+                    <p className="text-muted-foreground">Autonomous AI email campaigns that negotiate, engage, and close leads</p>
                 </div>
                 <div className="flex gap-2">
-                    <Button onClick={() => setViewMode('builder')} className="shadow-md">
-                        <Plus className="mr-2 h-4 w-4" /> New Campaign
+                    <Button onClick={() => setViewMode('builder')} className="shadow-md bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90">
+                        <Zap className="mr-2 h-4 w-4" /> New Campaign
                     </Button>
                 </div>
             </div>
@@ -866,6 +1540,9 @@ export default function FastSend() {
                     <TabsList className="bg-transparent h-12">
                         <TabsTrigger value="campaigns" className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary border-b-2 border-transparent data-[state=active]:border-primary rounded-none shadow-none gap-2">
                             <AlignLeft className="h-4 w-4" /> Campaigns
+                        </TabsTrigger>
+                        <TabsTrigger value="inbox" className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary border-b-2 border-transparent data-[state=active]:border-primary rounded-none shadow-none gap-2">
+                            <Inbox className="h-4 w-4" /> Inbox
                         </TabsTrigger>
                         <TabsTrigger value="accounts" className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary border-b-2 border-transparent data-[state=active]:border-primary rounded-none shadow-none gap-2">
                             <Settings className="h-4 w-4" /> Email Accounts
@@ -877,7 +1554,11 @@ export default function FastSend() {
                 </div>
 
                 <TabsContent value="campaigns" className="m-0 pt-4">
-                    <CampaignsTab onEdit={() => setViewMode('builder')} />
+                    <CampaignsTab onEdit={() => setViewMode('builder')} onOpenDetail={(camp) => { setSelectedCampaign(camp); setViewMode('detail'); }} />
+                </TabsContent>
+
+                <TabsContent value="inbox" className="m-0 pt-4">
+                    <InboxTab />
                 </TabsContent>
 
                 <TabsContent value="accounts" className="m-0 pt-4">

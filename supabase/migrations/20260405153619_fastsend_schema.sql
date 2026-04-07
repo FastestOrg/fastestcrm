@@ -73,7 +73,7 @@ CREATE TABLE IF NOT EXISTS email_campaigns (
     created_by              UUID REFERENCES auth.users(id),
     name                    TEXT NOT NULL,
     campaign_goal           TEXT DEFAULT 'sales' CHECK (campaign_goal IN ('sales', 'meeting_booking', 'app_download', 'other')),
-    campaign_mode           TEXT DEFAULT 'genetic' CHECK (campaign_mode IN ('guided', 'genetic')),
+    campaign_mode           TEXT DEFAULT 'agentic' CHECK (campaign_mode IN ('guided', 'agentic')),
 
     status                  TEXT DEFAULT 'draft' CHECK (status IN ('draft', 'active', 'paused', 'completed', 'scheduled')),
 
@@ -90,7 +90,7 @@ CREATE TABLE IF NOT EXISTS email_campaigns (
 
     -- AI metadata
     ai_generated            BOOLEAN DEFAULT false,
-    ai_perspective          TEXT,                         -- user-provided campaign perspective for genetic mode
+    ai_perspective          TEXT,                         -- user-provided campaign perspective for agentic mode
 
     -- Timestamps
     scheduled_at            TIMESTAMPTZ,

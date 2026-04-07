@@ -1,0 +1,480 @@
+import { useState, useEffect, useCallback } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { ArrowLeft, Plus, Trash2, Loader2, Save, Package } from 'lucide-react';
+import { useQuotations, QuotationItem } from '@/hooks/useQuotations';
+import { useInvoiceTaxes } from '@/hooks/useInvoiceSettings';
+import { useProducts } from '@/hooks/useProducts';
+import { useToast } from '@/hooks/use-toast';
+import { useCompany } from '@/hooks/useCompany';
+
+const CURRENCIES = ['INR', 'USD', 'EUR', 'GBP', 'AED', 'SAR', 'SGD', 'AUD', 'CAD', 'JPY'];
+
+export default function QuotationBuilder() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const { company } = useCompany();
+  const { createQuotation, updateQuotation, fetchQuotationWithItems } = useQuotations();
+  const { taxes } = useInvoiceTaxes();
+  const { products } = useProducts();
+
+  const isEditing = !!id;
+  const [loading, setLoading] = useState(isEditing);
+  const [saving, setSaving] = useState(false);
+
+  // Form state
+  const [clientName, setClientName] = useState('');
+  const [clientEmail, setClientEmail] = useState('');
+  const [clientPhone, setClientPhone] = useState('');
+  const [clientAddress, setClientAddress] = useState('');
+  const [clientGstin, setClientGstin] = useState('');
+  const [subject, setSubject] = useState('');
+  const [currency, setCurrency] = useState(company?.default_currency || 'INR');
+  const [discountType, setDiscountType] = useState<'flat' | 'percentage' | ''>('');
+  const [discountValue, setDiscountValue] = useState(0);
+  const [notes, setNotes] = useState('');
+  const [termsAndConditions, setTermsAndConditions] = useState('');
+  const [validUntil, setValidUntil] = useState('');
+  const [items, setItems] = useState<QuotationItem[]>([]);
+
+  // Load existing quotation
+  useEffect(() => {
+    if (isEditing) {
+      fetchQuotationWithItems(id!).then((data) => {
+        setClientName(data.client_name);
+        setClientEmail(data.client_email || '');
+        setClientPhone(data.client_phone || '');
+        setClientAddress(data.client_address || '');
+        setClientGstin(data.client_gstin || '');
+        setSubject(data.subject || '');
+        setCurrency(data.currency || 'INR');
+        setDiscountType(data.discount_type || '');
+        setDiscountValue(data.discount_value || 0);
+        setNotes(data.notes || '');
+        setTermsAndConditions(data.terms_and_conditions || '');
+        setValidUntil(data.valid_until || '');
+        setItems(data.items || []);
+        setLoading(false);
+      }).catch(() => {
+        toast({ title: 'Error', description: 'Quotation not found.', variant: 'destructive' });
+        navigate('/dashboard/quotations');
+      });
+    }
+  }, [id]);
+
+  // Sync default currency from company when loading new document
+  useEffect(() => {
+    if (!isEditing && company?.default_currency && currency === 'INR' && !items.length) {
+      setCurrency(company.default_currency);
+    }
+  }, [company?.default_currency, isEditing]);
+
+  // Add empty item
+  const addItem = () => {
+    setItems([...items, {
+      product_id: null,
+      description: '',
+      hsn_sac_code: null,
+      quantity: 1,
+      unit_price: 0,
+      discount_percentage: 0,
+      tax_ids: [],
+      tax_amount: 0,
+      line_total: 0,
+      sort_order: items.length,
+    }]);
+  };
+
+  // Add from product catalog
+  const addFromProduct = (productId: string) => {
+    const product = products?.find((p) => p.id === productId);
+    if (!product) return;
+
+    const defaultTaxIds = taxes.filter((t) => t.is_default && t.is_active).map((t) => t.id);
+    setItems([...items, {
+      product_id: product.id,
+      description: `${product.category} — ${product.name}`,
+      hsn_sac_code: null,
+      quantity: 1,
+      unit_price: product.price,
+      discount_percentage: 0,
+      tax_ids: defaultTaxIds,
+      tax_amount: 0,
+      line_total: 0,
+      sort_order: items.length,
+    }]);
+  };
+
+  const removeItem = (index: number) => {
+    setItems(items.filter((_, i) => i !== index));
+  };
+
+  const updateItem = (index: number, field: string, value: any) => {
+    const updated = [...items];
+    (updated[index] as any)[field] = value;
+    setItems(updated);
+  };
+
+  // Computed totals
+  const computedItems = items.map((item) => {
+    const base = item.quantity * item.unit_price;
+    const discountAmt = base * (item.discount_percentage / 100);
+    const afterDiscount = base - discountAmt;
+
+    const taxRate = item.tax_ids.reduce((sum, tid) => {
+      const tax = taxes.find((t) => t.id === tid);
+      return sum + (tax?.rate || 0);
+    }, 0);
+
+    const taxAmt = afterDiscount * (taxRate / 100);
+    const lineTotal = afterDiscount + taxAmt;
+
+    return { ...item, tax_amount: Math.round(taxAmt * 100) / 100, line_total: Math.round(lineTotal * 100) / 100 };
+  });
+
+  const subtotal = computedItems.reduce((s, i) => s + (i.quantity * i.unit_price), 0);
+  const itemDiscountTotal = computedItems.reduce((s, i) => s + (i.quantity * i.unit_price * i.discount_percentage / 100), 0);
+  const totalTax = computedItems.reduce((s, i) => s + i.tax_amount, 0);
+
+  let docDiscountAmount = 0;
+  if (discountType === 'flat') docDiscountAmount = discountValue;
+  else if (discountType === 'percentage') docDiscountAmount = (subtotal - itemDiscountTotal) * (discountValue / 100);
+
+  const grandTotal = subtotal - itemDiscountTotal - docDiscountAmount + totalTax;
+
+  const handleSave = async (asDraft = true) => {
+    if (!clientName.trim()) {
+      toast({ title: 'Error', description: 'Client name is required.', variant: 'destructive' });
+      return;
+    }
+    if (computedItems.length === 0) {
+      toast({ title: 'Error', description: 'Add at least one item.', variant: 'destructive' });
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const payload = {
+        client_name: clientName.trim(),
+        client_email: clientEmail || null,
+        client_phone: clientPhone || null,
+        client_address: clientAddress || null,
+        client_gstin: clientGstin || null,
+        subject: subject || null,
+        subtotal: Math.round(subtotal * 100) / 100,
+        discount_type: discountType || null,
+        discount_value: discountValue,
+        discount_amount: Math.round(docDiscountAmount * 100) / 100,
+        tax_amount: Math.round(totalTax * 100) / 100,
+        total: Math.round(grandTotal * 100) / 100,
+        currency,
+        notes: notes || null,
+        terms_and_conditions: termsAndConditions || null,
+        valid_until: validUntil || null,
+        status: asDraft ? 'draft' : 'sent',
+        items: computedItems,
+      };
+
+      if (isEditing) {
+        await updateQuotation.mutateAsync({ id: id!, ...payload });
+      } else {
+        await createQuotation.mutateAsync(payload);
+      }
+      navigate('/dashboard/quotations');
+    } catch {
+      // error handled in hook
+    }
+    setSaving(false);
+  };
+
+  if (loading) {
+    return <div className="flex justify-center items-center min-h-[60vh]"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+  }
+
+  return (
+    <>
+      <header className="sticky top-0 bg-background/80 backdrop-blur-xl border-b border-border px-6 md:px-8 py-4 z-10">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard/quotations')}>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div>
+              <h1 className="text-2xl font-bold" style={{ fontFamily: "'Syne', sans-serif" }}>
+                {isEditing ? 'Edit Quotation' : 'New Quotation'}
+              </h1>
+              <p className="text-muted-foreground text-sm">Fill in the details below.</p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => handleSave(true)} disabled={saving}>
+              {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              <Save className="h-4 w-4 mr-2" /> Save Draft
+            </Button>
+            <Button onClick={() => handleSave(false)} disabled={saving} className="gradient-primary">
+              {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Save & Send
+            </Button>
+          </div>
+        </div>
+      </header>
+
+      <div className="p-4 md:p-8 space-y-6">
+        {/* Client Details */}
+        <Card className="glass">
+          <CardHeader>
+            <CardTitle className="text-lg">Client Details</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label>Client Name *</Label>
+                <Input value={clientName} onChange={(e) => setClientName(e.target.value)} placeholder="Client / Company Name" />
+              </div>
+              <div className="space-y-2">
+                <Label>Email</Label>
+                <Input value={clientEmail} onChange={(e) => setClientEmail(e.target.value)} placeholder="client@email.com" />
+              </div>
+              <div className="space-y-2">
+                <Label>Phone</Label>
+                <Input value={clientPhone} onChange={(e) => setClientPhone(e.target.value)} placeholder="+91 98765 43210" />
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label>Address</Label>
+                <Input value={clientAddress} onChange={(e) => setClientAddress(e.target.value)} placeholder="Full address" />
+              </div>
+              <div className="space-y-2">
+                <Label>GSTIN</Label>
+                <Input value={clientGstin} onChange={(e) => setClientGstin(e.target.value)} placeholder="Client GSTIN" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Quotation Meta */}
+        <Card className="glass">
+          <CardHeader>
+            <CardTitle className="text-lg">Quotation Details</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label>Subject / Title</Label>
+                <Input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="e.g. Website Development Proposal" />
+              </div>
+              <div className="space-y-2">
+                <Label>Currency</Label>
+                <Select value={currency} onValueChange={setCurrency}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {CURRENCIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Valid Until</Label>
+                <Input type="date" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Line Items */}
+        <Card className="glass">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg">Line Items</CardTitle>
+              <div className="flex gap-2">
+                {products && products.length > 0 && (
+                  <Select onValueChange={addFromProduct}>
+                    <SelectTrigger className="w-[200px]">
+                      <Package className="h-4 w-4 mr-2" />
+                      <SelectValue placeholder="Add from catalog" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {products.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.name} — ₹{p.price}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                <Button variant="outline" onClick={addItem}>
+                  <Plus className="h-4 w-4 mr-2" /> Add Item
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {computedItems.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <Package className="h-12 w-12 mx-auto mb-4 opacity-30" />
+                <p>No items added yet. Add items from the catalog or manually.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="min-w-[250px]">Description</TableHead>
+                      <TableHead className="w-[80px]">Qty</TableHead>
+                      <TableHead className="w-[120px]">Unit Price</TableHead>
+                      <TableHead className="w-[80px]">Disc %</TableHead>
+                      <TableHead className="w-[160px]">Tax</TableHead>
+                      <TableHead className="w-[100px]">Tax Amt</TableHead>
+                      <TableHead className="w-[120px]">Total</TableHead>
+                      <TableHead className="w-[50px]"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {computedItems.map((item, idx) => (
+                      <TableRow key={idx}>
+                        <TableCell>
+                          <Input
+                            value={item.description}
+                            onChange={(e) => updateItem(idx, 'description', e.target.value)}
+                            placeholder="Item description"
+                            className="border-0 bg-transparent px-0 focus-visible:ring-0"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            value={item.quantity}
+                            onChange={(e) => updateItem(idx, 'quantity', parseFloat(e.target.value) || 0)}
+                            className="border-0 bg-transparent px-0 focus-visible:ring-0 w-16"
+                            min="0"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            value={item.unit_price}
+                            onChange={(e) => updateItem(idx, 'unit_price', parseFloat(e.target.value) || 0)}
+                            className="border-0 bg-transparent px-0 focus-visible:ring-0 w-24"
+                            min="0"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            value={item.discount_percentage}
+                            onChange={(e) => updateItem(idx, 'discount_percentage', parseFloat(e.target.value) || 0)}
+                            className="border-0 bg-transparent px-0 focus-visible:ring-0 w-16"
+                            min="0"
+                            max="100"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap gap-1">
+                            {taxes.filter((t) => t.is_active).map((tax) => (
+                              <Badge
+                                key={tax.id}
+                                variant={item.tax_ids.includes(tax.id) ? 'default' : 'outline'}
+                                className="cursor-pointer text-xs"
+                                onClick={() => {
+                                  const newIds = item.tax_ids.includes(tax.id)
+                                    ? item.tax_ids.filter((tid) => tid !== tax.id)
+                                    : [...item.tax_ids, tax.id];
+                                  updateItem(idx, 'tax_ids', newIds);
+                                }}
+                              >
+                                {tax.name} {tax.rate}%
+                              </Badge>
+                            ))}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">{currency} {item.tax_amount.toLocaleString()}</TableCell>
+                        <TableCell className="font-semibold">{currency} {item.line_total.toLocaleString()}</TableCell>
+                        <TableCell>
+                          <Button variant="ghost" size="icon" className="text-destructive" onClick={() => removeItem(idx)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+
+            {/* Summary */}
+            {computedItems.length > 0 && (
+              <div className="mt-6 flex justify-end">
+                <div className="w-full max-w-sm space-y-3 p-4 rounded-xl bg-card/50 border border-border/50">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Subtotal</span>
+                    <span>{currency} {subtotal.toLocaleString()}</span>
+                  </div>
+                  {itemDiscountTotal > 0 && (
+                    <div className="flex justify-between text-sm text-amber-400">
+                      <span>Item Discounts</span>
+                      <span>-{currency} {itemDiscountTotal.toLocaleString()}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <Select value={discountType || 'none'} onValueChange={(v) => setDiscountType(v === 'none' ? '' : v as any)}>
+                      <SelectTrigger className="w-[130px] text-xs h-8">
+                        <SelectValue placeholder="Discount" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">No Discount</SelectItem>
+                        <SelectItem value="flat">Flat</SelectItem>
+                        <SelectItem value="percentage">Percentage</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {discountType && (
+                      <Input
+                        type="number"
+                        value={discountValue}
+                        onChange={(e) => setDiscountValue(parseFloat(e.target.value) || 0)}
+                        className="w-24 h-8 text-sm"
+                        min="0"
+                      />
+                    )}
+                    {docDiscountAmount > 0 && (
+                      <span className="text-amber-400 text-sm ml-auto">-{currency} {docDiscountAmount.toLocaleString()}</span>
+                    )}
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Tax</span>
+                    <span>{currency} {totalTax.toLocaleString()}</span>
+                  </div>
+                  <div className="border-t border-border pt-2 flex justify-between font-bold text-lg">
+                    <span>Total</span>
+                    <span className="text-primary">{currency} {Math.round(grandTotal * 100 / 100).toLocaleString()}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Notes & Terms */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <Card className="glass">
+            <CardHeader><CardTitle className="text-lg">Notes</CardTitle></CardHeader>
+            <CardContent>
+              <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Additional notes for the client..." rows={4} />
+            </CardContent>
+          </Card>
+          <Card className="glass">
+            <CardHeader><CardTitle className="text-lg">Terms & Conditions</CardTitle></CardHeader>
+            <CardContent>
+              <Textarea value={termsAndConditions} onChange={(e) => setTermsAndConditions(e.target.value)} placeholder="Payment terms, delivery terms, etc." rows={4} />
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </>
+  );
+}

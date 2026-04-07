@@ -34,6 +34,7 @@ interface Company {
   subscription_status: string | null;
   features: Record<string, boolean> | null;
   mask_leads: boolean;
+  default_currency: string | null;
 }
 
 interface WalletData {
@@ -79,6 +80,7 @@ export default function ManageCompany() {
   const [savingSlug, setSavingSlug] = useState(false);
   const [slugError, setSlugError] = useState('');
   const [maskLeads, setMaskLeads] = useState(false);
+  const [defaultCurrency, setDefaultCurrency] = useState('INR');
 
   // Data Sync
   const [syncCountryCode, setSyncCountryCode] = useState('91');
@@ -154,6 +156,7 @@ export default function ManageCompany() {
         subscription_status: companyData.subscription_status,
         features: (companyData.features as Record<string, boolean>) || null,
         mask_leads: companyData.mask_leads || false,
+        default_currency: companyData.default_currency || 'INR',
       };
 
       setCompany(mappedCompany);
@@ -163,6 +166,7 @@ export default function ManageCompany() {
       setPrimaryColor(mappedCompany.primary_color || '#8B5CF6');
       setLogoUrl(proxifySupabaseUrl(mappedCompany.logo_url));
       setMaskLeads(mappedCompany.mask_leads);
+      setDefaultCurrency(mappedCompany.default_currency || 'INR');
 
       // Get Wallet
       const { data: walletData } = await supabase
@@ -225,6 +229,7 @@ export default function ManageCompany() {
           primary_color: primaryColor,
           logo_url: logoUrl,
           mask_leads: maskLeads,
+          default_currency: defaultCurrency,
         })
         .eq('id', company.id);
 
@@ -845,6 +850,21 @@ export default function ManageCompany() {
                   <Input type="color" value={primaryColor} onChange={e => setPrimaryColor(e.target.value)} className="w-16 h-10 p-1 cursor-pointer" />
                   <Input value={primaryColor} onChange={e => setPrimaryColor(e.target.value)} className="flex-1" />
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Default Currency</Label>
+                <Select value={defaultCurrency} onValueChange={setDefaultCurrency}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select Currency" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {['INR', 'USD', 'EUR', 'GBP', 'AED', 'SAR', 'SGD', 'AUD', 'CAD', 'JPY'].map((c) => (
+                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">Default currency for new quotations and invoices.</p>
               </div>
               <Button onClick={handleSaveSettings} disabled={saving} className="w-full">
                 {saving ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : <Save className="mr-2 h-4 w-4" />} Save Branding

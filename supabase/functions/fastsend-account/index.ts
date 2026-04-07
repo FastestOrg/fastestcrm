@@ -124,6 +124,42 @@ async function testSMTPLive(account: any): Promise<{ success: boolean; error?: s
   }
 }
 
+async function testIMAPLive(account: any): Promise<{ success: boolean; error?: string }> {
+  let conn: Deno.Conn | null = null;
+  try {
+    const port = account.imap_port || 993;
+    // Most IMAP servers use TLS on 993
+    if (port === 993) {
+      conn = await Deno.connectTls({ hostname: account.imap_host, port });
+    } else {
+      conn = await Deno.connect({ hostname: account.imap_host, port });
+    }
+
+    let response = await readResponse(conn);
+    if (!response.includes("OK")) throw new Error("IMAP greeting failed: " + response);
+
+    // Auth
+    if (account.access_token && account.provider === 'gmail') {
+      // Gmail XOAUTH2 for IMAP
+      const authString = `user=${account.email_address}\x01auth=Bearer ${account.access_token}\x01\x01`;
+      const base64Auth = base64Encode(new TextEncoder().encode(authString));
+      response = await sendCommand(conn, `A001 AUTHENTICATE XOAUTH2 ${base64Auth}`);
+    } else {
+      // Standard LOGIN
+      response = await sendCommand(conn, `A001 LOGIN "${account.imap_user || account.email_address}" "${account.imap_password || account.smtp_password}"`);
+    }
+
+    if (!response.includes("A001 OK")) throw new Error("IMAP login failed: " + response);
+
+    await sendCommand(conn, "A002 LOGOUT");
+    conn.close();
+    return { success: true };
+  } catch (err: any) {
+    if (conn) try { conn.close(); } catch {}
+    return { success: false, error: "IMAP Error: " + err.message };
+  }
+}
+
 async function sendTestEmail(account: any, to: string): Promise<{ success: boolean; error?: string }> {
   let conn: Deno.Conn | null = null;
   try {
@@ -244,8 +280,18 @@ Deno.serve(async (req) => {
     }
 
     if (action === "test") {
-      const result = await testSMTPLive(account);
+      const smtpResult = await testSMTPLive(account);
+      let imapResult = { success: true };
+
+      if (smtpResult.success && account.protocol === 'imap_smtp') {
+        imapResult = await testIMAPLive(account);
+      }
       
+      const result = {
+        success: smtpResult.success && imapResult.success,
+        error: smtpResult.error || imapResult.error
+      };
+
       if (accountId) {
         await adminClient.from("email_accounts").update({
           status: result.success ? "connected" : "error",

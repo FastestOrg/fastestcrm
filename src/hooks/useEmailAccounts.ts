@@ -143,9 +143,27 @@ export function useEmailAccounts() {
     // ── Test connection ───────────────────────────────────────────────────
 
     const testConnection = useMutation({
-        mutationFn: async (accountId: string) => {
+        mutationFn: async (params: string | { 
+            accountId?: string;
+            provider?: string;
+            email?: string;
+            protocol?: string;
+            smtpHost?: string;
+            smtpPort?: number;
+            smtpUser?: string;
+            smtpPassword?: string;
+            smtpSecure?: boolean;
+            imapHost?: string;
+            imapPort?: number;
+            imapUser?: string;
+            imapPassword?: string;
+        }) => {
             const { data: sessionData } = await supabase.auth.getSession();
             const token = sessionData.session?.access_token;
+
+            const body = typeof params === 'string' 
+                ? { action: 'test', accountId: params }
+                : { action: 'test', ...params };
 
             const res = await fetch(`https://${projectId}.supabase.co/functions/v1/fastsend-account`, {
                 method: 'POST',
@@ -153,7 +171,7 @@ export function useEmailAccounts() {
                     Authorization: `Bearer ${token}`,
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ action: 'test', accountId }),
+                body: JSON.stringify(body),
             });
 
             const data = await res.json();

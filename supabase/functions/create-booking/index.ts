@@ -122,10 +122,16 @@ serve(async (req) => {
           end: { dateTime: computedEndTime, timeZone: bookingPage.timezone || "Asia/Kolkata" },
           attendees: [{ email: attendeeEmail, displayName: attendeeName }],
           reminders: { useDefault: true },
+          conferenceData: {
+            createRequest: {
+              requestId: crypto.randomUUID(),
+              conferenceSolutionKey: { type: "hangoutsMeet" }
+            }
+          }
         };
 
         const gcalResp = await fetch(
-          `https://www.googleapis.com/calendar/v3/calendars/${calConn.calendar_id || "primary"}/events?sendUpdates=all`,
+          `https://www.googleapis.com/calendar/v3/calendars/${calConn.calendar_id || "primary"}/events?sendUpdates=all&conferenceDataVersion=1`,
           {
             method: "POST",
             headers: {
@@ -138,7 +144,13 @@ serve(async (req) => {
 
         const gcalData = await gcalResp.json();
         if (gcalData.id) {
-          await supabase.from("calendar_events").update({ google_event_id: gcalData.id }).eq("id", event.id);
+          const meetLink = gcalData.hangoutLink || '';
+          await supabase.from("calendar_events").update({ 
+            google_event_id: gcalData.id,
+            location: meetLink
+          }).eq("id", event.id);
+          
+          event.location = meetLink;
         }
       } catch (gcalError) {
         console.error("Google Calendar API error:", gcalError);

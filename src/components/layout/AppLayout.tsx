@@ -6,7 +6,7 @@ import { useCompany } from '@/hooks/useCompany';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { LayoutDashboard, Users, UserCheck, CreditCard, Settings, LogOut, Phone, Workflow, Link2, BarChart3, Brain, Calendar, FileText, Building2, Shield, Package, PieChart, Database, CheckSquare, AlertTriangle, Clock, ChevronDown, ChevronUp, Mail, PanelLeftClose, PanelLeftOpen, MessageCircle } from 'lucide-react';
+import { LayoutDashboard, Users, UserCheck, CreditCard, Settings, LogOut, Phone, Workflow, Link2, BarChart3, Brain, Calendar, FileText, Building2, Shield, Package, PieChart, Database, CheckSquare, AlertTriangle, Clock, ChevronDown, ChevronUp, Mail, PanelLeftClose, PanelLeftOpen, MessageCircle, Receipt } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -75,6 +75,16 @@ const navItems: NavItem[] = [{
     label: 'Insurance Plans',
     path: '/dashboard/insurance-plans',
     industryOnly: 'insurance',
+    section: 'FastBoard'
+}, {
+    icon: FileText,
+    label: 'Quotations',
+    path: '/dashboard/quotations',
+    section: 'FastBoard'
+}, {
+    icon: Receipt,
+    label: 'Invoices',
+    path: '/dashboard/invoices',
     section: 'FastBoard'
 }, {
     icon: Phone,
@@ -152,6 +162,11 @@ const navItems: NavItem[] = [{
     icon: Settings,
     label: 'Settings',
     path: '/dashboard/settings',
+    section: 'Accounts'
+}, {
+    icon: Receipt,
+    label: 'Invoice Settings',
+    path: '/dashboard/invoice-settings',
     section: 'Accounts'
 }];
 

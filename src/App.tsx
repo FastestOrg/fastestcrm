@@ -67,6 +67,11 @@ import FastSend from "./pages/FastSend";
 import RealEstateCRM from "./pages/RealEstateCRM";
 import EdTechCRM from "./pages/EdTechCRM";
 import SaasCRM from "./pages/SaasCRM";
+import Quotations from "./pages/Quotations";
+import QuotationBuilder from "./pages/QuotationBuilder";
+import Invoices from "./pages/Invoices";
+import InvoiceBuilder from "./pages/InvoiceBuilder";
+import InvoiceSettings from "./pages/InvoiceSettings";
 
 import { isAndroidWebView } from "@/lib/platform";
 
@@ -187,7 +192,7 @@ function AppRoutes() {
       <Route path="/crm-for-saas" element={<SaasCRM />} />
       <Route path="/app" element={<RedirectToApp />} />
       <Route path="/documentation" element={<Documentation />} />
-      <Route path="/book/:slug" element={<PublicBooking />} />
+
 
       {/* Platform Admin */}
       <Route path="/platform" element={<Protected><PlatformAdmin /></Protected>} />
@@ -225,8 +230,16 @@ function AppRoutes() {
         <Route path="/dashboard/email-settings" element={<ManageEmailAliases />} />
         <Route path="/dashboard/fastsend" element={<FastSend />} />
         <Route path="/dashboard/whatsapp" element={<WhatsAppCampaign />} />
+        <Route path="/dashboard/quotations" element={<Quotations />} />
+        <Route path="/dashboard/quotations/new" element={<QuotationBuilder />} />
+        <Route path="/dashboard/quotations/:id" element={<QuotationBuilder />} />
+        <Route path="/dashboard/invoices" element={<Invoices />} />
+        <Route path="/dashboard/invoices/new" element={<InvoiceBuilder />} />
+        <Route path="/dashboard/invoices/:id" element={<InvoiceBuilder />} />
+        <Route path="/dashboard/invoice-settings" element={<InvoiceSettings />} />
       </Route>
 
+      <Route path="/:companySlug/:slug" element={<PublicBooking />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

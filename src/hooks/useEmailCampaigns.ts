@@ -180,6 +180,9 @@ export function useEmailCampaigns() {
             warmupRampPerDay?: number;
             aiGenerated?: boolean;
             aiPerspective?: string;
+            aiAutoReplyEnabled?: boolean;
+            aiAutoReplyGoal?: string;
+            aiAutoReplyPerspective?: string;
             scheduledAt?: string | null;
             sequences: Array<{
                 step_number: number;
@@ -214,6 +217,9 @@ export function useEmailCampaigns() {
                     warmup_ramp_per_day: params.warmupRampPerDay || 2,
                     ai_generated: params.aiGenerated || false,
                     ai_perspective: params.aiPerspective || null,
+                    ai_auto_reply_enabled: params.aiAutoReplyEnabled || false,
+                    ai_auto_reply_goal: params.aiAutoReplyGoal || null,
+                    ai_auto_reply_perspective: params.aiAutoReplyPerspective || null,
                     scheduled_at: params.scheduledAt || null,
                     status: params.scheduledAt ? 'scheduled' : 'draft',
                 })
@@ -347,27 +353,69 @@ export function useEmailCampaigns() {
             queryKey: ['email-campaign-analytics', campaignId],
             queryFn: async () => {
                 if (!campaignId) return null;
+
+                // Fetch recipients
                 const { data: recipients } = await supabase
                     .from('email_campaign_recipients' as any)
-                    .select('status, opened_at, replied_at, clicked_at')
+                    .select('status, opened_at, replied_at, clicked_at, current_step, last_sent_at')
                     .eq('campaign_id', campaignId);
 
+                // Fetch logs for sent count (more accurate)
+                const { data: logs } = await supabase
+                    .from('email_campaign_logs' as any)
+                    .select('id, status, sent_at, opened_at, replied_at, clicked_at, sequence_step_id')
+                    .eq('campaign_id', campaignId);
+
+                // Fetch sequences for per-step stats
+                const { data: sequences } = await supabase
+                    .from('email_campaign_sequences' as any)
+                    .select('id, step_number, subject, send_condition')
+                    .eq('campaign_id', campaignId)
+                    .order('step_number', { ascending: true });
+
                 const recs = (recipients as any[]) || [];
+                const logEntries = (logs as any[]) || [];
+                const steps = (sequences as any[]) || [];
+
+                // Per-step breakdown
+                const stepStats = steps.map(step => {
+                    const stepLogs = logEntries.filter(l => l.sequence_step_id === step.id);
+                    return {
+                        stepNumber: step.step_number,
+                        subject: step.subject,
+                        condition: step.send_condition,
+                        sent: stepLogs.length,
+                        opened: stepLogs.filter(l => l.opened_at).length,
+                        replied: stepLogs.filter(l => l.replied_at).length,
+                        clicked: stepLogs.filter(l => l.clicked_at).length,
+                    };
+                });
+
+                const totalSent = logEntries.length;
+                const totalOpened = recs.filter(r => r.opened_at).length;
+                const totalReplied = recs.filter(r => r.replied_at).length;
+                const totalClicked = recs.filter(r => r.clicked_at).length;
+
                 return {
                     total: recs.length,
+                    sent: totalSent,
                     pending: recs.filter(r => r.status === 'pending').length,
                     in_progress: recs.filter(r => r.status === 'in_progress').length,
                     completed: recs.filter(r => r.status === 'completed').length,
                     replied: recs.filter(r => r.status === 'replied').length,
                     bounced: recs.filter(r => r.status === 'bounced').length,
                     failed: recs.filter(r => r.status === 'failed').length,
-                    opened: recs.filter(r => r.opened_at).length,
-                    clicked: recs.filter(r => r.clicked_at).length,
-                    openRate: recs.length > 0 ? Math.round((recs.filter(r => r.opened_at).length / recs.length) * 100) : 0,
-                    replyRate: recs.length > 0 ? Math.round((recs.filter(r => r.replied_at).length / recs.length) * 100) : 0,
+                    opened: totalOpened,
+                    clicked: totalClicked,
+                    openRate: recs.length > 0 ? Math.round((totalOpened / recs.length) * 100) : 0,
+                    replyRate: recs.length > 0 ? Math.round((totalReplied / recs.length) * 100) : 0,
+                    clickRate: recs.length > 0 ? Math.round((totalClicked / recs.length) * 100) : 0,
+                    stepStats,
+                    totalSteps: steps.length,
                 };
             },
             enabled: !!campaignId,
+            refetchInterval: 30000, // Auto-refresh every 30s for live campaigns
         });
     };
 
