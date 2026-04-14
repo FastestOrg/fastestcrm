@@ -1,0 +1,25 @@
+{
+  "name": "Fastest CRM | AI-Powered Sales Platform",
+  "short_name": "Fastest CRM",
+  "description": "India's #1 AI-powered CRM for high-growth sales teams.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0d9488",
+  "theme_color": "#0d9488",
+  "icons": [
+    {
+      "src": "/fastestcrmlogo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/fastestcrmlogo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "orientation": "portrait",
+  "scope": "/"
+}

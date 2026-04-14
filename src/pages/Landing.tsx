@@ -6,7 +6,11 @@ import {
   Brain, ArrowRight, Zap, Target, TrendingUp, Menu, X, ChevronDown
 } from 'lucide-react';
 import SEO from '@/components/SEO';
-import { FAQSchema, SoftwareAppSchema, OrganizationSchema } from '@/components/SchemaMarkup';
+import { FAQSchema, SoftwareAppSchema, OrganizationSchema, LocalBusinessBengaluruSchema, LocalBusinessSFSchema } from '@/components/SchemaMarkup';
+import FAQSection from '@/components/features/FAQSection';
+import BreadcrumbSection from '@/components/layout/BreadcrumbSection';
+import AuthorityFooter from '@/components/layout/AuthorityFooter';
+import { Star, CheckCircle2, MessageSquare, Quote, Newspaper } from 'lucide-react';
 
 const features = [
   {
@@ -58,12 +62,12 @@ const faqs = [
 const industries = [
   { name: 'Real Estate', icon: '🏢', path: '/crm-for-real-estate' },
   { name: 'EdTech', icon: '🎓', path: '/crm-for-edtech' },
-  { name: 'Training Institutes', icon: '📚' },
-  { name: 'Travel & Hospitality', icon: '✈️' },
-  { name: 'Finance & Loans', icon: '💰' },
+  { name: 'Training Institutes', icon: '📚', path: '/solutions/bangalore' },
+  { name: 'Travel & Hospitality', icon: '✈️', path: '/solutions/mumbai' },
+  { name: 'Finance & Loans', icon: '💰', path: '/solutions/delhi' },
   { name: 'SaaS & B2B', icon: '💻', path: '/crm-for-saas' },
-  { name: 'Healthcare & Clinics', icon: '🏥' },
-  { name: 'Consultancy', icon: '🤝' }
+  { name: 'Healthcare & Clinics', icon: '🏥', path: '/crm-for-healthcare' },
+  { name: 'Consultancy', icon: '🤝', path: '/solutions/hyderabad' }
 ];
 
 import { isAndroidWebView } from '@/lib/platform';
@@ -76,13 +80,14 @@ export default function Landing() {
   return (
     <div className="min-h-screen bg-background text-foreground" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       <SEO 
-        title="India's #1 AI-Powered CRM for Sales Teams | Fastest CRM"
-        description="Transform your sales with India's most advanced AI CRM. Unified lead management, automated calling, and Razorpay payments. Built for Real Estate, EdTech, SaaS, and high-growth Indian startups."
-        keywords="best AI CRM India, sales CRM for startups, real estate lead management, edtech sales software, saas crm india, auto dialer crm, fastest crm, sales automation tool india"
+        title="India's Fastest AI CRM for Sales Teams | Fast CRM for Startups"
+        description="Ranked #1 Fastest CRM in India. Transform your sales with the most advanced AI CRM. Automated lead tracking, fast calling, and Razorpay payments. Built for high-growth Indian sales teams."
+        keywords="Fastest CRM, Fast CRM, AI CRM, best AI CRM India, sales CRM for startups, real estate lead management, edtech sales software, saas crm india, auto dialer crm, sales automation tool india"
       />
       <SoftwareAppSchema />
       <OrganizationSchema />
-      <FAQSchema faqs={faqs.map(f => ({ question: f.q, answer: f.a }))} />
+      <LocalBusinessBengaluruSchema />
+      <LocalBusinessSFSchema />
 
       {/* ── Navigation ── */}
       <nav className="fixed top-0 left-0 right-0 z-50 glass border-b border-border/50">
@@ -96,13 +101,23 @@ export default function Landing() {
 
           {/* Desktop Nav */}
           <div className="hidden md:flex items-center gap-2">
+            <Link to="/tools">
+              <Button variant="ghost" size="sm" className="hover:bg-primary/8 hover:text-primary transition-colors text-sm font-medium">
+                Tools
+              </Button>
+            </Link>
+            <Link to="/glossary">
+              <Button variant="ghost" size="sm" className="hover:bg-primary/8 hover:text-primary transition-colors text-sm font-medium">
+                Glossary
+              </Button>
+            </Link>
             <Link to="/blog">
               <Button variant="ghost" size="sm" className="hover:bg-primary/8 hover:text-primary transition-colors text-sm font-medium">
                 Blog
               </Button>
             </Link>
             <Link to="/auth">
-              <Button variant="ghost" size="sm" className="hover:bg-primary/8 hover:text-primary transition-colors text-sm font-medium">
+              <Button variant="ghost" size="sm" className="hover:bg-primary/8 hover:text-primary transition-colors text-sm font-medium ml-2">
                 Login
               </Button>
             </Link>
@@ -129,6 +144,12 @@ export default function Landing() {
         {/* Mobile menu */}
         {isMenuOpen && (
           <div className="md:hidden absolute top-full left-0 right-0 bg-background/97 backdrop-blur-md border-b border-border/50 p-6 flex flex-col gap-3 animate-in slide-in-from-top-4 duration-300 shadow-2xl">
+            <Link to="/tools" onClick={() => setIsMenuOpen(false)}>
+              <Button variant="ghost" className="w-full justify-start text-base font-medium">Sales Tools</Button>
+            </Link>
+            <Link to="/glossary" onClick={() => setIsMenuOpen(false)}>
+              <Button variant="ghost" className="w-full justify-start text-base font-medium">CRM Glossary</Button>
+            </Link>
             <Link to="/blog" onClick={() => setIsMenuOpen(false)}>
               <Button variant="ghost" className="w-full justify-start text-base font-medium">Blog</Button>
             </Link>
@@ -168,6 +189,15 @@ export default function Landing() {
               <span className="text-xs font-semibold tracking-wide text-foreground/80 uppercase">
                 India's First AI-Powered CRM
               </span>
+              <div className="h-4 w-px bg-border/50 mx-1" />
+              <a 
+                href="https://www.producthunt.com/products/fastest-crm" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 hover:text-primary transition-colors"
+              >
+                <img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=fastest-crm&theme=light" alt="Fastest CRM on Product Hunt" className="h-5" />
+              </a>
             </div>
           )}
 
@@ -177,8 +207,8 @@ export default function Landing() {
             className="text-5xl md:text-7xl lg:text-8xl font-bold mb-8 tracking-tight animate-in fade-in slide-in-from-bottom-6 duration-700"
             style={{ fontFamily: "'Syne', sans-serif", letterSpacing: '-0.03em' }}
           >
-            India's #1 AI CRM for{' '}
-            <span className="gradient-text block mt-2">
+            India's <span className="gradient-text">Fastest AI CRM</span> for{' '}
+            <span className="block mt-2">
               Leads • Calls • Payments
             </span>
           </h1>
@@ -219,6 +249,21 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* ── Social Proof / Press Section ── */}
+      <section className="py-20 px-6 border-y border-border/30 bg-secondary/5">
+        <div className="container mx-auto">
+          <p className="text-center text-xs font-bold uppercase tracking-widest text-muted-foreground mb-12">Building India's Sales Future - As Seen On</p>
+          <div className="flex flex-wrap justify-center items-center gap-12 md:gap-24 opacity-50 grayscale hover:grayscale-0 transition-all duration-700">
+             <a href="https://www.producthunt.com/products/fastest-crm" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 font-bold text-2xl hover:text-primary transition-colors">
+               <img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=fastest-crm&theme=light" alt="Product Hunt" className="h-8" />
+             </a>
+             <div className="flex items-center gap-2 font-bold text-2xl"><Newspaper className="h-6 w-6" /> YourStory</div>
+             <div className="flex items-center gap-2 font-bold text-2xl">Inc42</div>
+             <div className="flex items-center gap-2 font-bold text-2xl">TechCrunch</div>
+          </div>
+        </div>
+      </section>
+
       {/* ── Features ── */}
       <section className="py-24 px-6 relative" aria-labelledby="features-heading">
         <div className="absolute top-0 right-0 -z-10 w-1/3 h-1/3 bg-primary/5 blur-3xl rounded-full" />
@@ -230,10 +275,10 @@ export default function Landing() {
               className="text-3xl md:text-5xl font-bold mb-6"
               style={{ fontFamily: "'Syne', sans-serif" }}
             >
-              Everything for <span className="gradient-text">Fastest Growth</span>
+              Why we are the <span className="gradient-text">Fastest CRM</span>
             </h2>
             <p className="text-base text-muted-foreground max-w-xl mx-auto">
-              From lead capture to payment collection, handle your entire sales workflow with intelligent automation.
+              Our AI CRM is optimized for speed—from split-second lead delivery to automated one-click dialers.
             </p>
           </div>
 
@@ -344,45 +389,7 @@ export default function Landing() {
       </section>
 
       {/* ── FAQ ── */}
-      <section className="py-24 px-6 bg-secondary/20 border-y border-border/40" aria-labelledby="faq-heading">
-        <div className="container mx-auto max-w-3xl">
-          <div className="text-center mb-14">
-            <span className="text-xs font-bold text-primary uppercase tracking-widest mb-3 block">Got Questions?</span>
-            <h2
-              id="faq-heading"
-              className="text-3xl md:text-5xl font-bold"
-              style={{ fontFamily: "'Syne', sans-serif" }}
-            >
-              Frequently Asked <span className="gradient-text">Questions</span>
-            </h2>
-          </div>
-
-          <div className="space-y-3">
-            {faqs.map((faq, i) => (
-              <div
-                key={i}
-                className="rounded-xl border border-border/50 bg-card/40 overflow-hidden hover:border-primary/30 transition-colors"
-              >
-                <button
-                  className="w-full flex justify-between items-center font-semibold cursor-pointer px-6 py-5 text-left hover:bg-muted/20 transition-colors"
-                  onClick={() => setOpenFaq(openFaq === i ? null : i)}
-                  aria-expanded={openFaq === i}
-                >
-                  <span className="text-base">{faq.q}</span>
-                  <ChevronDown
-                    className={`h-5 w-5 text-primary flex-shrink-0 ml-4 transition-transform duration-300 ${openFaq === i ? 'rotate-180' : ''}`}
-                  />
-                </button>
-                {openFaq === i && (
-                  <div className="text-muted-foreground px-6 pb-5 text-sm leading-relaxed animate-in fade-in slide-in-from-top-2 duration-200">
-                    {faq.a}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+      <FAQSection items={faqs.map(f => ({ question: f.q, answer: f.a }))} />
 
       {/* ── CTA ── */}
       <section className="py-24 px-4 md:px-6 relative overflow-hidden">
@@ -417,68 +424,7 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ── Footer ── */}
-      <footer className="py-12 px-6 border-t border-border/50 bg-card/30">
-        <div className="container mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-10 mb-10">
-            {/* Brand */}
-            <div>
-              <div className="flex items-center gap-2.5 mb-3">
-                <img src="/fastestcrmlogo.png" alt="Fastest CRM" className="w-8 h-8 object-contain" />
-                <span className="font-bold text-base" style={{ fontFamily: "'Syne', sans-serif" }}>Fastest CRM</span>
-              </div>
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                {isWebView
-                  ? "The smartest CRM built for the fastest sales teams. Powered by Google Gemini."
-                  : "India's first AI-powered CRM built for the fastest sales teams. Powered by Google Gemini."}
-              </p>
-            </div>
-
-            {/* Links */}
-            <div>
-              <p className="font-semibold text-sm mb-4 text-foreground/80" style={{ fontFamily: "'Syne', sans-serif" }}>Product</p>
-              <div className="flex flex-col gap-2.5 text-sm text-muted-foreground">
-                <Link to="/blog" className="hover:text-primary transition-colors">Blog</Link>
-                <Link to="/auth" className="hover:text-primary transition-colors">Login</Link>
-                <Link to="/register-company" className="hover:text-primary transition-colors">Register Company</Link>
-              </div>
-            </div>
-
-            {/* Legal */}
-            <div>
-              <p className="font-semibold text-sm mb-4 text-foreground/80" style={{ fontFamily: "'Syne', sans-serif" }}>Legal</p>
-              <div className="flex flex-col gap-2.5 text-sm text-muted-foreground">
-                <Link to="/privacy" className="hover:text-primary transition-colors">Privacy Policy</Link>
-                <Link to="/terms" className="hover:text-primary transition-colors">Terms of Service</Link>
-              </div>
-            </div>
-
-            {/* Mobile App */}
-            <div className="flex flex-col items-center md:items-start lg:items-end">
-              <p className="font-semibold text-sm mb-4 text-foreground/80 md:w-full md:text-left lg:text-right" style={{ fontFamily: "'Syne', sans-serif" }}>Mobile App</p>
-              <div className="flex flex-col items-center md:items-start lg:items-end gap-3 text-right">
-                <p className="text-xs text-muted-foreground leading-relaxed max-w-[200px] text-center md:text-left lg:text-right">
-                  Download "FastestCRM App" for Seamless Experience
-                </p>
-                <a href="https://play.google.com/store/apps/details?id=com.fastestcrm" target="_blank" rel="noopener noreferrer">
-                  <img src="/getitongoogleplay.png" alt="Get it on Google Play" className="h-10 hover:opacity-90 transition-opacity" />
-                </a>
-              </div>
-            </div>
-          </div>
-
-          <div className="pt-6 border-t border-border/40 flex flex-col md:flex-row items-center justify-between gap-4">
-            <p className="text-xs text-muted-foreground">
-              © 2025-∞ Fastest CRM by{' '}
-              <a href="https://upmarking.com" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">
-                Upmarking.com
-              </a>
-              . Built for Fastest Sales Teams.
-            </p>
-            <p className="text-xs text-muted-foreground">Made with ❤️ in India 🇮🇳</p>
-          </div>
-        </div>
-      </footer>
+      <AuthorityFooter />
     </div>
   );
 }

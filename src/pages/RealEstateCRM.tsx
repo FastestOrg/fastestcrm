@@ -8,6 +8,7 @@ import {
 import SEO from '@/components/SEO';
 import { FAQSchema, SoftwareAppSchema, OrganizationSchema, BreadcrumbSchema } from '@/components/SchemaMarkup';
 import { isAndroidWebView } from '@/lib/platform';
+import AuthorityFooter from '@/components/layout/AuthorityFooter';
 
 const features = [
   {
@@ -195,10 +196,7 @@ export default function RealEstateCRM() {
         </div>
       </section>
 
-      {/* ── Simple Footer ── */}
-      <footer className="py-12 px-6 border-t border-border/50 text-center text-sm text-muted-foreground">
-        © 2025 Fastest CRM. All rights reserved.
-      </footer>
+      <AuthorityFooter />
     </div>
   );
 }

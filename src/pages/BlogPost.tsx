@@ -6,6 +6,8 @@ import { ArrowLeft, Clock, Calendar, User, Share2 } from 'lucide-react';
 import { format } from 'date-fns';
 import SEO from '@/components/SEO';
 import { BreadcrumbSchema, ArticleSchema } from '@/components/SchemaMarkup';
+import { injectInterlinks } from '@/lib/seo-utils';
+import { FAQSection } from '@/components/features/FAQSection';
 
 export default function BlogPost() {
     const { slug } = useParams();
@@ -117,7 +119,7 @@ export default function BlogPost() {
 
                     {/* Content */}
                     <article className="prose prose-lg dark:prose-invert max-w-none animate-in fade-in slide-in-from-bottom-8 duration-700 delay-200">
-                        <div dangerouslySetInnerHTML={{ __html: blog.content }} />
+                        <div dangerouslySetInnerHTML={{ __html: injectInterlinks(blog.content) }} />
                     </article>
 
                     {/* CTA Box */}

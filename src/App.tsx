@@ -72,6 +72,17 @@ import QuotationBuilder from "./pages/QuotationBuilder";
 import Invoices from "./pages/Invoices";
 import InvoiceBuilder from "./pages/InvoiceBuilder";
 import InvoiceSettings from "./pages/InvoiceSettings";
+import IndustrySolutionTemplate from "./pages/IndustrySolutionTemplate";
+import { solutionsData } from "./data/solutions";
+import ComparisonTemplate from "./pages/ComparisonTemplate";
+import { comparisonsData } from "./data/comparisons";
+import RegionalSolutionTemplate from "./pages/RegionalSolutionTemplate";
+import { citiesData } from "./data/cities";
+import GlossaryPage from "./pages/GlossaryPage";
+import GlossaryTermPage from "./pages/GlossaryTermPage";
+import SalesToolsPage from "./pages/SalesToolsPage";
+import PressKitPage from "./pages/PressKitPage";
+import { glossaryTerms } from "./data/glossary";
 
 import { isAndroidWebView } from "@/lib/platform";
 
@@ -190,6 +201,27 @@ function AppRoutes() {
       <Route path="/crm-for-real-estate" element={<RealEstateCRM />} />
       <Route path="/crm-for-edtech" element={<EdTechCRM />} />
       <Route path="/crm-for-saas" element={<SaasCRM />} />
+      <Route path="/crm-for-healthcare" element={<IndustrySolutionTemplate {...solutionsData.healthcare} />} />
+      <Route path="/crm-for-education" element={<IndustrySolutionTemplate {...solutionsData.education} />} />
+      
+      {/* Comparison Pages */}
+      <Route path="/vs/zoho" element={<ComparisonTemplate {...comparisonsData.zoho} />} />
+      <Route path="/vs/hubspot" element={<ComparisonTemplate {...comparisonsData.hubspot} />} />
+      <Route path="/vs/leadsquared" element={<ComparisonTemplate {...comparisonsData.leadsquared} />} />
+      <Route path="/vs/freshsales" element={<ComparisonTemplate {...comparisonsData.freshsales} />} />
+      
+      {/* Regional Pages */}
+      <Route path="/solutions/bangalore" element={<RegionalSolutionTemplate {...citiesData.bangalore} />} />
+      <Route path="/solutions/mumbai" element={<RegionalSolutionTemplate {...citiesData.mumbai} />} />
+      <Route path="/solutions/delhi" element={<RegionalSolutionTemplate {...citiesData.delhi} />} />
+      <Route path="/solutions/hyderabad" element={<RegionalSolutionTemplate {...citiesData.hyderabad} />} />
+      
+      {/* 10,000X SEO Knowledge Hub & Tools */}
+      <Route path="/glossary" element={<GlossaryPage />} />
+      <Route path="/glossary/:slug" element={<GlossaryTermPage />} />
+      <Route path="/tools" element={<SalesToolsPage />} />
+      <Route path="/press" element={<PressKitPage />} />
+      
       <Route path="/app" element={<RedirectToApp />} />
       <Route path="/documentation" element={<Documentation />} />
 

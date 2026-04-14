@@ -15,6 +15,7 @@ import MobileBottomNav from './MobileBottomNav';
 import { NotificationsBell } from './NotificationsBell';
 import { AnnouncementBanner } from './AnnouncementBanner';
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+import SEO from '@/components/SEO';
 
 type NavSection = 'FastBoard' | 'FastEngage' | 'Data Enrichment' | 'Accounts';
 
@@ -289,6 +290,7 @@ export default function AppLayout() {
     if (!user) return null;
 
     return <TooltipProvider delayDuration={0}>
+        <SEO noindex={true} title="Dashboard" />
         <div className="h-screen overflow-hidden bg-background dark flex">
             {/* Desktop Sidebar */}
             {!isMobile && <aside className={`${isCollapsed ? 'w-20' : 'w-64'} transition-all duration-300 ease-in-out bg-sidebar border-r border-sidebar-border flex flex-col shrink-0`}>
