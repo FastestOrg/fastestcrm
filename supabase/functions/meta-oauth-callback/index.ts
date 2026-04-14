@@ -6,7 +6,7 @@ import { corsHeaders } from "../_shared/cors.ts";
 
 
 // Where the popup should end up (a real page that can run JS and postMessage back to opener).
-const FINAL_CLIENT_CALLBACK_URL = "https://fastestcrm.com/meta-oauth-callback";
+const FINAL_CLIENT_CALLBACK_URL = "https://www.fastestcrm.com/meta-oauth-callback";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {

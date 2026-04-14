@@ -8,8 +8,8 @@ export const OrganizationSchema = () => {
     "@context": "https://schema.org",
     "@type": "Organization",
     "name": "Fastest CRM",
-    "url": "https://fastestcrm.com",
-    "logo": "https://fastestcrm.com/fastestcrmlogo.png",
+    "url": "https://www.fastestcrm.com",
+    "logo": "https://www.fastestcrm.com/fastestcrmlogo.png",
     "sameAs": [
       "https://twitter.com/LeadCubed",
       "https://linkedin.com/company/fastestcrm"
@@ -74,7 +74,7 @@ export const SoftwareAppSchema = () => {
     "name": "Fastest CRM",
     "applicationCategory": "BusinessApplication",
     "operatingSystem": "Web",
-    "url": "https://fastestcrm.com",
+    "url": "https://www.fastestcrm.com",
     "description": "India's first AI-powered CRM built for sales teams, training companies, and enrollment teams. Manage leads, calls, payments, and analytics with intelligent automation powered by Google Gemini.",
     "offers": {
       "@type": "Offer",
@@ -135,7 +135,7 @@ export const ArticleSchema = ({
       "name": "Fastest CRM",
       "logo": {
         "@type": "ImageObject",
-        "url": "https://fastestcrm.com/fastestcrmlogo.png"
+        "url": "https://www.fastestcrm.com/fastestcrmlogo.png"
       }
     },
     "datePublished": datePublished,

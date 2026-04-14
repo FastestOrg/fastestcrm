@@ -15,9 +15,9 @@ interface SEOProps {
 const SEO: React.FC<SEOProps> = ({
   title = "Fastest CRM | AI-Powered CRM for Indian Sales Teams",
   description = "India's first AI-powered CRM. Manage leads, calls, payments, and analytics with intelligent automation. Built for sales teams, training companies, and enrollment teams.",
-  canonical = "https://fastestcrm.com",
+  canonical = "https://www.fastestcrm.com",
   ogType = "website",
-  ogImage = "https://fastestcrm.com/webimg.png",
+  ogImage = "https://www.fastestcrm.com/webimg.png",
   twitterCard = "summary_large_image",
   keywords = "CRM, AI CRM, sales CRM, lead management, India CRM, sales automation, Razorpay CRM, EdTech CRM, Real Estate CRM, auto dialer, lead tracking",
   children,

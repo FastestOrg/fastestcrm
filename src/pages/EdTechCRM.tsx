@@ -58,11 +58,11 @@ export default function EdTechCRM() {
         title="Best EdTech & Coaching CRM in India | Student Admission Software"
         description="The fastest AI CRM for EdTech startups and coaching institutes. Automate admissions, counselor calling, and fee collection in one platform."
         keywords="edtech crm india, coaching institute software, admission management system, student lead tracking, sales crm for education"
-        canonical="https://fastestcrm.com/crm-for-edtech"
+        canonical="https://www.fastestcrm.com/crm-for-edtech"
       />
       <BreadcrumbSchema items={[
-        { name: 'Home', item: 'https://fastestcrm.com' },
-        { name: 'EdTech CRM', item: 'https://fastestcrm.com/crm-for-edtech' }
+        { name: 'Home', item: 'https://www.fastestcrm.com' },
+        { name: 'EdTech CRM', item: 'https://www.fastestcrm.com/crm-for-edtech' }
       ]} />
       <SoftwareAppSchema />
       <OrganizationSchema />

@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://fastestcrm.com/sitemap.xml
+Sitemap: https://www.fastestcrm.com/sitemap.xml

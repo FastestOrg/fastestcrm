@@ -5,7 +5,7 @@ import { corsHeaders } from "../_shared/cors.ts";
 
 
 
-const FINAL_CLIENT_CALLBACK_URL = "https://fastestcrm.com/google-oauth-callback";
+const FINAL_CLIENT_CALLBACK_URL = "https://www.fastestcrm.com/google-oauth-callback";
 
 serve(async (req) => {
     if (req.method === "OPTIONS") {

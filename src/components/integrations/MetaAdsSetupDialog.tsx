@@ -51,6 +51,7 @@ const META_OAUTH_REDIRECT_URI = `https://api.fastestcrm.com/functions/v1/meta-oa
 const META_OAUTH_ALLOWED_ORIGINS = new Set([
   'https://api.fastestcrm.com',
   'https://fastestcrm.com',
+  'https://www.fastestcrm.com',
 ]);
 
 // Timeout for OAuth flow (5 minutes)

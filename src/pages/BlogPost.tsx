@@ -31,12 +31,12 @@ export default function BlogPost() {
                 ogType="article"
                 ogImage={blog.image}
                 keywords={`${blog.category}, ${blog.title.split(' ').join(', ')}, Fastest CRM`}
-                canonical={`https://fastestcrm.com/blog/${blog.slug}`}
+                canonical={`https://www.fastestcrm.com/blog/${blog.slug}`}
             />
             <BreadcrumbSchema items={[
-                { name: 'Home', item: 'https://fastestcrm.com' },
-                { name: 'Blog', item: 'https://fastestcrm.com/blog' },
-                { name: blog.title, item: `https://fastestcrm.com/blog/${blog.slug}` }
+                { name: 'Home', item: 'https://www.fastestcrm.com' },
+                { name: 'Blog', item: 'https://www.fastestcrm.com/blog' },
+                { name: blog.title, item: `https://www.fastestcrm.com/blog/${blog.slug}` }
             ]} />
             <ArticleSchema 
                 title={blog.title}
@@ -44,7 +44,7 @@ export default function BlogPost() {
                 image={blog.image}
                 author={blog.author}
                 datePublished={blog.date}
-                url={`https://fastestcrm.com/blog/${blog.slug}`}
+                url={`https://www.fastestcrm.com/blog/${blog.slug}`}
             />
             {/* Navigation */}
             <nav className="fixed top-0 left-0 right-0 z-50 glass border-b border-border/50">

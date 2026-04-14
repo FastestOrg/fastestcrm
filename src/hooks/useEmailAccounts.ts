@@ -178,9 +178,20 @@ export function useEmailAccounts() {
             if (data.error) throw new Error(data.error);
             return data;
         },
-        onSuccess: (data) => {
-            queryClient.invalidateQueries({ queryKey: ['email-accounts'] });
-            toast({ title: data.success ? 'Connection successful!' : 'Connection failed' });
+        onSuccess: (data, variables) => {
+            // If the test succeeded and we have an accountId, also update status directly
+            // from the frontend as a reliable fallback (edge function does this too)
+            const accountId = typeof variables === 'string' ? variables : (variables as any)?.accountId;
+            if (data.success && accountId) {
+                supabase
+                    .from('email_accounts' as any)
+                    .update({ status: 'connected', last_error: null, updated_at: new Date().toISOString() })
+                    .eq('id', accountId)
+                    .then(() => queryClient.invalidateQueries({ queryKey: ['email-accounts'] }));
+            } else {
+                queryClient.invalidateQueries({ queryKey: ['email-accounts'] });
+            }
+            toast({ title: data.success ? 'Connection successful! ✅' : 'Connection test failed', description: data.success ? undefined : (data.error || 'Check credentials') });
         },
         onError: (err: any) => {
             toast({ title: 'Test failed', description: err.message, variant: 'destructive' });
@@ -253,8 +264,19 @@ export function useEmailAccounts() {
             if (data.error) throw new Error(data.error);
             return data;
         },
-        onSuccess: (data) => {
-            toast({ title: 'Test email sent!', description: 'Check your inbox.' });
+        onSuccess: (data, variables) => {
+            // After a successful test send, also mark the account as connected from the frontend
+            // This is a reliable fallback in case the edge function's DB update has any issue
+            if (variables?.accountId) {
+                supabase
+                    .from('email_accounts' as any)
+                    .update({ status: 'connected', last_error: null, updated_at: new Date().toISOString() })
+                    .eq('id', variables.accountId)
+                    .then(() => queryClient.invalidateQueries({ queryKey: ['email-accounts'] }));
+            } else {
+                queryClient.invalidateQueries({ queryKey: ['email-accounts'] });
+            }
+            toast({ title: 'Test email sent! ✅', description: 'Connection verified. Account marked as connected.' });
         },
         onError: (err: any) => {
             toast({ title: 'Send failed', description: err.message, variant: 'destructive' });

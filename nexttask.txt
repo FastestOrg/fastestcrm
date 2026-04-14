@@ -1,0 +1,1 @@
+In FastSent, In email account, It is always showing as disconnected Even if The credentials and everything is correct. I did test it by Sending a test email and it was working really fine Still it is showing as disconnected only. Can you check. on this and solve with this issue

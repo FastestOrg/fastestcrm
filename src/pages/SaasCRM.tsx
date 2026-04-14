@@ -58,11 +58,11 @@ export default function SaasCRM() {
         title="Best B2B SaaS CRM in India | AI Sales Automation"
         description="The fastest AI CRM for SaaS startups. Manage your B2B sales pipeline, trials, and subscription payments with intelligent automation."
         keywords="saas crm india, b2b sales software, startup crm, lead tracking for saas, cloud sales automation"
-        canonical="https://fastestcrm.com/crm-for-saas"
+        canonical="https://www.fastestcrm.com/crm-for-saas"
       />
       <BreadcrumbSchema items={[
-        { name: 'Home', item: 'https://fastestcrm.com' },
-        { name: 'SaaS CRM', item: 'https://fastestcrm.com/crm-for-saas' }
+        { name: 'Home', item: 'https://www.fastestcrm.com' },
+        { name: 'SaaS CRM', item: 'https://www.fastestcrm.com/crm-for-saas' }
       ]} />
       <SoftwareAppSchema />
       <OrganizationSchema />

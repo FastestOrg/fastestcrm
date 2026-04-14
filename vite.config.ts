@@ -31,7 +31,7 @@ export default defineConfig(({ mode }) => {
       react(),
       mode === "development" && componentTagger(),
       Sitemap({
-        hostname: "https://fastestcrm.com",
+        hostname: "https://www.fastestcrm.com",
         dynamicRoutes: routes,
       }),
     ].filter(Boolean),

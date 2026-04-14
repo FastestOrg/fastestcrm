@@ -75,7 +75,7 @@ export function GoogleAdsSetupDialog({ isOpen, onOpenChange, onComplete, existin
       // Or we can just redirect the user and have them come back.
 
       // Given we didn't implement a specific frontend route for google callback yet, let's use the popup 
-      // but simplistic: The backend function redirects to `https://fastestcrm.com/google-oauth-callback`
+      // but simplistic: The backend function redirects to `https://www.fastestcrm.com/google-oauth-callback`
       // We assume that route exists or handles it. If not, we might need to add it.
       // Existing Meta uses `meta-oauth-callback`. Let's assume we can add a generic one or reuse.
 

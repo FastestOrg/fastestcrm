@@ -12,11 +12,11 @@ export default function Blog() {
                 title="Sales & CRM Insights | Fastest CRM Blog"
                 description="Expert tips, strategies, and trends in AI CRM, lead generation, and sales automation to help your Indian sales team grow faster."
                 keywords="sales tips, CRM blog, lead generation strategies, sales automation trends, AI in sales, CRM best practices"
-                canonical="https://fastestcrm.com/blog"
+                canonical="https://www.fastestcrm.com/blog"
             />
             <BreadcrumbSchema items={[
-                { name: 'Home', item: 'https://fastestcrm.com' },
-                { name: 'Blog', item: 'https://fastestcrm.com/blog' }
+                { name: 'Home', item: 'https://www.fastestcrm.com' },
+                { name: 'Blog', item: 'https://www.fastestcrm.com/blog' }
             ]} />
             {/* Navigation */}
             <nav className="fixed top-0 left-0 right-0 z-50 glass border-b border-border/50">

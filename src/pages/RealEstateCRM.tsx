@@ -60,11 +60,11 @@ export default function RealEstateCRM() {
         title="Best Real Estate CRM in India | AI-Powered Sales Automation"
         description="The fastest AI CRM built specifically for Indian Real Estate teams. Manage site visits, automate calling, and track property bookings with ease."
         keywords="real estate crm india, property management software, site visit tracking, lead management for builders, real estate sales automation"
-        canonical="https://fastestcrm.com/crm-for-real-estate"
+        canonical="https://www.fastestcrm.com/crm-for-real-estate"
       />
       <BreadcrumbSchema items={[
-        { name: 'Home', item: 'https://fastestcrm.com' },
-        { name: 'Real Estate CRM', item: 'https://fastestcrm.com/crm-for-real-estate' }
+        { name: 'Home', item: 'https://www.fastestcrm.com' },
+        { name: 'Real Estate CRM', item: 'https://www.fastestcrm.com/crm-for-real-estate' }
       ]} />
       <SoftwareAppSchema />
       <OrganizationSchema />
