@@ -6,61 +6,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-async function getGeminiKey(companyId: string): Promise<string> {
-    const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('company_id', companyId);
-
-    const userIds = profiles?.map((p: any) => p.id) || [];
-    if (userIds.length === 0) throw new Error('No users found for company');
-
-    const { data: integration } = await supabase
-        .from('integration_api_keys')
-        .select('api_key')
-        .in('user_id', userIds)
-        .eq('service_name', 'gemini')
-        .eq('is_active', true)
-        .limit(1)
-        .maybeSingle();
-
-    if (!integration?.api_key) {
-        throw new Error('Gemini API key not found. Please add it in Integrations → Google Gemini AI.');
-    }
-
-    return integration.api_key;
-}
-
-async function callGemini(apiKey: string, prompt: string): Promise<string> {
-    const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-        {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{ parts: [{ text: prompt }] }],
-                generationConfig: {
-                    temperature: 0.7,
-                    topP: 0.9,
-                    maxOutputTokens: 8192,
-                },
-            }),
-        }
-    );
-
-    if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error('Gemini API Error: ' + (err.error?.message || res.statusText));
-    }
-
-    const data = await res.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!text) throw new Error('No response generated from Gemini.');
-    return text.trim();
-}
+import { getGeminiKey, callGemini, cleanAIResponse } from './aiUtils';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -91,6 +37,15 @@ export async function generateFullDripCampaign(
     const apiKey = await getGeminiKey(params.companyId);
     const steps = params.numberOfSteps || 5;
 
+    // Fetch company details
+    const { data: companyData } = await supabase
+        .from('companies')
+        .select('name')
+        .eq('id', params.companyId)
+        .single();
+
+    const companyName = companyData?.name || 'FastestCRM Customer';
+
     const goalDescriptions: Record<string, string> = {
         sales: 'Close a sale or get them to purchase',
         meeting_booking: 'Book a meeting or demo call',
@@ -98,9 +53,27 @@ export async function generateFullDripCampaign(
         other: 'Drive engagement and conversion',
     };
 
-    const prompt = `You are an elite email marketing strategist specializing in cold outreach and drip campaigns with industry-leading open rates (40%+) and reply rates (10%+).
+    const strategies = [
+        "Introduction + value proposition",
+        "Social proof / case study mention (sent if no reply to previous)",
+        "Address objections (sent if no reply to previous)",
+        "Create urgency with a time-sensitive offer",
+        "Follow-up with a new perspective or benefit",
+        "Gentle nudge / reminder",
+        "Breakup email / last chance"
+    ];
+
+    const strategyList = Array.from({ length: steps }, (_, i) => {
+        // Always use first strategy for step 1, last strategy for last step, and middle ones for the rest
+        const strategyText = i === 0 ? strategies[0] : (i === steps - 1 ? strategies[strategies.length - 1] : strategies[Math.min(i, strategies.length - 2)]);
+        return `   - Email ${i + 1}: ${strategyText}`;
+    }).join('\n');
+
+    const prompt = `You are an elite email marketing strategist working for ${companyName}.
+Your job is to generate cold outreach and drip campaigns with industry-leading open rates (40%+) and reply rates (10%+).
 
 ## Campaign Brief
+- **Company**: ${companyName}
 - **Goal**: ${goalDescriptions[params.campaignGoal] || params.campaignGoal}
 - **Campaign Perspective**: ${params.perspective}
 ${params.productInfo ? `- **Product/Service**: ${params.productInfo}` : ''}
@@ -109,14 +82,12 @@ ${params.targetAudience ? `- **Target Audience**: ${params.targetAudience}` : ''
 
 ## Requirements
 Generate a ${steps}-step drip email campaign. For each email:
-1. **Subject lines**: Short (5-8 words), curiosity-driven, NO spam words (free, guaranteed, act now). Use personalization with %name% where appropriate.
-2. **Body**: Keep it concise (50-150 words per email). Use personalization variables: %name%, %company%, %email%. Write in plain conversational tone. Include a clear CTA matching the goal.
-3. **Strategy**:
-   - Email 1: Introduction + value proposition
-   - Email 2: Social proof / case study mention (sent if no reply to #1)
-   - Email 3: Address objections (sent if no reply to #2)
-   - Email 4: Create urgency with a time-sensitive offer
-   - Email 5: Breakup email / last chance
+1. **Subject lines**: Short (5-8 words), curiosity-driven, NO spam words. Use personalization with %name% where appropriate.
+2. **Body**: Keep it concise (50-150 words per email). Use ONLY these personalization variables: %name%, %company%, %email%. 
+3. **CRITICAL**: Do NOT use any placeholders in brackets like [Your Name], [Company Name], or [Link]. Replace them with the actual information provided above or use the variables %name% and %company%. The emails must be ready to send immediately.
+4. **HTML Formatting**: Use professional, production-ready HTML. Use button styling (rounded corners, solid background color, padding) for call to action links. Wrap the content in a clean div with 'font-family: sans-serif; line-height: 1.6; color: #1a1a1a;'. Use '<p>' tags for paragraphs, '<strong>' for emphasis, and styled '<a>' tags for links (e.g., 'color: #2563eb; font-weight: 600; text-decoration: underline;').
+5. **Strategy**:
+${strategyList}
 
 ## Output Format
 Return ONLY a valid JSON array. Each element must have exactly these fields:
@@ -125,7 +96,7 @@ Return ONLY a valid JSON array. Each element must have exactly these fields:
   {
     "step_number": 1,
     "subject": "Subject line here",
-    "body_html": "<p>HTML email body with <strong>formatting</strong></p>",
+    "body_html": "<div style=\"font-family: sans-serif; line-height: 1.6; color: #1a1a1a; max-width: 600px;\"><p>Hi %name%,</p><p>Professional email content here...</p><p><a href=\"https://example.com\" style=\"color: #2563eb; font-weight: 600;\">Call to Action Link</a></p><p>Best regards,<br>The %company% Team</p></div>",
     "body_text": "Plain text version of the email",
     "delay_after_ms": 86400000,
     "send_condition": "always"
@@ -136,12 +107,10 @@ Return ONLY a valid JSON array. Each element must have exactly these fields:
 delay_after_ms values: 0 for first email, 86400000 (24h) for follow-ups, 172800000 (48h) for later ones.
 send_condition: "always" for first email, "if_no_reply" for follow-ups.
 
-Return ONLY the JSON array, no markdown fences, no explanations.`;
+Return ONLY the JSON array, no markdown fences, no explanations.
+`;
 
-    const raw = await callGemini(apiKey, prompt);
-
-    // Parse JSON (strip any markdown fences the model might add)
-    const cleaned = raw.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+    const cleaned = await callGemini({ apiKey, prompt });
     try {
         const emails: GeneratedEmail[] = JSON.parse(cleaned);
         return emails.map((e, i) => ({
@@ -155,6 +124,48 @@ Return ONLY the JSON array, no markdown fences, no explanations.`;
     } catch {
         throw new Error('AI returned invalid JSON. Please try again.');
     }
+}
+
+// ─── Agentic Drip (Lead-Context Generation) ──────────────────────────────────
+
+export async function generateAgenticReply(params: {
+    companyId: string;
+    lead: any;
+    instructions: string;
+    context?: string;
+}): Promise<{ subject: string; body_html: string; body_text: string }> {
+    const apiKey = await getGeminiKey(params.companyId);
+
+    const prompt = `You are a high-performance sales agent. Craft a personalized follow-up email for this lead.
+    
+## Lead Profile
+- Name: ${params.lead.name || 'Unknown'}
+- Email: ${params.lead.email || 'Unknown'}
+- Interest: ${params.lead.property_name || params.lead.product_purchased || 'General Interest'}
+- Budget: ${params.lead.budget_max || 'Flexible'}
+
+## Recent History / Context
+${params.context || 'No previous interaction history available.'}
+
+## Your Specific Goal for this Email
+${params.instructions}
+
+## Requirements
+- Reference at least one detail from their profile or history to show it's not a template.
+- Tone should be professional, empathetic, and low-pressure.
+- Keep it under 100 words.
+- Use placeholders like %name% if you want to be safe, but you have the real name above.
+
+Return ONLY valid JSON:
+{
+  "subject": "Compelling subject line",
+  "body_html": "<p>HTML body with standard formatting</p>",
+  "body_text": "Plain text version"
+}
+`;
+
+    const cleaned = await callGemini({ apiKey, prompt });
+    return JSON.parse(cleaned);
 }
 
 // ─── Guided Mode (Single Email Generation) ────────────────────────────────────
@@ -193,8 +204,7 @@ Return ONLY valid JSON (no markdown fences):
   "send_condition": "${params.stepNumber === 1 ? 'always' : 'if_no_reply'}"
 }`;
 
-    const raw = await callGemini(apiKey, prompt);
-    const cleaned = raw.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+    const cleaned = await callGemini({ apiKey, prompt });
     return JSON.parse(cleaned);
 }
 
@@ -227,8 +237,7 @@ Return ONLY valid JSON (no markdown fences):
   "body_text": "Improved plain text"
 }`;
 
-    const raw = await callGemini(apiKey, prompt);
-    const cleaned = raw.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+    const cleaned = await callGemini({ apiKey, prompt });
     return JSON.parse(cleaned);
 }
 
@@ -251,7 +260,6 @@ Rules: Each subject should be 5-8 words, curiosity-driven, no spam words. Use %n
 Return ONLY a JSON array of strings, no markdown fences:
 ["Subject 1", "Subject 2", "Subject 3", "Subject 4", "Subject 5"]`;
 
-    const raw = await callGemini(apiKey, prompt);
-    const cleaned = raw.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+    const cleaned = await callGemini({ apiKey, prompt });
     return JSON.parse(cleaned);
 }

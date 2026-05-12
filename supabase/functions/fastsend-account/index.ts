@@ -70,19 +70,24 @@ async function readSmtpResponse(conn: Deno.Conn): Promise<string> {
     try {
       const n = await conn.read(buf);
       if (n === null) break;
-      fullResponse += decoder.decode(buf.subarray(0, n));
-      // Check if the last complete line is a terminal response (code + space, not dash)
-      const lines = fullResponse.split("\r\n").filter(l => l.length > 0);
-      const lastLine = lines[lines.length - 1];
-      // Terminal SMTP line: 3 digits followed by a space (not a dash)
-      if (lastLine && /^\d{3} /.test(lastLine)) {
-        break;
+      
+      const chunk = decoder.decode(buf.subarray(0, n));
+      fullResponse += chunk;
+      
+      // Standard SMTP responses must end with \r\n (CRLF)
+      // We check for the termination pattern: 3 digits followed by a SPACE on the last line.
+      if (fullResponse.endsWith("\n")) {
+        // Simple optimization: check the last few lines rather than splitting the whole thing every time
+        const lines = fullResponse.split(/\r?\n/);
+        // The last element is empty because of the trailing \n
+        const lastLine = lines[lines.length - 2]; 
+        
+        if (lastLine && /^\d{3} /.test(lastLine)) {
+          break;
+        }
       }
-      // Also break if we get a simple single-line response that ends with \r\n
-      if (fullResponse.endsWith("\r\n") && /^\d{3} /.test(fullResponse)) {
-        break;
-      }
-    } catch (_e) {
+    } catch (e) {
+      console.error("[SMTP READ ERROR]", e);
       break;
     }
   }
@@ -90,8 +95,11 @@ async function readSmtpResponse(conn: Deno.Conn): Promise<string> {
 }
 
 async function sendSmtpCommand(conn: Deno.Conn, command: string): Promise<string> {
-  await conn.write(new TextEncoder().encode(command + "\r\n"));
-  return await readSmtpResponse(conn);
+  const encoder = new TextEncoder();
+  await conn.write(encoder.encode(command + "\r\n"));
+  const response = await readSmtpResponse(conn);
+  console.log(`[SMTP] ${command} -> ${response.split(/\r?\n/)[0]}...`);
+  return response;
 }
 
 async function testSMTPLive(account: any): Promise<{ success: boolean; error?: string }> {

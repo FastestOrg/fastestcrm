@@ -7,6 +7,19 @@ const corsHeaders = {
     'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, PUT, DELETE',
 }
 
+// Mirror of useLeadsTable.ts — resolves the correct leads table for an industry
+function resolveLeadsTable(company: { custom_leads_table?: string | null; industry?: string | null }): string {
+    if (company.custom_leads_table) return company.custom_leads_table
+    switch (company.industry) {
+        case 'real_estate': return 'leads_real_estate'
+        case 'saas':        return 'leads_saas'
+        case 'healthcare':  return 'leads_healthcare'
+        case 'insurance':   return 'leads_insurance'
+        case 'travel':      return 'leads_travel'
+        default:            return 'leads'
+    }
+}
+
 serve(async (req) => {
     if (req.method === 'OPTIONS') {
         return new Response('ok', { headers: corsHeaders })
@@ -160,23 +173,14 @@ serve(async (req) => {
                     .eq('company_id', company_id)
 
                 // Get leads count from the company's table
-                const tableName = company.custom_leads_table || 'leads'
+                const tableName = resolveLeadsTable(company)
                 let leadsCount = 0
 
-                // Get lead count - try custom table first
-                if (company.custom_leads_table) {
-                    const { count } = await supabaseAdmin
-                        .from(company.custom_leads_table)
-                        .select('*', { count: 'exact', head: true })
-                        .eq('company_id', company_id)
-                    leadsCount = count || 0
-                } else {
-                    const { count } = await supabaseAdmin
-                        .from('leads')
-                        .select('*', { count: 'exact', head: true })
-                        .eq('company_id', company_id)
-                    leadsCount = count || 0
-                }
+                const { count } = await supabaseAdmin
+                    .from(tableName as any)
+                    .select('*', { count: 'exact', head: true })
+                    .eq('company_id', company_id)
+                leadsCount = count || 0
 
                 // Get team members
                 const { data: profiles } = await supabaseAdmin
@@ -760,6 +764,76 @@ serve(async (req) => {
                 )
             }
 
+            // ─────────────────────────────────────────────────────────────────────
+            // Download all leads data for a specific company (as seen in All Leads)
+            // ─────────────────────────────────────────────────────────────────────
+            case 'download_company_data': {
+                const { company_id } = body
+                if (!company_id) throw new Error('company_id required')
+
+                // 1. Fetch company to determine industry / table
+                const { data: company, error: companyError } = await supabaseAdmin
+                    .from('companies')
+                    .select('id, name, slug, industry, custom_leads_table')
+                    .eq('id', company_id)
+                    .single()
+
+                if (companyError || !company) throw new Error('Company not found')
+
+                const tableName = resolveLeadsTable(company)
+
+                // 2. Fetch all leads from the resolved table (no pagination — admin export)
+                const { data: leads, error: leadsError } = await supabaseAdmin
+                    .from(tableName as any)
+                    .select('*')
+                    .eq('company_id', company_id)
+                    .order('created_at', { ascending: false })
+
+                if (leadsError) throw leadsError
+
+                // 3. Enrich: resolve owner names from profiles
+                const ownerIds = new Set<string>()
+                ;(leads || []).forEach((lead: any) => {
+                    if (lead.sales_owner_id) ownerIds.add(lead.sales_owner_id)
+                    if (lead.pre_sales_owner_id) ownerIds.add(lead.pre_sales_owner_id)
+                    if (lead.post_sales_owner_id) ownerIds.add(lead.post_sales_owner_id)
+                    if (lead.created_by_id) ownerIds.add(lead.created_by_id)
+                })
+
+                let profileMap = new Map<string, string>()
+                if (ownerIds.size > 0) {
+                    const { data: profiles } = await supabaseAdmin
+                        .from('profiles')
+                        .select('id, full_name, email')
+                        .in('id', Array.from(ownerIds))
+                    ;(profiles || []).forEach((p: any) => {
+                        profileMap.set(p.id, p.full_name || p.email || p.id)
+                    })
+                }
+
+                // 4. Annotate leads with human-readable owner names
+                const enrichedLeads = (leads || []).map((lead: any) => ({
+                    ...lead,
+                    _owner_name: lead.sales_owner_id ? (profileMap.get(lead.sales_owner_id) || lead.sales_owner_id) : null,
+                    _pre_sales_owner_name: lead.pre_sales_owner_id ? (profileMap.get(lead.pre_sales_owner_id) || lead.pre_sales_owner_id) : null,
+                    _post_sales_owner_name: lead.post_sales_owner_id ? (profileMap.get(lead.post_sales_owner_id) || lead.post_sales_owner_id) : null,
+                    _created_by_name: lead.created_by_id ? (profileMap.get(lead.created_by_id) || lead.created_by_id) : null,
+                }))
+
+                return new Response(
+                    JSON.stringify({
+                        success: true,
+                        company_name: company.name,
+                        company_slug: company.slug,
+                        industry: company.industry || 'education',
+                        table_name: tableName,
+                        total: enrichedLeads.length,
+                        leads: enrichedLeads,
+                    }),
+                    { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+                )
+            }
+
             case 'get_analytics': {
 
 
@@ -862,7 +936,7 @@ serve(async (req) => {
                     // Get ISO week number
                     const startOfYear = new Date(d.getFullYear(), 0, 1)
                     const weekNum = Math.ceil(((d.getTime() - startOfYear.getTime()) / 86400000 + startOfYear.getDay() + 1) / 7)
-                    const weekKey = `${d.getFullYear()}-W${String(weekNum).padStart(2, '0')}`
+                    const weekKey = `${d.getFullYear()}-W${String(weekNum).padStart(2, '00')}`
                     if (!leadHeatmapMap[weekKey]) leadHeatmapMap[weekKey] = {}
                     leadHeatmapMap[weekKey][lead.company_id] = (leadHeatmapMap[weekKey][lead.company_id] || 0) + 1
                 })

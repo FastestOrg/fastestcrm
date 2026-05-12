@@ -14,61 +14,15 @@ import { Badge } from '@/components/ui/badge';
 import { useWhatsAppAccounts } from '@/hooks/useWhatsAppAccounts';
 import { useWhatsAppCampaigns } from '@/hooks/useWhatsAppCampaigns';
 import { useLeadStatuses } from '@/hooks/useLeadStatuses';
+import { WhatsAppAccountAddDialog } from '@/components/integrations/WhatsAppAccountAddDialog';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 
 // ─── Accounts Tab ────────────────────────────────────────────────────────────
 function AccountsTab() {
-    const { accounts, isLoading, createSession, disconnectSession, deleteAccount, pollQR, updateAccountAI } = useWhatsAppAccounts();
+    const { accounts, isLoading, disconnectSession, deleteAccount, updateAccountAI } = useWhatsAppAccounts();
     const [isConnecting, setIsConnecting] = useState(false);
-    const [qrCode, setQrCode] = useState<string | null>(null);
-    const [newSessionName, setNewSessionName] = useState('');
-    const [qrStatus, setQrStatus] = useState<'idle' | 'loading' | 'waiting_scan' | 'connected'>('idle');
     const [aiConfigAccount, setAiConfigAccount] = useState<any>(null);
-    const pollInterval = React.useRef<any>(null);
-    
-    React.useEffect(() => {
-        return () => {
-            if (pollInterval.current) clearInterval(pollInterval.current);
-        };
-    }, []);
-
-    const handleConnect = async () => {
-        if (!newSessionName.trim()) return;
-        const sessionId = `${newSessionName.replace(/[^a-zA-Z0-9]/g, '')}_${Date.now()}`;
-        setQrStatus('loading');
-        
-        try {
-            const res = await createSession.mutateAsync({ sessionId });
-            if (res.status === 'connected') {
-                setQrStatus('connected');
-                setTimeout(() => setIsConnecting(false), 2000);
-            } else if (res.qr) {
-                setQrCode(res.qr);
-                setQrStatus('waiting_scan');
-                
-                // Poll for scan
-                if (pollInterval.current) clearInterval(pollInterval.current);
-                pollInterval.current = setInterval(async () => {
-                    const statusRes = await pollQR(sessionId);
-                    if (statusRes.status === 'connected') {
-                        if (pollInterval.current) clearInterval(pollInterval.current);
-                        setQrStatus('connected');
-                        setTimeout(() => {
-                            setIsConnecting(false);
-                            setQrCode(null);
-                            setNewSessionName('');
-                            setQrStatus('idle');
-                        }, 2000);
-                    } else if (statusRes.qr && statusRes.qr !== qrCode) {
-                        setQrCode(statusRes.qr);
-                    }
-                }, 3000);
-            }
-        } catch (e) {
-            setQrStatus('idle');
-        }
-    };
 
     if (isLoading) return <div>Loading accounts...</div>;
 
@@ -132,69 +86,10 @@ function AccountsTab() {
                 ))}
             </div>
 
-            <Dialog open={isConnecting} onOpenChange={(open) => {
-                setIsConnecting(open);
-                if (!open) { 
-                    if (pollInterval.current) clearInterval(pollInterval.current);
-                    setQrCode(null); 
-                    setQrStatus('idle'); 
-                    setNewSessionName(''); 
-                }
-            }}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Link WhatsApp Account</DialogTitle>
-                        <DialogDescription>
-                            Scan the QR code with your WhatsApp app to link this account.
-                        </DialogDescription>
-                    </DialogHeader>
-                    
-                    {qrStatus === 'idle' && (
-                        <div className="space-y-4 py-4">
-                            <div className="space-y-2">
-                                <Label>Account Label</Label>
-                                <Input 
-                                    placeholder="e.g. Sales Phone 1" 
-                                    value={newSessionName}
-                                    onChange={e => setNewSessionName(e.target.value)}
-                                />
-                            </div>
-                            <Button onClick={handleConnect} disabled={!newSessionName.trim()} className="w-full">
-                                Generate QR Code
-                            </Button>
-                        </div>
-                    )}
-
-                    {qrStatus === 'loading' && (
-                        <div className="flex flex-col items-center justify-center py-8 space-y-4">
-                            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                            <p className="text-sm text-muted-foreground">Generating QR Code...</p>
-                        </div>
-                    )}
-
-                    {qrStatus === 'waiting_scan' && qrCode && (
-                        <div className="flex flex-col items-center justify-center py-4 space-y-4">
-                            <div className="bg-white p-4 rounded-xl border">
-                                <img src={qrCode} alt="WhatsApp QR Code" className="h-48 w-48" />
-                            </div>
-                            <p className="text-sm text-center text-muted-foreground">
-                                Open WhatsApp on your phone<br/>
-                                Go to Settings &gt; Linked Devices &gt; Link a Device<br/>
-                                Point your camera at this screen
-                            </p>
-                        </div>
-                    )}
-
-                    {qrStatus === 'connected' && (
-                        <div className="flex flex-col items-center justify-center py-8 space-y-4">
-                            <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center">
-                                <Activity className="h-6 w-6 text-green-600" />
-                            </div>
-                            <p className="font-medium">Account Linked Successfully!</p>
-                        </div>
-                    )}
-                </DialogContent>
-            </Dialog>
+            <WhatsAppAccountAddDialog 
+                isOpen={isConnecting} 
+                onOpenChange={setIsConnecting} 
+            />
 
             {/* AI Config Dialog */}
             <Dialog open={!!aiConfigAccount} onOpenChange={(open) => !open && setAiConfigAccount(null)}>
@@ -268,7 +163,7 @@ Current Basic Instructions: ${aiPrompt}
 
 Rewrite the instructions to be extremely clear, conversion-focused, and suitable to act as the exact system prompt for a WhatsApp auto-responder AI. Define tone, guardrails, and structure. Return ONLY the final rewritten prompt text, without any markdown formatting wrappers or conversational filler.`;
 
-            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${integration.api_key}`, {
+            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${integration.api_key}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -402,6 +297,7 @@ function CampaignsTab() {
     const [scheduledAt, setScheduledAt] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [editingCampaignId, setEditingCampaignId] = useState<string | null>(null);
+    const [isWhatsAppAddOpen, setIsWhatsAppAddOpen] = useState(false);
 
     const openEdit = (campaign: any) => {
         setEditingCampaignId(campaign.id);
@@ -589,11 +485,25 @@ function CampaignsTab() {
                                         </label>
                                     </div>
                                 ))}
+                                <Button 
+                                    variant="outline" 
+                                    className="border-dashed border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/5 h-auto py-2 flex flex-col items-center justify-center"
+                                    onClick={() => setIsWhatsAppAddOpen(true)}
+                                >
+                                    <Plus className="h-4 w-4 mb-1" />
+                                    <span className="text-[10px] uppercase font-bold tracking-wider">Add New Account</span>
+                                </Button>
                                 {accounts.filter(a => a.status === 'connected').length === 0 && (
                                     <div className="text-sm text-muted-foreground col-span-2">No connected accounts. Please link an account first.</div>
                                 )}
                             </div>
                         </div>
+
+                        <WhatsAppAccountAddDialog 
+                            isOpen={isWhatsAppAddOpen} 
+                            onOpenChange={setIsWhatsAppAddOpen}
+                            onSuccess={(id) => setSelectedAccounts(prev => [...prev, id])}
+                        />
 
                         <div className="grid grid-cols-2 gap-4">
                             {!editingCampaignId && (

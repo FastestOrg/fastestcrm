@@ -27,7 +27,6 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 export async function subscribeToPush(userId: string): Promise<boolean> {
     try {
         if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-            console.warn('Push notifications not supported in this browser');
             return false;
         }
 
@@ -49,8 +48,6 @@ export async function subscribeToPush(userId: string): Promise<boolean> {
         // Persist to Supabase
         const subscriptionJson = subscription.toJSON();
         
-        console.log('[Push] Subscription generated:', subscriptionJson.endpoint.substring(0, 30) + '...');
-        
         const { error } = await supabase
             .from('push_subscriptions' as any)
             .upsert(
@@ -69,7 +66,6 @@ export async function subscribeToPush(userId: string): Promise<boolean> {
             return false;
         }
 
-        console.log('[Push] Subscription saved successfully to DB');
         return true;
     } catch (error) {
         console.error('[Push] Subscription process failed entirely:', error);

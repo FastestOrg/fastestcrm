@@ -132,5 +132,6 @@ export const anonSupabase = createClient<Database>(DIRECT_URL, SUPABASE_PUBLISHA
     persistSession: false,
     autoRefreshToken: false,
     detectSessionInUrl: false,
+    storageKey: 'sb-anon-auth-token', // Unique key to avoid conflict with main client
   },
 });

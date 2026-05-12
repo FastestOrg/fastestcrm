@@ -87,7 +87,8 @@ async function sendEmailViaSMTP(
   htmlBody: string, 
   trackingPixelId: string,
   inReplyTo?: string,
-  references?: string
+  references?: string,
+  unsubscribeData?: { leadId: string, leadTable: string, companyId: string }
 ): Promise<{ success: boolean; error?: string }> {
   let conn: Deno.Conn | null = null;
   
@@ -152,45 +153,76 @@ async function sendEmailViaSMTP(
     response = await sendCommand(conn, "DATA");
     if (!response.startsWith("354")) throw new Error("DATA not accepted: " + response);
 
-    // Build tracking pixel URL
+    // Build tracking and unsubscribe URLs
     const projectId = SUPABASE_URL.replace("https://", "").replace(".supabase.co", "");
     const trackingUrl = `https://${projectId}.supabase.co/functions/v1/fastsend-track?pid=${trackingPixelId}`;
     const trackingPixelHtml = `<img src="${trackingUrl}" width="1" height="1" style="display:none" alt="" />`;
 
-    // Inject tracking pixel into HTML body
-    const bodyWithTracking = htmlBody.includes("</body>")
-      ? htmlBody.replace("</body>", trackingPixelHtml + "</body>")
-      : htmlBody + trackingPixelHtml;
+    let unsubscribeHtml = "";
+    let unsubscribeText = "";
 
-    // Compose message
+    if (unsubscribeData) {
+      const unsubUrl = `https://${projectId}.supabase.co/functions/v1/fastsend-unsubscribe?lid=${unsubscribeData.leadId}&lt=${unsubscribeData.leadTable}&cid=${unsubscribeData.companyId}`;
+      unsubscribeHtml = `<div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb; font-size: 12px; color: #9ca3af; text-align: center;">
+        You are receiving this email because you are a lead. 
+        <a href="${unsubUrl}" style="color: #9ca3af; text-decoration: underline;">Unsubscribe</a>
+      </div>`;
+      unsubscribeText = `\n\n---\nUnsubscribe: ${unsubUrl}`;
+    }
+
+    // Inject tracking pixel and unsubscribe link into HTML body
+    const bodyWithTracking = htmlBody.includes("</body>")
+      ? htmlBody.replace("</body>", trackingPixelHtml + unsubscribeHtml + "</body>")
+      : htmlBody + trackingPixelHtml + unsubscribeHtml;
+
+    // Helper for base64 encoding with line breaks
+    const toBase64 = (str: string) => {
+      const bytes = new TextEncoder().encode(str);
+      const b64 = base64Encode(bytes);
+      // SMTP usually likes lines to be wrapped at 76 chars
+      return b64.match(/.{1,76}/g)?.join("\r\n") || b64;
+    };
+
+    // Helper for subject encoding
+    const encodeSubject = (str: string) => {
+      if (/^[a-zA-Z0-9\s.,!?-]*$/.test(str)) return str;
+      return `=?UTF-8?B?${base64Encode(new TextEncoder().encode(str))}?=`;
+    };
+
+    // Generate plain text by stripping HTML
+    const plainText = bodyWithTracking
+      .replace(/<style[^>]*>.*<\/style>/gs, "")
+      .replace(/<script[^>]*>.*<\/script>/gs, "")
+      .replace(/<[^>]*>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim() + unsubscribeText;
+
     const boundary = `----=_Part_${Date.now()}_${Math.random().toString(36).substring(2)}`;
     const fromName = account.display_name || account.email_address;
-    
-    // Message ID for this email
     const myMessageId = `<${crypto.randomUUID()}@fastestcrm.com>`;
 
     const message = [
-      `From: "${fromName}" <${account.email_address}>`,
+      `From: "${fromName.replace(/"/g, "")}" <${account.email_address}>`,
       `To: <${to}>`,
-      `Subject: ${subject}`,
+      `Subject: ${encodeSubject(subject)}`,
       `Message-ID: ${myMessageId}`,
       inReplyTo ? `In-Reply-To: ${inReplyTo}` : "",
       references ? `References: ${references}` : "",
       `MIME-Version: 1.0`,
       `Content-Type: multipart/alternative; boundary="${boundary}"`,
-      `X-Mailer: FastSend/1.0`,
+      `X-Mailer: FastestCRM/FastSend`,
       ``,
       `--${boundary}`,
       `Content-Type: text/plain; charset=utf-8`,
-      `Content-Transfer-Encoding: quoted-printable`,
+      `Content-Transfer-Encoding: base64`,
       ``,
-      subject, // fallback plain text
+      toBase64(plainText),
       ``,
       `--${boundary}`,
       `Content-Type: text/html; charset=utf-8`,
-      `Content-Transfer-Encoding: quoted-printable`,
+      `Content-Transfer-Encoding: base64`,
       ``,
-      bodyWithTracking,
+      toBase64(bodyWithTracking),
       ``,
       `--${boundary}--`,
       `.`,
@@ -240,7 +272,7 @@ Deno.serve(async (req) => {
 
     const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     const body = await req.json();
-    const { accountId, to, subject, bodyHtml, campaignId, recipientId, sequenceStepId, companyId, inReplyTo, references, threadId } = body;
+    const { accountId, to, subject, bodyHtml, campaignId, recipientId, sequenceStepId, companyId, inReplyTo, references, threadId, leadId, leadTable } = body;
 
     // Load account
     const { data: account } = await adminClient
@@ -287,7 +319,16 @@ Deno.serve(async (req) => {
     const trackingPixelId = crypto.randomUUID();
 
     // Send email
-    const result = await sendEmailViaSMTP(account, to, subject, bodyHtml, trackingPixelId, inReplyTo, references);
+    const result = await sendEmailViaSMTP(
+      account, 
+      to, 
+      subject, 
+      bodyHtml, 
+      trackingPixelId, 
+      inReplyTo, 
+      references,
+      (leadId && leadTable) ? { leadId, leadTable, companyId: account.company_id } : undefined
+    );
 
     const now = new Date().toISOString();
 

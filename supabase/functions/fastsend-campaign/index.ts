@@ -130,10 +130,10 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Process recipients (first batch — edge functions have 60s timeout)
+      // Process recipients
       let processed = 0;
       let accountIndex = 0;
-      const maxBatch = 10; // Process up to 10 per invocation to stay within timeout
+      const maxBatch = 50; // Increased batch size
 
       for (const recipient of recipients) {
         if (processed >= maxBatch) break;
@@ -200,7 +200,7 @@ Deno.serve(async (req) => {
           const sendRes = await fetch(`https://${projectId}.supabase.co/functions/v1/fastsend-send`, {
             method: "POST",
             headers: {
-              Authorization: authHeader,
+              Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`, // Use service key for internal calls
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
@@ -212,6 +212,8 @@ Deno.serve(async (req) => {
               recipientId: recipient.id,
               sequenceStepId: sequence.id,
               companyId: campaign.company_id,
+              leadId: recipient.lead_id,
+              leadTable: recipient.lead_table
             }),
           });
 
@@ -248,7 +250,7 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Check if all recipients are done
+      // Check if there's more work to do
       const { data: remaining } = await adminClient
         .from("email_campaign_recipients")
         .select("id")
@@ -256,7 +258,27 @@ Deno.serve(async (req) => {
         .in("status", ["pending", "in_progress"])
         .limit(1);
 
-      if (!remaining || remaining.length === 0) {
+      if (remaining && remaining.length > 0) {
+        // Still work to do! Chain the next invocation with a 120s gap
+        console.log(`[Campaign] More work remaining for ${campaignId}. Waiting 120 seconds before next batch...`);
+        
+        const projectId = SUPABASE_URL.replace("https://", "").replace(".supabase.co", "");
+        
+        // We use a backgrounded setTimeout. 
+        // Note: For very long delays, a database-driven cron is more reliable,
+        // but this works for 120s in most Edge environments.
+        setTimeout(() => {
+          fetch(`https://${projectId}.supabase.co/functions/v1/fastsend-campaign`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`
+            },
+            body: JSON.stringify({ action: "resume", campaignId })
+          }).catch(err => console.error("[Campaign] Chaining error:", err));
+        }, 120000); // 120 seconds gap
+
+      } else {
         await adminClient
           .from("email_campaigns")
           .update({ status: "completed", completed_at: new Date().toISOString() })

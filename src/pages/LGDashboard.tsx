@@ -10,6 +10,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useForms } from '@/hooks/useForms';
 import { useLGLinks } from '@/hooks/useLGLinks';
+import { useGrowthSettings } from '@/hooks/useGrowthSettings';
+import { Switch } from '@/components/ui/switch';
+import { Wand2, Zap, BrainCircuit, Activity } from 'lucide-react';
 
 export default function LGDashboard() {
     const [caName, setCaName] = useState('');
@@ -20,6 +23,7 @@ export default function LGDashboard() {
 
     const { data: forms = [], isLoading: formsLoading } = useForms();
     const { links, loading: linksLoading, createLink } = useLGLinks();
+    const { settings, loading: settingsLoading, updateSettings } = useGrowthSettings();
 
     const activeForms = forms.filter(f => f.status === 'active');
 
@@ -98,6 +102,113 @@ export default function LGDashboard() {
                     <h1 className="text-2xl font-bold mb-2">Lead Generation Dashboard</h1>
                     <p className="text-muted-foreground">Create UTM-tracked links and monitor performance.</p>
                 </div>
+
+                {/* Autonomous Growth Engine Section */}
+                <Card className="border-primary/20 bg-primary/5 shadow-lg overflow-hidden relative">
+                    <div className="absolute top-0 right-0 p-4 opacity-10">
+                        <BrainCircuit className="h-24 w-24 text-primary" />
+                    </div>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-primary">
+                            <Wand2 className="h-5 w-5" />
+                            Autonomous Growth Engine
+                        </CardTitle>
+                        <CardDescription>Configure AI to autonomously find, enrich, and engage leads in the background.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 relative z-10">
+                            <div className="flex items-center justify-between p-4 rounded-xl bg-background/50 border shadow-sm">
+                                <div className="space-y-1">
+                                    <h4 className="font-semibold flex items-center gap-2">
+                                        <Zap className="h-4 w-4 text-amber-500" />
+                                        Autonomous Enrichment
+                                    </h4>
+                                    <p className="text-xs text-muted-foreground">Automatically research every new lead using Gemini AI.</p>
+                                </div>
+                                <Switch 
+                                    checked={settings?.is_enabled || false} 
+                                    onCheckedChange={(val) => updateSettings({ is_enabled: val })}
+                                    disabled={settingsLoading}
+                                />
+                            </div>
+
+                            <div className="flex items-center justify-between p-4 rounded-xl bg-background/50 border shadow-sm">
+                                <div className="space-y-1">
+                                    <h4 className="font-semibold flex items-center gap-2">
+                                        <Activity className="h-4 w-4 text-green-500" />
+                                        Auto-Outreach
+                                    </h4>
+                                    <p className="text-xs text-muted-foreground">Trigger "Agentic" campaigns immediately after enrichment.</p>
+                                </div>
+                                <Switch 
+                                    checked={settings?.auto_outreach_enabled || false} 
+                                    onCheckedChange={(val) => updateSettings({ auto_outreach_enabled: val })}
+                                    disabled={settingsLoading || !settings?.is_enabled}
+                                />
+                            </div>
+
+                            <div className="flex items-center justify-between p-4 rounded-xl bg-background/50 border shadow-sm">
+                                <div className="space-y-1">
+                                    <h4 className="font-semibold flex items-center gap-2">
+                                        <Activity className="h-4 w-4 text-blue-500" />
+                                        Approval Mode
+                                    </h4>
+                                    <p className="text-xs text-muted-foreground">Require human approval before AI sends messages.</p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[10px] uppercase font-bold text-muted-foreground">
+                                        {settings?.autonomy_mode === 'autonomous' ? 'Full Auto' : 'Review'}
+                                    </span>
+                                    <Switch 
+                                        checked={settings?.autonomy_mode === 'autonomous'} 
+                                        onCheckedChange={(val) => updateSettings({ autonomy_mode: val ? 'autonomous' : 'semi-autonomous' })}
+                                        disabled={settingsLoading || !settings?.auto_outreach_enabled}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="flex items-center justify-between p-4 rounded-xl bg-background/50 border shadow-sm">
+                                <div className="space-y-1">
+                                    <h4 className="font-semibold flex items-center gap-2 text-primary">
+                                        <Zap className="h-4 w-4" />
+                                        Channel Priority
+                                    </h4>
+                                    <p className="text-xs text-muted-foreground">Choose the AI's preferred outreach platform.</p>
+                                </div>
+                                <Select 
+                                    value={settings?.preferred_channel || 'email'} 
+                                    onValueChange={(val: any) => updateSettings({ preferred_channel: val })}
+                                    disabled={settingsLoading}
+                                >
+                                    <SelectTrigger className="w-28 h-8 text-xs">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="email">Email</SelectItem>
+                                        <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            <div className="space-y-2 p-4 rounded-xl bg-background/50 border shadow-sm">
+                                <div className="flex justify-between items-center mb-1">
+                                    <label className="text-sm font-semibold">Daily Autonomy Budget</label>
+                                    <span className="text-xs font-mono bg-primary/10 px-2 py-0.5 rounded text-primary">
+                                        {settings?.daily_budget_limit || 0} Leads/Day
+                                    </span>
+                                </div>
+                                <Input 
+                                    type="number"
+                                    className="h-8"
+                                    value={settings?.daily_budget_limit || 100}
+                                    onChange={(e) => updateSettings({ daily_budget_limit: parseInt(e.target.value) || 0 })}
+                                    disabled={settingsLoading}
+                                />
+                                <p className="text-[10px] text-muted-foreground">Limits Gemini API and outreach volume to control costs.</p>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
 
                 {/* Create Link Section */}
                 <Card className="glass">

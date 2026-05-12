@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, Save, Trash, GripVertical, ArrowLeft, Eye, EyeOff, Check, Copy, Code } from 'lucide-react';
 import { toast } from 'sonner';
 import { useForm, useCreateForm, useUpdateForm } from '@/hooks/useForms';
+import { extractFieldsFromImage } from '@/services/formAIService';
 import { Switch } from '@/components/ui/switch';
 import { useAuth } from '@/hooks/useAuth';
 import { useCompany } from '@/hooks/useCompany';
@@ -301,6 +302,7 @@ export default function FormBuilder() {
     const [showApiInfo, setShowApiInfo] = useState(false);
     const [copiedUrl, setCopiedUrl] = useState(false);
     const [copiedJson, setCopiedJson] = useState(false);
+    const [isExtracting, setIsExtracting] = useState(false);
 
     const apiUrl = `https://api.fastestcrm.com/functions/v1/submit-external-lead`;
     const canViewApiInfo = (userRole === 'company' || userRole === 'company_subadmin');
@@ -443,6 +445,39 @@ export default function FormBuilder() {
         }
     };
 
+    const handleImportFromImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file || !company?.id) return;
+
+        setIsExtracting(true);
+        try {
+            const extracted = await extractFieldsFromImage({
+                companyId: company.id,
+                file,
+                availableAttributes: leadAttributes
+            });
+
+            const newFields = extracted.map(f => ({
+                id: Math.random().toString(36).substr(2, 9),
+                label: f.label,
+                type: f.type,
+                required: f.required,
+                attribute: f.attribute,
+                hidden: false,
+                options: f.options
+            }));
+
+            setFields(prev => [...prev, ...newFields]);
+            toast.success(`AI successfully extracted ${extracted.length} fields!`);
+        } catch (error) {
+            console.error('Extraction failed', error);
+            toast.error('Failed to extract fields. Is your Gemini key active?');
+        } finally {
+            setIsExtracting(false);
+            if (e.target) e.target.value = '';
+        }
+    };
+
     if (id && isLoading) {
         return (
             <>
@@ -552,6 +587,30 @@ export default function FormBuilder() {
                                     onChange={(e) => setDescription(e.target.value)}
                                     placeholder="Enter form description"
                                 />
+                            </div>
+
+                            <div className="pt-4 border-t border-border/50">
+                                <Label className="text-primary font-bold flex items-center gap-2 mb-3">
+                                   <Sparkles className="h-4 w-4" /> AI Magic Onboarding
+                                </Label>
+                                <div className="space-y-3">
+                                    <p className="text-[10px] text-muted-foreground leading-tight">
+                                        Upload a photo or PDF of your physical registration form. Our AI will build the digital version instantly.
+                                    </p>
+                                    <div className="relative">
+                                        <Input
+                                            type="file"
+                                            accept="image/*,application/pdf"
+                                            className="opacity-0 absolute inset-0 w-full h-full cursor-pointer z-10"
+                                            onChange={handleImportFromImage}
+                                            disabled={isExtracting}
+                                        />
+                                        <Button variant="outline" className="w-full gap-2 border-primary/20 bg-primary/5 hover:bg-primary/10" disabled={isExtracting}>
+                                            {isExtracting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                                            {isExtracting ? 'Extracting Fields...' : 'Import from Paper Form'}
+                                        </Button>
+                                    </div>
+                                </div>
                             </div>
                         </CardContent>
                     </Card>

@@ -1,8 +1,9 @@
 
 import { supabase } from '@/integrations/supabase/client';
+import { generateAgenticReply } from './emailAIService';
 
 export type TriggerType = 'lead_created' | 'status_changed' | 'tag_added' | 'form_submitted';
-export type ActionType = 'send_email' | 'webhook' | 'create_task' | 'assign_lead';
+export type ActionType = 'send_email' | 'webhook' | 'create_task' | 'assign_lead' | 'ai_personalized_followup';
 
 export interface Automation {
     id: string;
@@ -144,6 +145,17 @@ export const automationService = {
     },
 
     async executeAction(auto: Automation, data: any) {
+        // Fetch full lead data to get history and other details
+        const { data: lead, error: leadError } = await supabase
+            .from('leads')
+            .select('*, sales_owner:profiles!leads_sales_owner_id_fkey(full_name)')
+            .eq('id', data.id)
+            .single();
+
+        if (leadError) {
+            console.error('Failed to fetch lead for automation', leadError);
+            return;
+        }
 
         const logEntry = {
             automation_id: auto.id,
@@ -163,15 +175,58 @@ export const automationService = {
         try {
             if (auto.action_type === 'send_email') {
 
-                // TODO: Real email sending logic
-            } else if (auto.action_type === 'webhook') {
-                if (auto.action_config?.url) {
-                    await fetch(auto.action_config.url, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(data)
-                    });
+                // Automated email sending is handled by the notify_lead_owner database-level trigger or equivalent service.
+            } else if (auto.action_type === 'ai_personalized_followup') {
+                const instructions = auto.action_config?.instructions || 'Follow up with the lead about their interest.';
+                
+                // Get lead history as context
+                const context = lead.lead_history && Array.isArray(lead.lead_history)
+                    ? lead.lead_history.slice(-5).map((h: any) => `[${h.timestamp}] ${h.type}: ${h.details}`).join('\n')
+                    : 'New lead, no history.';
+
+                // Generate Reply
+                const aiReply = await generateAgenticReply({
+                    companyId: lead.company_id,
+                    lead: lead,
+                    instructions: instructions,
+                    context: context
+                });
+
+                // Get owner email account
+                const { data: account } = await supabase
+                    .from('email_accounts' as any)
+                    .select('*')
+                    .eq('user_id', lead.sales_owner_id)
+                    .eq('status', 'connected')
+                    .limit(1)
+                    .maybeSingle() as any;
+
+                if (!account) {
+                    throw new Error('No connected email account found for lead owner');
                 }
+
+                // Send via Edge Function
+                const { data: sessionData } = await supabase.auth.getSession();
+                const token = sessionData.session?.access_token;
+
+                const res = await fetch(`https://${import.meta.env.VITE_SUPABASE_PROJECT_ID}.supabase.co/functions/v1/fastsend-account`, {
+                    method: 'POST',
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        action: 'test_send',
+                        accountId: account.id,
+                        to: lead.email,
+                        subject: aiReply.subject,
+                        body: aiReply.body_html
+                    }),
+                });
+
+                const sendResult = await res.json();
+                if (sendResult.error) throw new Error(sendResult.error);
+
             } else if (auto.action_type === 'whatsapp' as any) {
                 const apiKey = await this.getIntegrationKey('whatsapp');
                 if (!apiKey) {

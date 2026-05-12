@@ -8,12 +8,23 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Plus, Trash2, Loader2, Save, Package } from 'lucide-react';
-import { useQuotations, QuotationItem } from '@/hooks/useQuotations';
+import { ArrowLeft, Plus, Trash2, Loader2, Save, Package, Sparkles, Wand2, Zap, Edit, ArrowRightCircle, Mail } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { useQuotations, QuotationItem, Quotation } from '@/hooks/useQuotations';
+import { SendDocumentDialog } from '@/components/financial/SendDocumentDialog';
+import { DocumentView } from '@/components/financial/DocumentView';
+import PublicDocument from './PublicDocument';
 import { useInvoiceTaxes } from '@/hooks/useInvoiceSettings';
 import { useProducts } from '@/hooks/useProducts';
 import { useToast } from '@/hooks/use-toast';
 import { useCompany } from '@/hooks/useCompany';
+import { useLeads } from '@/hooks/useLeads';
+import { useLeadsTable } from '@/hooks/useLeadsTable';
+import { useDebounce } from '@/hooks/useDebounce';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Check, ChevronsUpDown, User, Search } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 const CURRENCIES = ['INR', 'USD', 'EUR', 'GBP', 'AED', 'SAR', 'SGD', 'AUD', 'CAD', 'JPY'];
 
@@ -44,6 +55,93 @@ export default function QuotationBuilder() {
   const [termsAndConditions, setTermsAndConditions] = useState('');
   const [validUntil, setValidUntil] = useState('');
   const [items, setItems] = useState<QuotationItem[]>([]);
+  const [isGeneratingAI, setIsGeneratingAI] = useState(false);
+  const [leadId, setLeadId] = useState<string | null>(null);
+  const [leadTable, setLeadTable] = useState<string | null>(null);
+  const [leadSearch, setLeadSearch] = useState('');
+  const [openLeadSelector, setOpenLeadSelector] = useState(false);
+  const [status, setStatus] = useState<'draft' | 'sent' | 'accepted' | 'rejected' | 'expired' | 'converted'>('draft');
+  const [viewMode, setViewMode] = useState<'edit' | 'preview'>('edit');
+  const [sendDialogOpen, setSendDialogOpen] = useState(false);
+  
+  const debouncedSearch = useDebounce(leadSearch, 300);
+  const { tableName } = useLeadsTable();
+  const { data: leadsData } = useLeads({ search: debouncedSearch, pageSize: 5 });
+  const leads = leadsData?.leads || [];
+
+  // AI Suggestion Logic
+  const suggestAIItems = async () => {
+    if (!clientName && !subject) {
+      toast({ title: 'Context Needed', description: 'Please enter a Client Name or Subject to give AI some context.', variant: 'destructive' });
+      return;
+    }
+
+    setIsGeneratingAI(true);
+    try {
+      const { data, error } = await (await import('@/integrations/supabase/client')).supabase.functions.invoke('ai-closing-orchestrator', {
+        body: { 
+          transcript: `Generate a quotation for ${clientName}. Subject: ${subject}. Target Industry: ${company?.industry}. Use these products if possible: ${products?.map(p => p.name).join(', ')}`,
+          companyId: company?.id,
+          mode: 'quotation_suggestion'
+        }
+      });
+
+      if (error) throw error;
+      
+      const suggestedItems: QuotationItem[] = [];
+      const aiItems = data.result?.line_items || [];
+      
+      aiItems.forEach((aiItem: any, idx: number) => {
+          // Find closest product match
+          const matchedProduct = products?.find(p => aiItem.description.toLowerCase().includes(p.name.toLowerCase()));
+          
+          suggestedItems.push({
+              product_id: matchedProduct?.id || null,
+              description: aiItem.description,
+              hsn_sac_code: null,
+              quantity: aiItem.quantity || 1,
+              unit_price: aiItem.unit_price || (matchedProduct?.price || 0),
+              discount_percentage: 0,
+              tax_ids: taxes.filter(t => t.is_default).map(t => t.id),
+              tax_amount: 0,
+              line_total: 0,
+              sort_order: items.length + idx
+          });
+      });
+
+      if (suggestedItems.length > 0) {
+          setItems([...items, ...suggestedItems]);
+          toast({ title: 'AI Suggestions Added', description: 'Based on your context, we added some initial line items.' });
+      } else {
+          toast({ title: 'AI Recommendation', description: data.result?.summary_battlecard || "No specific items found." });
+      }
+
+    } catch (err: any) {
+      console.error('AI Quote Error:', err);
+      toast({ title: 'AI Suggestion Failed', description: err.message, variant: 'destructive' });
+    } finally {
+      setIsGeneratingAI(false);
+    }
+  };
+
+  // Edit Item Modal State
+  const [editingItemIdx, setEditingItemIdx] = useState<number | null>(null);
+  const [editingItem, setEditingItem] = useState<QuotationItem | null>(null);
+
+  const openEditModal = (idx: number) => {
+    setEditingItemIdx(idx);
+    setEditingItem({ ...items[idx] });
+  };
+
+  const saveEditedItem = () => {
+    if (editingItemIdx !== null && editingItem) {
+      const updated = [...items];
+      updated[editingItemIdx] = editingItem;
+      setItems(updated);
+      setEditingItemIdx(null);
+      setEditingItem(null);
+    }
+  };
 
   // Load existing quotation
   useEffect(() => {
@@ -62,6 +160,9 @@ export default function QuotationBuilder() {
         setTermsAndConditions(data.terms_and_conditions || '');
         setValidUntil(data.valid_until || '');
         setItems(data.items || []);
+        setLeadId(data.lead_id || null);
+        setLeadTable(data.lead_table || null);
+        setStatus(data.status || 'draft');
         setLoading(false);
       }).catch(() => {
         toast({ title: 'Error', description: 'Quotation not found.', variant: 'destructive' });
@@ -179,16 +280,29 @@ export default function QuotationBuilder() {
         notes: notes || null,
         terms_and_conditions: termsAndConditions || null,
         valid_until: validUntil || null,
-        status: asDraft ? 'draft' : 'sent',
+        status: status === 'draft' && !asDraft ? 'sent' : (asDraft && status === 'draft' ? 'draft' : status),
+        lead_id: leadId,
+        lead_table: leadTable,
         items: computedItems,
       };
 
-      if (isEditing) {
-        await updateQuotation.mutateAsync({ id: id!, ...payload });
+      const res = isEditing 
+        ? await updateQuotation.mutateAsync({ id: id!, ...payload })
+        : await createQuotation.mutateAsync(payload);
+        
+      if (status === 'accepted') {
+        toast({
+          title: 'Quotation Accepted!',
+          description: 'Would you like to create an invoice now?',
+          action: (
+            <Button size="sm" onClick={() => navigate(`/dashboard/invoices/new?from_quotation=${id || (res as any).id}`)}>
+              Create Invoice
+            </Button>
+          ),
+        });
       } else {
-        await createQuotation.mutateAsync(payload);
+        navigate('/dashboard/quotations');
       }
-      navigate('/dashboard/quotations');
     } catch {
       // error handled in hook
     }
@@ -215,6 +329,38 @@ export default function QuotationBuilder() {
             </div>
           </div>
           <div className="flex gap-2">
+            <div className="flex bg-muted p-1 rounded-lg mr-2">
+              <Button 
+                variant={viewMode === 'edit' ? 'secondary' : 'ghost'} 
+                size="sm" 
+                className="h-8 px-4"
+                onClick={() => setViewMode('edit')}
+              >
+                Edit
+              </Button>
+              <Button 
+                variant={viewMode === 'preview' ? 'secondary' : 'ghost'} 
+                size="sm" 
+                className="h-8 px-4"
+                onClick={() => setViewMode('preview')}
+              >
+                Preview
+              </Button>
+            </div>
+            {isEditing && (
+              <Button variant="outline" onClick={() => setSendDialogOpen(true)}>
+                <Mail className="h-4 w-4 mr-2" /> Send via Email
+              </Button>
+            )}
+            {isEditing && status === 'accepted' && (
+              <Button 
+                variant="outline" 
+                onClick={() => navigate(`/dashboard/invoices/new?from_quotation=${id}`)}
+                className="border-primary/50 text-primary hover:bg-primary/10"
+              >
+                <ArrowRightCircle className="h-4 w-4 mr-2" /> Convert to Invoice
+              </Button>
+            )}
             <Button variant="outline" onClick={() => handleSave(true)} disabled={saving}>
               {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               <Save className="h-4 w-4 mr-2" /> Save Draft
@@ -231,7 +377,73 @@ export default function QuotationBuilder() {
         {/* Client Details */}
         <Card className="glass">
           <CardHeader>
-            <CardTitle className="text-lg">Client Details</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg">Client Details</CardTitle>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground hidden md:inline">Select from CRM:</span>
+                <Popover open={openLeadSelector} onOpenChange={setOpenLeadSelector}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={openLeadSelector}
+                      className="w-[250px] justify-between h-9 text-xs"
+                    >
+                      {leadId 
+                        ? leads.find((l) => l.id === leadId)?.name || clientName || "Select lead..."
+                        : "Search CRM Leads..."}
+                      <ChevronsUpDown className="ml-2 h-3 w-3 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[300px] p-0 glass">
+                    <Command shouldFilter={false}>
+                      <CommandInput 
+                        placeholder="Search by name, email, phone..." 
+                        value={leadSearch}
+                        onValueChange={setLeadSearch}
+                        className="h-9"
+                      />
+                      <CommandList>
+                        <CommandEmpty>No leads found.</CommandEmpty>
+                        <CommandGroup>
+                          {leads.map((lead) => (
+                            <CommandItem
+                              key={lead.id}
+                              value={lead.id}
+                              onSelect={() => {
+                                setClientName(lead.name);
+                                setClientEmail(lead.email || '');
+                                setClientPhone(lead.phone || '');
+                                setClientAddress(lead.college || lead.state || ''); // Fallback for address
+                                setLeadId(lead.id);
+                                setLeadTable(tableName);
+                                setOpenLeadSelector(false);
+                                toast({ 
+                                  title: 'Lead Selected', 
+                                  description: `Client details populated for ${lead.name}`,
+                                  className: 'bg-primary/20 border-primary/20'
+                                });
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  leadId === lead.id ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                              <div className="flex flex-col">
+                                <span className="font-medium">{lead.name}</span>
+                                <span className="text-[10px] text-muted-foreground">{lead.email || lead.phone || 'No contact info'}</span>
+                              </div>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -283,6 +495,22 @@ export default function QuotationBuilder() {
                 <Label>Valid Until</Label>
                 <Input type="date" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} />
               </div>
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <Select value={status} onValueChange={(v: any) => setStatus(v)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="draft">Draft</SelectItem>
+                    <SelectItem value="sent">Sent</SelectItem>
+                    <SelectItem value="accepted">Accepted</SelectItem>
+                    <SelectItem value="rejected">Rejected</SelectItem>
+                    <SelectItem value="expired">Expired</SelectItem>
+                    <SelectItem value="converted" disabled>Converted</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -308,6 +536,19 @@ export default function QuotationBuilder() {
                     </SelectContent>
                   </Select>
                 )}
+                <Button 
+                  variant="outline" 
+                  onClick={suggestAIItems} 
+                  disabled={isGeneratingAI}
+                  className="shadow-inner hover:bg-primary/10 transition-colors border-primary/20"
+                >
+                  {isGeneratingAI ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Wand2 className="h-4 w-4 mr-2 text-primary" />
+                  )}
+                  AI Suggest
+                </Button>
                 <Button variant="outline" onClick={addItem}>
                   <Plus className="h-4 w-4 mr-2" /> Add Item
                 </Button>
@@ -396,9 +637,14 @@ export default function QuotationBuilder() {
                         <TableCell className="text-muted-foreground">{currency} {item.tax_amount.toLocaleString()}</TableCell>
                         <TableCell className="font-semibold">{currency} {item.line_total.toLocaleString()}</TableCell>
                         <TableCell>
-                          <Button variant="ghost" size="icon" className="text-destructive" onClick={() => removeItem(idx)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          <div className="flex gap-1">
+                            <Button variant="ghost" size="icon" onClick={() => openEditModal(idx)}>
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="text-destructive" onClick={() => removeItem(idx)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -474,7 +720,149 @@ export default function QuotationBuilder() {
             </CardContent>
           </Card>
         </div>
-      </div>
+      )}
+
+      {viewMode === 'preview' && (
+          <div className="p-4 md:p-8 max-w-5xl mx-auto">
+              <div className="bg-white rounded-2xl shadow-2xl overflow-hidden border border-border relative">
+                  <DocumentView 
+                    type="quotation" 
+                    document={{
+                        status,
+                        quotation_number: isEditing ? (id ? "Loading..." : "QUO-NEW") : "QUO-NEW",
+                        currency,
+                        subtotal,
+                        discount_amount: docDiscountAmount,
+                        tax_amount: totalTax,
+                        total: grandTotal,
+                        client_name: clientName,
+                        client_email: clientEmail,
+                        client_phone: clientPhone,
+                        client_address: clientAddress,
+                        client_gstin: clientGstin,
+                        notes,
+                        terms_and_conditions: termsAndConditions,
+                        valid_until: validUntil,
+                        issued_at: new Date().toISOString()
+                    }}
+                    items={computedItems}
+                    company={{
+                        name: company?.name || 'FastestCRM',
+                        logo_url: company?.logo_url || null,
+                        primary_color: company?.primary_color || '#3b82f6',
+                        address: company?.address || null,
+                        email: company?.email || null,
+                        phone: company?.phone || null,
+                        gstin: null
+                    }}
+                  />
+              </div>
+          </div>
+      )}
+
+      {isEditing && (
+          <SendDocumentDialog 
+            open={sendDialogOpen}
+            onOpenChange={setSendDialogOpen}
+            document={{
+                id: id!,
+                client_name: clientName,
+                client_email: clientEmail,
+                lead_id: leadId,
+                lead_table: leadTable,
+                quotation_number: "Preview" // Will be fetched properly by the component if needed, or we just pass the object
+            } as any}
+            type="quotation"
+            onSuccess={() => {
+                // If it was draft, maybe update to sent
+                if (status === 'draft') {
+                    // We could trigger updateStatus mutation here
+                }
+            }}
+          />
+      )}
+
+      <Dialog open={editingItemIdx !== null} onOpenChange={(open) => !open && setEditingItemIdx(null)}>
+        <DialogContent className="sm:max-w-[500px] glass">
+          <DialogHeader>
+            <DialogTitle>Edit Line Item</DialogTitle>
+          </DialogHeader>
+          {editingItem && (
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Description</Label>
+                <Textarea 
+                  value={editingItem.description} 
+                  onChange={(e) => setEditingItem({ ...editingItem, description: e.target.value })}
+                  placeholder="Item description..."
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Quantity</Label>
+                  <Input 
+                    type="number" 
+                    value={editingItem.quantity} 
+                    onChange={(e) => setEditingItem({ ...editingItem, quantity: parseFloat(e.target.value) || 0 })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Unit Price</Label>
+                  <Input 
+                    type="number" 
+                    value={editingItem.unit_price} 
+                    onChange={(e) => setEditingItem({ ...editingItem, unit_price: parseFloat(e.target.value) || 0 })}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Discount %</Label>
+                  <Input 
+                    type="number" 
+                    value={editingItem.discount_percentage} 
+                    onChange={(e) => setEditingItem({ ...editingItem, discount_percentage: parseFloat(e.target.value) || 0 })}
+                    min="0"
+                    max="100"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>HSN/SAC Code</Label>
+                  <Input 
+                    value={editingItem.hsn_sac_code || ''} 
+                    onChange={(e) => setEditingItem({ ...editingItem, hsn_sac_code: e.target.value })}
+                    placeholder="Optional"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Tax applied</Label>
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {taxes.filter((t) => t.is_active).map((tax) => (
+                    <Badge
+                      key={tax.id}
+                      variant={editingItem.tax_ids.includes(tax.id) ? 'default' : 'outline'}
+                      className="cursor-pointer"
+                      onClick={() => {
+                        const newIds = editingItem.tax_ids.includes(tax.id)
+                          ? editingItem.tax_ids.filter((tid) => tid !== tax.id)
+                          : [...editingItem.tax_ids, tax.id];
+                        setEditingItem({ ...editingItem, tax_ids: newIds });
+                      }}
+                    >
+                      {tax.name} {tax.rate}%
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingItemIdx(null)}>Cancel</Button>
+            <Button onClick={saveEditedItem} className="gradient-primary">Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

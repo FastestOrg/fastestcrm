@@ -61,6 +61,7 @@ export default function GenericAllLeads() {
     const [viewMode, setViewMode] = useState<'table' | 'kanban'>('table');
 
     const defaultColumns = [
+        { id: 'priority', label: 'Priority' },
         { id: 'name', label: 'Name' },
         { id: 'email', label: 'Email' },
         { id: 'phone', label: 'Phone Number' },

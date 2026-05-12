@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useCompany } from '@/hooks/useCompany';
 import { useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 
@@ -23,6 +24,7 @@ export function AddIntegrationDialog({ serviceName, displayName, isOpen, onOpenC
     const [loading, setLoading] = useState(false);
     const { toast } = useToast();
     const { user } = useAuth();
+    const { company } = useCompany();
     const queryClient = useQueryClient();
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -43,6 +45,7 @@ export function AddIntegrationDialog({ serviceName, displayName, isOpen, onOpenC
                 .from('integration_api_keys')
                 .insert({
                     user_id: user?.id,
+                    company_id: company?.id,
                     service_name: serviceName,
                     api_key: finalApiKey,
                     is_active: true

@@ -13,7 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import {
   Building2, Users, Search, Plus, Wallet, Gift, Tag,
   Loader2, ArrowLeft, CheckCircle, XCircle, Eye, RefreshCw,
-  Calendar, Clock, DollarSign, BarChart3, Download, Trash2, Edit, Megaphone
+  Calendar, Clock, DollarSign, BarChart3, Download, Trash2, Edit, Megaphone, FileDown
 } from 'lucide-react';
 import { AnalyticsTab } from '@/components/platform/AnalyticsTab';
 import { AnnouncementsTab } from '@/components/platform/AnnouncementsTab';
@@ -118,6 +118,7 @@ export default function PlatformAdmin() {
   const [searchQuery, setSearchQuery] = useState('');
   const [processing, setProcessing] = useState(false);
   const [userMgmtCompany, setUserMgmtCompany] = useState<CompanyForPanel | null>(null);
+  const [downloadingCompanyId, setDownloadingCompanyId] = useState<string | null>(null);
 
   // Dialog states
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
@@ -564,6 +565,87 @@ export default function PlatformAdmin() {
     company.slug.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  /**
+   * Download all leads for a company as CSV.
+   * The correct table is resolved server-side based on industry / custom_leads_table,
+   * mirroring exactly what the company admin sees in "All Leads".
+   */
+  const handleDownloadCompanyData = async (company: Company) => {
+    setDownloadingCompanyId(company.id);
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-manage-company', {
+        body: { action: 'download_company_data', company_id: company.id }
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      const leads: Record<string, any>[] = data.leads || [];
+
+      if (leads.length === 0) {
+        toast({
+          title: 'No Data',
+          description: `${company.name} has no leads to download.`,
+        });
+        return;
+      }
+
+      // Build CSV: derive headers from first row, skip internal Supabase cols
+      const skipCols = new Set(['company_id']);
+      const allKeys = Object.keys(leads[0]).filter(k => !skipCols.has(k));
+
+      // Put friendly columns first
+      const priorityCols = [
+        'name', 'email', 'phone', 'status', 'lead_source',
+        '_owner_name', '_pre_sales_owner_name', '_post_sales_owner_name',
+        '_created_by_name', 'product_purchased', 'created_at', 'updated_at',
+      ];
+      const orderedKeys = [
+        ...priorityCols.filter(k => allKeys.includes(k)),
+        ...allKeys.filter(k => !priorityCols.includes(k)),
+      ];
+
+      const escapeCell = (val: any): string => {
+        if (val === null || val === undefined) return '';
+        const str = String(val).replace(/\r\n|\n|\r/g, ' ');
+        if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+          return `"${str.replace(/"/g, '""')}"`;
+        }
+        return str;
+      };
+
+      const header = orderedKeys.join(',');
+      const rows = leads.map(lead =>
+        orderedKeys.map(k => escapeCell(lead[k])).join(',')
+      );
+      const csv = [header, ...rows].join('\n');
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const date = new Date().toISOString().split('T')[0];
+      a.download = `${company.slug}_leads_${date}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: 'Download Started',
+        description: `Downloaded ${leads.length} leads for ${company.name} (${data.table_name}).`,
+      });
+    } catch (err: any) {
+      toast({
+        title: 'Error',
+        description: err.message || 'Failed to download company data',
+        variant: 'destructive',
+      });
+    } finally {
+      setDownloadingCompanyId(null);
+    }
+  };
+
   const generateRandomCode = (prefix: string = '') => {
     return prefix + Math.random().toString(36).substring(2, 10).toUpperCase();
   };
@@ -817,6 +899,18 @@ export default function PlatformAdmin() {
                               }}>
                                 <Calendar className="h-4 w-4 mr-2" />
                                 Edit Subscription
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => handleDownloadCompanyData(company)}
+                                disabled={downloadingCompanyId === company.id}
+                                className="text-blue-500 focus:text-blue-500"
+                              >
+                                {downloadingCompanyId === company.id ? (
+                                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                ) : (
+                                  <FileDown className="h-4 w-4 mr-2" />
+                                )}
+                                Download Data (CSV)
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 onClick={() => handleToggleActive(company)}

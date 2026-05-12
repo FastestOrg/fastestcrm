@@ -27,6 +27,9 @@ export interface EmailCampaign {
     warmup_ramp_per_day: number;
     ai_generated: boolean;
     ai_perspective: string | null;
+    product_info: string | null;
+    ai_auto_reply_goal: string | null;
+    ai_auto_reply_perspective: string | null;
     scheduled_at: string | null;
     started_at: string | null;
     completed_at: string | null;
@@ -132,19 +135,38 @@ export function useEmailCampaigns() {
 
     const fetchLeads = async (statusFilter?: string) => {
         if (!company?.id) return [];
-        let query = supabase
-            .from(tableName as any)
-            .select('*')
-            .eq('company_id', company.id)
-            .order('created_at', { ascending: false });
+        
+        let allLeads: any[] = [];
+        let from = 0;
+        const step = 1000;
+        let hasMore = true;
 
-        if (statusFilter && statusFilter !== 'all') {
-            query = query.eq('status', statusFilter);
+        while (hasMore) {
+            let query = supabase
+                .from(tableName as any)
+                .select('*')
+                .eq('company_id', company.id)
+                .neq('status', 'unsubscribed')
+                .order('created_at', { ascending: false })
+                .range(from, from + step - 1);
+
+            if (statusFilter && statusFilter !== 'all') {
+                query = query.eq('status', statusFilter);
+            }
+
+            const { data, error } = await query;
+            if (error) throw error;
+            
+            if (data && data.length > 0) {
+                allLeads = [...allLeads, ...data];
+                from += step;
+                if (data.length < step) hasMore = false;
+            } else {
+                hasMore = false;
+            }
         }
 
-        const { data, error } = await query;
-        if (error) throw error;
-        return (data as any[]) || [];
+        return allLeads;
     };
 
     // ── Get lead table columns ────────────────────────────────────────────
@@ -183,6 +205,7 @@ export function useEmailCampaigns() {
             aiAutoReplyEnabled?: boolean;
             aiAutoReplyGoal?: string;
             aiAutoReplyPerspective?: string;
+            productInfo?: string;
             scheduledAt?: string | null;
             sequences: Array<{
                 step_number: number;
@@ -193,14 +216,15 @@ export function useEmailCampaigns() {
                 send_condition: string;
                 ai_generated?: boolean;
             }>;
-            leads: any[];
+            leadStatusFilter: string;
             emailField: string;
         }) => {
             if (!company?.id) throw new Error('No company context');
             const { data: userData } = await supabase.auth.getUser();
             if (!userData.user) throw new Error('Not authenticated');
 
-            // 1. Create campaign
+
+            // 2. Create campaign
             const { data: campaign, error: campError } = await supabase
                 .from('email_campaigns' as any)
                 .insert({
@@ -210,13 +234,14 @@ export function useEmailCampaigns() {
                     campaign_goal: params.campaignGoal,
                     campaign_mode: params.campaignMode,
                     account_ids: params.accountIds,
-                    recipient_count: params.leads.length,
+                    recipient_count: 0,
                     delay_between_emails_ms: params.delayBetweenEmailsMs || 60000,
                     daily_limit: params.dailyLimit || 50,
                     warmup_enabled: params.warmupEnabled || false,
                     warmup_ramp_per_day: params.warmupRampPerDay || 2,
                     ai_generated: params.aiGenerated || false,
                     ai_perspective: params.aiPerspective || null,
+                    product_info: params.productInfo || null,
                     ai_auto_reply_enabled: params.aiAutoReplyEnabled || false,
                     ai_auto_reply_goal: params.aiAutoReplyGoal || null,
                     ai_auto_reply_perspective: params.aiAutoReplyPerspective || null,
@@ -229,7 +254,7 @@ export function useEmailCampaigns() {
             if (campError) throw campError;
             const campaignId = (campaign as any).id;
 
-            // 2. Create sequence steps
+            // 3. Create sequence steps
             const seqRows = params.sequences.map(s => ({
                 campaign_id: campaignId,
                 step_number: s.step_number,
@@ -248,24 +273,20 @@ export function useEmailCampaigns() {
                 if (seqError) throw seqError;
             }
 
-            // 3. Create recipients
-            const recipients = params.leads.map(lead => ({
-                campaign_id: campaignId,
-                lead_id: lead.id || null,
-                lead_table: tableName,
-                lead_email: lead[params.emailField] || lead.email || '',
-                lead_name: lead.name || '',
-                lead_data: lead,
-                status: 'pending',
-                current_step: 0,
-            }));
+            // 4. Create recipients via RPC (Server-side)
+            const { error: rpcError } = await supabase.rpc('create_campaign_recipients', {
+                p_campaign_id: campaignId,
+                p_lead_table: tableName,
+                p_status_filter: params.leadStatusFilter,
+                p_email_field: params.emailField,
+                p_company_id: company.id
+            });
 
-            for (let i = 0; i < recipients.length; i += 500) {
-                const batch = recipients.slice(i, i + 500);
-                const { error: recError } = await supabase
-                    .from('email_campaign_recipients' as any)
-                    .insert(batch);
-                if (recError) throw recError;
+            if (rpcError) {
+                console.error('RPC Error:', rpcError);
+                // Fallback to client-side count if RPC fails (though it shouldn't)
+                // But recipients might not be created.
+                throw rpcError;
             }
 
             return campaign;
@@ -276,6 +297,86 @@ export function useEmailCampaigns() {
         },
         onError: (err: any) => {
             toast({ title: 'Failed to create campaign', description: err.message, variant: 'destructive' });
+        },
+    });
+
+    const updateCampaign = useMutation({
+        mutationFn: async (params: {
+            id: string;
+            name: string;
+            campaignGoal: string;
+            accountIds: string[];
+            delayBetweenEmailsMs?: number;
+            aiPerspective?: string;
+            aiAutoReplyEnabled?: boolean;
+            aiAutoReplyGoal?: string;
+            aiAutoReplyPerspective?: string;
+            productInfo?: string;
+            sequences: Array<{
+                step_number: number;
+                subject: string;
+                body_html: string;
+                body_text?: string;
+                delay_after_ms: number;
+                send_condition: string;
+                ai_generated?: boolean;
+            }>;
+        }) => {
+            if (!company?.id) throw new Error('No company context');
+
+            // 1. Update campaign meta
+            const { error: campError } = await supabase
+                .from('email_campaigns' as any)
+                .update({
+                    name: params.name,
+                    campaign_goal: params.campaignGoal,
+                    account_ids: params.accountIds,
+                    delay_between_emails_ms: params.delayBetweenEmailsMs || 60000,
+                    ai_perspective: params.aiPerspective || null,
+                    product_info: params.productInfo || null,
+                    ai_auto_reply_enabled: params.aiAutoReplyEnabled || false,
+                    ai_auto_reply_goal: params.aiAutoReplyGoal || null,
+                    ai_auto_reply_perspective: params.aiAutoReplyPerspective || null,
+                    updated_at: new Date().toISOString(),
+                })
+                .eq('id', params.id);
+
+            if (campError) throw campError;
+
+            // 2. Update sequence steps (Delete and re-insert)
+            const { error: delError } = await supabase
+                .from('email_campaign_sequences' as any)
+                .delete()
+                .eq('campaign_id', params.id);
+
+            if (delError) throw delError;
+
+            const seqRows = params.sequences.map(s => ({
+                campaign_id: params.id,
+                step_number: s.step_number,
+                subject: s.subject,
+                body_html: s.body_html,
+                body_text: s.body_text || '',
+                delay_after_ms: s.delay_after_ms,
+                send_condition: s.send_condition,
+                ai_generated: s.ai_generated || false,
+            }));
+
+            if (seqRows.length > 0) {
+                const { error: seqError } = await supabase
+                    .from('email_campaign_sequences' as any)
+                    .insert(seqRows);
+                if (seqError) throw seqError;
+            }
+
+            return params.id;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['email-campaigns'] });
+            toast({ title: 'Campaign updated successfully!' });
+        },
+        onError: (err: any) => {
+            toast({ title: 'Failed to update campaign', description: err.message, variant: 'destructive' });
         },
     });
 
@@ -451,6 +552,7 @@ export function useEmailCampaigns() {
         leadColumns: leadColumnsQuery.data || [],
         fetchLeads,
         createCampaign,
+        updateCampaign,
         startCampaign,
         pauseCampaign,
         resumeCampaign,

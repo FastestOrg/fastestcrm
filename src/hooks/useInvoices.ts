@@ -176,6 +176,18 @@ export function useInvoices() {
         if (itemErr) throw itemErr;
       }
 
+      // If created from a quotation, mark the quotation as converted
+      if (input.quotation_id) {
+        await supabase
+          .from('quotations' as any)
+          .update({
+            status: 'converted',
+            converted_to_invoice_id: (inv as any).id,
+            updated_at: new Date().toISOString(),
+          } as any)
+          .eq('id', input.quotation_id);
+      }
+
       return inv;
     },
     onSuccess: () => {

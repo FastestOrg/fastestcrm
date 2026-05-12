@@ -18,13 +18,24 @@ import { createClient } from '@supabase/supabase-js';
 import { proxifySupabaseUrl } from '@/lib/utils';
 
 // Deep fallback for workspace resolution in case the proxy has CORS/Body issues
-// We use the direct Supabase URL as the ultimate source of truth
-const SUPABASE_PROJECT_URL = `https://${import.meta.env.VITE_SUPABASE_PROJECT_ID || 'uykdyqdeyilpulaqlqip'}.supabase.co`;
-const fallbackClient = createClient(
-  SUPABASE_PROJECT_URL,
-  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string,
-  { auth: { persistSession: false } }
-);
+// We use a lazy accessor to avoid creating multiple clients on module load
+let _fallbackClient: any = null;
+const getFallbackClient = () => {
+  if (_fallbackClient) return _fallbackClient;
+  
+  const projectUrl = `https://${import.meta.env.VITE_SUPABASE_PROJECT_ID || 'uykdyqdeyilpulaqlqip'}.supabase.co`;
+  _fallbackClient = createClient(
+    projectUrl,
+    import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string,
+    { 
+      auth: { 
+        persistSession: false,
+        storageKey: 'sb-fallback-auth-token' // Unique key to avoid conflict
+      } 
+    }
+  );
+  return _fallbackClient;
+};
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -168,7 +179,7 @@ export function useSubdomain(): SubdomainResult {
             console.error('[useSubdomain] Proxy RPC failed, trying fallback...', rpcError);
 
             // EMERGENCY FALLBACK: Hit Supabase direct if proxy failed
-            const { data: fallbackData, error: fallbackError } = await fallbackClient.rpc(
+            const { data: fallbackData, error: fallbackError } = await getFallbackClient().rpc(
               'get_subdomain_company', { _slug: subdomain }
             );
 

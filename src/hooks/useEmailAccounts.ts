@@ -187,7 +187,14 @@ export function useEmailAccounts() {
                     .from('email_accounts' as any)
                     .update({ status: 'connected', last_error: null, updated_at: new Date().toISOString() })
                     .eq('id', accountId)
-                    .then(() => queryClient.invalidateQueries({ queryKey: ['email-accounts'] }));
+                    .then(({ error }) => {
+                        if (error) console.error('[FastSend] Status update failed:', error);
+                        queryClient.invalidateQueries({ queryKey: ['email-accounts'] });
+                    })
+                    .catch(err => {
+                        console.error('[FastSend] Status update exception:', err);
+                        queryClient.invalidateQueries({ queryKey: ['email-accounts'] });
+                    });
             } else {
                 queryClient.invalidateQueries({ queryKey: ['email-accounts'] });
             }
@@ -237,7 +244,6 @@ export function useEmailAccounts() {
         mutationFn: async (params: { 
             accountId?: string; 
             to: string; 
-            // Optional: allow passing raw details for testing before saving
             smtp_host?: string;
             smtp_port?: number;
             smtp_user?: string;
@@ -265,14 +271,19 @@ export function useEmailAccounts() {
             return data;
         },
         onSuccess: (data, variables) => {
-            // After a successful test send, also mark the account as connected from the frontend
-            // This is a reliable fallback in case the edge function's DB update has any issue
             if (variables?.accountId) {
                 supabase
                     .from('email_accounts' as any)
                     .update({ status: 'connected', last_error: null, updated_at: new Date().toISOString() })
                     .eq('id', variables.accountId)
-                    .then(() => queryClient.invalidateQueries({ queryKey: ['email-accounts'] }));
+                    .then(({ error }) => {
+                        if (error) console.error('[FastSend] Status update after send failed:', error);
+                        queryClient.invalidateQueries({ queryKey: ['email-accounts'] });
+                    })
+                    .catch(err => {
+                        console.error('[FastSend] Status update after send exception:', err);
+                        queryClient.invalidateQueries({ queryKey: ['email-accounts'] });
+                    });
             } else {
                 queryClient.invalidateQueries({ queryKey: ['email-accounts'] });
             }
@@ -280,6 +291,39 @@ export function useEmailAccounts() {
         },
         onError: (err: any) => {
             toast({ title: 'Send failed', description: err.message, variant: 'destructive' });
+        },
+    });
+
+    const sendDirectEmail = useMutation({
+        mutationFn: async (params: { 
+            accountId: string; 
+            to: string; 
+            subject: string; 
+            bodyHtml: string;
+            leadId?: string;
+            leadTable?: string;
+        }) => {
+            const { data: sessionData } = await supabase.auth.getSession();
+            const token = sessionData.session?.access_token;
+
+            const res = await fetch(`https://${projectId}.supabase.co/functions/v1/fastsend-send`, {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(params),
+            });
+
+            const data = await res.json();
+            if (data.error) throw new Error(data.error);
+            return data;
+        },
+        onSuccess: () => {
+            toast({ title: 'Email sent successfully! ✅' });
+        },
+        onError: (err: any) => {
+            toast({ title: 'Failed to send email', description: err.message, variant: 'destructive' });
         },
     });
 
@@ -291,6 +335,7 @@ export function useEmailAccounts() {
         updateAccount,
         deleteAccount,
         sendTestEmail,
+        sendDirectEmail,
         refetch: accountsQuery.refetch,
     };
 }

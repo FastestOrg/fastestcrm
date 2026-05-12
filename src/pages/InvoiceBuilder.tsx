@@ -9,13 +9,23 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { ArrowLeft, Plus, Trash2, Loader2, Save, Package, DollarSign, CreditCard } from 'lucide-react';
-import { useInvoices, InvoiceItem } from '@/hooks/useInvoices';
+import { ArrowLeft, Plus, Trash2, Loader2, Save, Package, DollarSign, CreditCard, Mail } from 'lucide-react';
+import { useInvoices, InvoiceItem, Invoice } from '@/hooks/useInvoices';
+import { SendDocumentDialog } from '@/components/financial/SendDocumentDialog';
+import { DocumentView } from '@/components/financial/DocumentView';
+import PublicDocument from './PublicDocument';
 import { useQuotations } from '@/hooks/useQuotations';
 import { useInvoiceTaxes } from '@/hooks/useInvoiceSettings';
 import { useProducts } from '@/hooks/useProducts';
 import { useToast } from '@/hooks/use-toast';
 import { useCompany } from '@/hooks/useCompany';
+import { useLeads } from '@/hooks/useLeads';
+import { useLeadsTable } from '@/hooks/useLeadsTable';
+import { useDebounce } from '@/hooks/useDebounce';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Check, ChevronsUpDown, Search } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 const CURRENCIES = ['INR', 'USD', 'EUR', 'GBP', 'AED', 'SAR', 'SGD', 'AUD', 'CAD', 'JPY'];
 
@@ -53,6 +63,18 @@ export default function InvoiceBuilder() {
   const [quotationId, setQuotationId] = useState<string | null>(null);
   const [amountPaid, setAmountPaid] = useState(0);
   const [items, setItems] = useState<InvoiceItem[]>([]);
+  const [leadId, setLeadId] = useState<string | null>(null);
+  const [leadTable, setLeadTable] = useState<string | null>(null);
+  const [leadSearch, setLeadSearch] = useState('');
+  const [openLeadSelector, setOpenLeadSelector] = useState(false);
+  const [viewMode, setViewMode] = useState<'edit' | 'preview'>('edit');
+  const [sendDialogOpen, setSendDialogOpen] = useState(false);
+  const [status, setStatus] = useState<'draft' | 'sent' | 'paid' | 'unpaid' | 'overdue' | 'partial' | 'cancelled'>('draft');
+  
+  const debouncedSearch = useDebounce(leadSearch, 300);
+  const { tableName } = useLeadsTable();
+  const { data: leadsData } = useLeads({ search: debouncedSearch, pageSize: 5 });
+  const leads = leadsData?.leads || [];
 
   // Payment dialog
   const [payDialog, setPayDialog] = useState(actionPay);
@@ -81,6 +103,9 @@ export default function InvoiceBuilder() {
         setQuotationId(data.quotation_id);
         setAmountPaid(data.amount_paid || 0);
         setItems(data.items || []);
+        setLeadId(data.lead_id || null);
+        setLeadTable(data.lead_table || null);
+        setStatus(data.status || 'draft');
         setLoading(false);
       }).catch(() => {
         toast({ title: 'Error', description: 'Invoice not found.', variant: 'destructive' });
@@ -100,6 +125,8 @@ export default function InvoiceBuilder() {
         setNotes(quo.notes || '');
         setTermsAndConditions(quo.terms_and_conditions || '');
         setQuotationId(quo.id);
+        setLeadId(quo.lead_id || null);
+        setLeadTable(quo.lead_table || null);
         setItems(quo.items?.map((it) => ({
           ...it,
           invoice_id: undefined,
@@ -219,7 +246,9 @@ export default function InvoiceBuilder() {
         terms_and_conditions: termsAndConditions || null,
         payment_terms: paymentTerms || null,
         due_date: dueDate || null,
-        status: asDraft ? 'draft' : 'sent',
+        status: status === 'draft' && !asDraft ? 'sent' : (asDraft && status === 'draft' ? 'draft' : status),
+        lead_id: leadId,
+        lead_table: leadTable,
         items: computedItems,
       };
 
@@ -272,6 +301,29 @@ export default function InvoiceBuilder() {
             </div>
           </div>
           <div className="flex gap-2">
+            <div className="flex bg-muted p-1 rounded-lg mr-2">
+              <Button 
+                variant={viewMode === 'edit' ? 'secondary' : 'ghost'} 
+                size="sm" 
+                className="h-8 px-4"
+                onClick={() => setViewMode('edit')}
+              >
+                Edit
+              </Button>
+              <Button 
+                variant={viewMode === 'preview' ? 'secondary' : 'ghost'} 
+                size="sm" 
+                className="h-8 px-4"
+                onClick={() => setViewMode('preview')}
+              >
+                Preview
+              </Button>
+            </div>
+            {isEditing && (
+              <Button variant="outline" onClick={() => setSendDialogOpen(true)}>
+                <Mail className="h-4 w-4 mr-2" /> Send via Email
+              </Button>
+            )}
             {isEditing && (
               <Button variant="outline" onClick={() => setPayDialog(true)} className="border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/10">
                 <DollarSign className="h-4 w-4 mr-2" /> Record Payment
@@ -292,7 +344,75 @@ export default function InvoiceBuilder() {
       <div className="p-4 md:p-8 space-y-6">
         {/* Client Details */}
         <Card className="glass">
-          <CardHeader><CardTitle className="text-lg">Client Details</CardTitle></CardHeader>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg">Client Details</CardTitle>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground hidden md:inline">Select from CRM:</span>
+                <Popover open={openLeadSelector} onOpenChange={setOpenLeadSelector}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={openLeadSelector}
+                      className="w-[250px] justify-between h-9 text-xs"
+                    >
+                      {leadId 
+                        ? leads.find((l) => l.id === leadId)?.name || clientName || "Select lead..."
+                        : "Search CRM Leads..."}
+                      <ChevronsUpDown className="ml-2 h-3 w-3 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[300px] p-0 glass">
+                    <Command shouldFilter={false}>
+                      <CommandInput 
+                        placeholder="Search by name, email, phone..." 
+                        value={leadSearch}
+                        onValueChange={setLeadSearch}
+                        className="h-9"
+                      />
+                      <CommandList>
+                        <CommandEmpty>No leads found.</CommandEmpty>
+                        <CommandGroup>
+                          {leads.map((lead) => (
+                            <CommandItem
+                              key={lead.id}
+                              value={lead.id}
+                              onSelect={() => {
+                                setClientName(lead.name);
+                                setClientEmail(lead.email || '');
+                                setClientPhone(lead.phone || '');
+                                setClientAddress(lead.college || lead.state || ''); // Fallback for address
+                                setLeadId(lead.id);
+                                setLeadTable(tableName);
+                                setOpenLeadSelector(false);
+                                toast({ 
+                                  title: 'Lead Selected', 
+                                  description: `Client details populated for ${lead.name}`,
+                                  className: 'bg-primary/20 border-primary/20'
+                                });
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  leadId === lead.id ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                              <div className="flex flex-col">
+                                <span className="font-medium">{lead.name}</span>
+                                <span className="text-[10px] text-muted-foreground">{lead.email || lead.phone || 'No contact info'}</span>
+                              </div>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
+          </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <div className="space-y-2">
@@ -516,7 +636,66 @@ export default function InvoiceBuilder() {
             </CardContent>
           </Card>
         </div>
-      </div>
+      )}
+
+      {viewMode === 'preview' && (
+          <div className="p-4 md:p-8 max-w-5xl mx-auto">
+              <div className="bg-white rounded-2xl shadow-2xl overflow-hidden border border-border relative">
+                  <DocumentView 
+                    type="invoice" 
+                    document={{
+                        status,
+                        invoice_number: isEditing ? (id ? "Loading..." : "INV-NEW") : "INV-NEW",
+                        currency,
+                        subtotal,
+                        discount_amount: docDiscountAmount,
+                        tax_amount: totalTax,
+                        total: grandTotal,
+                        client_name: clientName,
+                        client_email: clientEmail,
+                        client_phone: clientPhone,
+                        client_address: clientAddress,
+                        client_gstin: clientGstin,
+                        notes,
+                        terms_and_conditions: termsAndConditions,
+                        due_date: dueDate,
+                        issued_at: new Date().toISOString()
+                    }}
+                    items={computedItems}
+                    company={{
+                        name: company?.name || 'FastestCRM',
+                        logo_url: company?.logo_url || null,
+                        primary_color: company?.primary_color || '#3b82f6',
+                        address: company?.address || null,
+                        email: company?.email || null,
+                        phone: company?.phone || null,
+                        gstin: null
+                    }}
+                  />
+              </div>
+          </div>
+      )}
+
+      {isEditing && (
+          <SendDocumentDialog 
+            open={sendDialogOpen}
+            onOpenChange={setSendDialogOpen}
+            document={{
+                id: id!,
+                client_name: clientName,
+                client_email: clientEmail,
+                lead_id: leadId,
+                lead_table: leadTable,
+                invoice_number: "Preview"
+            } as any}
+            type="invoice"
+            onSuccess={() => {
+                if (status === 'draft') {
+                    // Update to sent
+                }
+            }}
+          />
+      )}
 
       {/* Record Payment Dialog */}
       <Dialog open={payDialog} onOpenChange={setPayDialog}>

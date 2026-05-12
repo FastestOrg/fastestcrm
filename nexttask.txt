@@ -1,1 +1,39 @@
-In FastSent, In email account, It is always showing as disconnected Even if The credentials and everything is correct. I did test it by Sending a test email and it was working really fine Still it is showing as disconnected only. Can you check. on this and solve with this issue
+Objective:
+Act as a senior product strategist and AI transformation consultant. Conduct a comprehensive assessment of our CRM platform and recommend five high-impact, production-grade features that will position the company as a truly AI-first CRM.
+
+Context:
+We are building an AI-first CRM company with the long-term vision of enabling autonomous, end-to-end workflow execution across sales, marketing, and customer success. The goal is to transition from a traditional system-of-record to an intelligent system-of-action, where AI drives decision-making, execution, and continuous optimization at scale.
+
+Instructions:
+
+Feature Identification
+Recommend five strategic features that significantly enhance AI readiness and autonomy.
+Ensure each feature is practical, achievable, and production-grade, avoiding experimental or gimmicky ideas.
+Prioritize innovations that create sustainable competitive advantage and clear differentiation in the CRM market.
+
+Evaluation Criteria
+Each recommendation should be assessed against the following dimensions:
+Strategic Value: Alignment with an AI-first vision and long-term market positioning.
+Business Impact: Potential to drive revenue growth, cost efficiency, customer retention, or productivity gains.
+Customer Value: Tangible improvements in user experience and measurable outcomes.
+Feasibility: Realistic implementation using current or near-term technologies.
+Scalability: Ability to support enterprise-scale operations.
+Level of Autonomy: Contribution toward achieving near 100% autonomous task execution.
+Required Output Format
+For each feature, provide:
+Feature Name
+Executive Summary (2–3 sentences suitable for investor communication)
+Problem Statement
+Proposed Solution
+Key Capabilities
+Strategic Differentiation
+Business & ROI Impact
+Implementation Feasibility (technology stack, estimated complexity, and timeline)
+Risks & Mitigation
+Success Metrics (KPIs)
+Strategic Framing
+Position recommendations within the broader evolution from CRM → Intelligent CRM → Autonomous CRM.
+Highlight how these features strengthen defensibility, data network effects, and AI-driven moats.
+
+Deliverable:
+A concise yet insightful idea presenting five transformative features that establish our platform as a category-defining AI-first CRM, capable of delivering autonomous operations and long-term enterprise value.

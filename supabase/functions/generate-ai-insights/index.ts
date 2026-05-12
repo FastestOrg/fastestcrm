@@ -18,19 +18,41 @@ serve(async (req) => {
     console.log(`[AI Insights] Generating insights for company ${company_id}`);
 
     // 1. Fetch Gemini API Key
-    const { data: keyData, error: keyError } = await supabase
-      .from('integration_api_keys')
-      .select('api_key')
-      .eq('service_name', 'gemini')
-      .eq('is_active', true)
+    let { data: integration } = await supabase
+      .from("integration_api_keys")
+      .select("api_key")
+      .eq("company_id", company_id)
+      .eq("service_name", "gemini")
+      .eq("is_active", true)
       .limit(1)
       .maybeSingle();
 
-    if (keyError) throw keyError;
-    if (!keyData) {
-      throw new Error("Gemini API key not found in Integrations. Please connect Google Gemini in the Integrations page first.");
+    // Fallback for legacy keys
+    if (!integration?.api_key) {
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("company_id", company_id);
+      
+      if (profiles && profiles.length > 0) {
+        const userIds = profiles.map((p: any) => p.id);
+        const { data: legacyKey } = await supabase
+          .from("integration_api_keys")
+          .select("api_key")
+          .in("user_id", userIds)
+          .eq("service_name", "gemini")
+          .eq("is_active", true)
+          .limit(1)
+          .maybeSingle();
+        
+        if (legacyKey) integration = legacyKey;
+      }
     }
-    const geminiKey = keyData.api_key;
+
+    if (!integration?.api_key) {
+      throw new Error("No active Gemini API key found for this company. Please connect Google Gemini in the Integrations page first.");
+    }
+    const geminiKey = integration.api_key;
 
     // 2. Determine Leads Table
     const { data: company, error: companyError } = await supabase
@@ -167,7 +189,7 @@ serve(async (req) => {
     `;
 
     // 7. Call Gemini
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`;
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
     const response = await fetch(geminiUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

@@ -42,6 +42,8 @@ import { LeadHistoryDialog } from './LeadHistoryDialog';
 import { useLeadStatuses, CompanyLeadStatus } from '@/hooks/useLeadStatuses';
 import { StatusReminderDialog } from './StatusReminderDialog';
 import { MaskedValue } from '@/components/ui/MaskedValue';
+import { PriorityBadge } from './PriorityBadge';
+import { calculatePriorityLevel } from '@/hooks/useLeadScoring';
 
 type Lead = Tables<'leads'> & {
   sales_owner?: {
@@ -238,6 +240,13 @@ export function LeadsTable({ leads, loading, selectedLeads, onSelectionChange, o
 
   // Define Column Renderers
   const columnDefinitions: Record<string, { label: string, render: (lead: Lead) => React.ReactNode }> = {
+    priority: {
+      label: 'Priority',
+      render: (lead) => {
+        const { level, score } = calculatePriorityLevel(lead);
+        return <PriorityBadge level={level} score={score} />;
+      }
+    },
     name: {
       label: 'Name',
       render: (lead) => <div className="font-medium">{lead.name}</div>
@@ -400,6 +409,7 @@ export function LeadsTable({ leads, loading, selectedLeads, onSelectionChange, o
     if (!columnConfig) {
       // Default order
       return [
+        'priority',
         'name',
         'email',
         'phone',

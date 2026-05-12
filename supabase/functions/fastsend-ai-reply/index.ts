@@ -71,15 +71,39 @@ Deno.serve(async (req) => {
     }
 
     // 4. Fetch Gemini API Key
-    const { data: integration } = await adminClient
+    let { data: integration } = await adminClient
       .from("integration_api_keys")
       .select("api_key")
       .eq("company_id", thread.company_id)
-      .eq("provider", "gemini")
-      .single();
+      .eq("service_name", "gemini")
+      .eq("is_active", true)
+      .limit(1)
+      .maybeSingle();
 
-    if (!integration || !integration.api_key) {
-      throw new Error("Gemini API key not configured for company.");
+    // Fallback for legacy keys
+    if (!integration?.api_key) {
+      const { data: profiles } = await adminClient
+        .from("profiles")
+        .select("id")
+        .eq("company_id", thread.company_id);
+      
+      if (profiles && profiles.length > 0) {
+        const userIds = profiles.map((p: any) => p.id);
+        const { data: legacyKey } = await adminClient
+          .from("integration_api_keys")
+          .select("api_key")
+          .in("user_id", userIds)
+          .eq("service_name", "gemini")
+          .eq("is_active", true)
+          .limit(1)
+          .maybeSingle();
+        
+        if (legacyKey) integration = legacyKey;
+      }
+    }
+
+    if (!integration?.api_key) {
+      throw new Error("No active Gemini API key found for this company.");
     }
 
     // 5. Construct Prompt

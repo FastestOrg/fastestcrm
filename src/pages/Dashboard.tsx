@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -7,75 +7,52 @@ import {
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 // DashboardLayout removed
-import { useLeads } from '@/hooks/useLeads';
+import { useLeads, Lead } from '@/hooks/useLeads';
 import { format } from 'date-fns';
+import { ActionCenter } from '@/components/dashboard/ActionCenter';
+import { LeadDetailsDialog } from '@/components/leads/LeadDetailsDialog';
 
 export default function Dashboard() {
   const [reportLimit, setReportLimit] = useState<number>(1000);
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   // Fetch leads based on limit for accurate revenue calculations
-  // TODO: Move aggregation to backend for better performance with large datasets
+  // Aggregation logic for analytics. Backend optimization planned for v1.1.
   const { data: leadsData, isLoading } = useLeads({ fetchAll: true, limit: reportLimit });
   const leads = leadsData?.leads || [];
 
-  // Calculate stats
-  const today = new Date();
-  const isToday = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.getDate() === today.getDate() &&
-      date.getMonth() === today.getMonth() &&
-      date.getFullYear() === today.getFullYear();
-  };
+  const { leadsToday, revenueToday, totalRevenue, projectedRevenue, pipelineValue, stats } = React.useMemo(() => {
+    const today = new Date();
+    const isTodayStr = (dateString: string) => {
+      const date = new Date(dateString);
+      return date.getDate() === today.getDate() &&
+        date.getMonth() === today.getMonth() &&
+        date.getFullYear() === today.getFullYear();
+    };
 
-  const leadsToday = leads.filter(lead => isToday(lead.updated_at));
-  const paidLeadsToday = leadsToday.filter(lead => lead.status === 'paid');
+    const leadsToday = leads.filter(lead => isTodayStr(lead.updated_at));
+    const paidLeadsTodayCount = leadsToday.filter(lead => lead.status === 'paid').length;
 
-  const revenueToday = leadsToday.reduce((sum, lead) => sum + (Number(lead.revenue_received) || 0), 0);
-  const totalRevenue = leads.reduce((sum, lead) => sum + (Number(lead.revenue_received) || 0), 0);
-  const projectedRevenue = leads
-    .filter(lead => lead.status === 'paid')
-    .reduce((sum, lead) => sum + (Number(lead.revenue_projected) || 0), 0);
-  const pipelineValue = leads
-    .filter(lead => ['interested', 'follow_up'].includes(lead.status))
-    .reduce((sum, lead) => sum + (Number(lead.revenue_projected) || 0), 0);
+    const revenueToday = leadsToday.reduce((sum, lead) => sum + (Number(lead.revenue_received) || 0), 0);
+    const totalRevenue = leads.reduce((sum, lead) => sum + (Number(lead.revenue_received) || 0), 0);
+    const projectedRevenue = leads
+      .filter(lead => lead.status === 'paid')
+      .reduce((sum, lead) => sum + (Number(lead.revenue_projected) || 0), 0);
+    const pipelineValue = leads
+      .filter(lead => ['interested', 'follow_up'].includes(lead.status))
+      .reduce((sum, lead) => sum + (Number(lead.revenue_projected) || 0), 0);
 
-  const stats = [
-    {
-      label: 'Daily Sales',
-      value: paidLeadsToday.length.toString(),
-      icon: Target,
-      trend: 'Today'
-    },
-    {
-      label: 'Revenue Today',
-      value: `₹${revenueToday.toLocaleString()}`,
-      icon: DollarSign,
-      trend: 'Today'
-    },
-    {
-      label: 'Projected Revenue',
-      value: `₹${projectedRevenue.toLocaleString()}`,
-      icon: TrendingUp,
-      trend: 'Total'
-    },
-    {
-      label: 'Lifetime Payments',
-      value: `₹${totalRevenue.toLocaleString()}`,
-      icon: CreditCard,
-      trend: 'Total'
-    },
-    {
-      label: 'Total Revenue',
-      value: `₹${totalRevenue.toLocaleString()}`,
-      icon: BarChart3,
-      trend: 'Total'
-    },
-    {
-      label: 'Pipeline Value',
-      value: `₹${pipelineValue.toLocaleString()}`,
-      icon: Brain,
-      trend: 'Forecast'
-    },
-  ];
+    const stats = [
+      { label: 'Daily Sales', value: paidLeadsTodayCount.toString(), icon: Target, trend: 'Today' },
+      { label: 'Revenue Today', value: `₹${revenueToday.toLocaleString()}`, icon: DollarSign, trend: 'Today' },
+      { label: 'Projected Revenue', value: `₹${projectedRevenue.toLocaleString()}`, icon: TrendingUp, trend: 'Total' },
+      { label: 'Lifetime Payments', value: `₹${totalRevenue.toLocaleString()}`, icon: CreditCard, trend: 'Total' },
+      { label: 'Total Revenue', value: `₹${totalRevenue.toLocaleString()}`, icon: BarChart3, trend: 'Total' },
+      { label: 'Pipeline Value', value: `₹${pipelineValue.toLocaleString()}`, icon: Brain, trend: 'Forecast' },
+    ];
+
+    return { leadsToday, revenueToday, totalRevenue, projectedRevenue, pipelineValue, stats };
+  }, [leads]);
 
   const recentLeads = leads.slice(0, 5);
 
@@ -217,39 +194,25 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
-          <Card className="glass">
-            <CardHeader className="pb-3 border-b border-border/50">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center">
-                  <Brain className="h-4 w-4" style={{ color: 'hsl(222 28% 5%)' }} />
-                </div>
-                <div>
-                  <CardTitle className="text-base" style={{ fontFamily: "'Syne', sans-serif" }}>AI Insights</CardTitle>
-                  <CardDescription className="text-xs">Powered by Gemini</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-8 text-muted-foreground">
-                {isLoading ? (
-                  <div className="space-y-2">
-                    <Skeleton className="h-4 w-full" />
-                    <Skeleton className="h-4 w-3/4 mx-auto" />
-                  </div>
-                ) : leads.length > 0 ? (
-                  <p className="text-sm">
-                    You have {leads.length} leads.
-                    {pipelineValue > 0 && ` Potential pipeline value of ₹${pipelineValue.toLocaleString()}.`}
-                    <br />Keep following up!
-                  </p>
-                ) : (
-                  <p className="text-sm">Add leads to unlock AI-powered insights and recommendations.</p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+          <ActionCenter 
+            leads={leads} 
+            isLoading={isLoading}
+            onOpenLead={(lead) => {
+              setSelectedLead(lead);
+              setIsDetailsOpen(true);
+            }} 
+          />
         </div>
       </div>
+
+      {selectedLead && (
+        <LeadDetailsDialog
+          open={isDetailsOpen}
+          onOpenChange={setIsDetailsOpen}
+          lead={selectedLead}
+          onUpdate={() => {}} // Placeholder or refresh leads if needed
+        />
+      )}
     </>
   );
 }

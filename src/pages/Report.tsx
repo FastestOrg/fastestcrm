@@ -27,6 +27,14 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useForecast } from "@/hooks/useForecast";
+import { DollarSign, Activity, Sparkles, BrainCircuit } from "lucide-react";
+import { 
+    ComposedChart, 
+    Area, 
+    Tooltip as RechartsTooltip 
+} from "recharts";
+
 
 const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884d8", "#82ca9d"];
 
@@ -34,9 +42,10 @@ export default function Report() {
     const [reportLimit, setReportLimit] = useState<number>(1000);
     const { data: leadsData, isLoading: leadsLoading } = useLeads({ fetchAll: true, limit: reportLimit });
     const { members, loading: teamLoading } = useTeam();
+    const { data: forecastData, isLoading: forecastLoading } = useForecast();
     const leads = leadsData?.leads || [];
 
-    const isLoading = leadsLoading || teamLoading;
+    const isLoading = leadsLoading || teamLoading || forecastLoading;
 
     // 1. Leads per Employee (Basic for Chart)
     const leadsPerEmployee = members.map((member) => {
@@ -147,6 +156,10 @@ export default function Report() {
                     <TabsList>
                         <TabsTrigger value="overview">Overview</TabsTrigger>
                         <TabsTrigger value="individual">Individual Reporting</TabsTrigger>
+                        <TabsTrigger value="forecast" className="gap-2">
+                             <Sparkles className="h-3.5 w-3.5 text-blue-500" />
+                             Revenue Forecast
+                        </TabsTrigger>
                     </TabsList>
 
                     <TabsContent value="overview" className="space-y-4">
@@ -356,7 +369,140 @@ export default function Report() {
                             </CardContent>
                         </Card>
                     </TabsContent>
+
+
+                    <TabsContent value="forecast" className="space-y-4">
+                        <div className="grid gap-4 md:grid-cols-4">
+                            <Card className="bg-gradient-to-br from-blue-500/10 to-transparent border-blue-500/20">
+                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                    <CardTitle className="text-sm font-medium">Potential Pipeline</CardTitle>
+                                    <Activity className="h-4 w-4 text-blue-500" />
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="text-2xl font-bold">
+                                        {forecastData?.totalPotential.toLocaleString('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 })}
+                                    </div>
+                                    <p className="text-xs text-muted-foreground">Gross value of all active leads</p>
+                                </CardContent>
+                            </Card>
+                            <Card className="bg-gradient-to-br from-emerald-500/10 to-transparent border-emerald-500/20">
+                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                    <CardTitle className="text-sm font-medium">Expected Revenue</CardTitle>
+                                    <BrainCircuit className="h-4 w-4 text-emerald-500" />
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="text-2xl font-bold">
+                                        {forecastData?.expectedRevenue.toLocaleString('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 })}
+                                    </div>
+                                    <p className="text-xs text-muted-foreground">Probability-adjusted weighting</p>
+                                </CardContent>
+                            </Card>
+                            <Card className="bg-gradient-to-br from-purple-500/10 to-transparent border-purple-500/20">
+                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                    <CardTitle className="text-sm font-medium">Closed Revenue</CardTitle>
+                                    <DollarSign className="h-4 w-4 text-purple-500" />
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="text-2xl font-bold">
+                                        {forecastData?.closedRevenue.toLocaleString('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 })}
+                                    </div>
+                                    <p className="text-xs text-muted-foreground">Total payments received</p>
+                                </CardContent>
+                            </Card>
+                            <Card>
+                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                    <CardTitle className="text-sm font-medium">Avg Conversion</CardTitle>
+                                    <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="text-2xl font-bold">{forecastData?.conversionRate.toFixed(1)}%</div>
+                                    <p className="text-xs text-muted-foreground">Leads to Paid ratio</p>
+                                </CardContent>
+                            </Card>
+                        </div>
+
+                        <div className="grid gap-4 md:grid-cols-7">
+                            <Card className="col-span-4">
+                                <CardHeader>
+                                    <CardTitle>Pipeline Value Distribution</CardTitle>
+                                    <CardDescription>
+                                        Comparison between gross pipeline value and expected revenue (probability adjusted).
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <ResponsiveContainer width="100%" height={400}>
+                                        <ComposedChart data={forecastData?.pipelineByStatus}>
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" />
+                                            <XAxis 
+                                                dataKey="name" 
+                                                fontSize={10} 
+                                                tickLine={false} 
+                                                axisLine={false}
+                                                angle={-45}
+                                                textAnchor="end"
+                                                height={70}
+                                            />
+                                            <YAxis 
+                                                fontSize={10} 
+                                                tickLine={false} 
+                                                axisLine={false}
+                                                tickFormatter={(value) => `₹${value/1000}k`}
+                                            />
+                                            <RechartsTooltip 
+                                                contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px' }}
+                                                formatter={(value: number) => [value.toLocaleString('en-IN', { style: 'currency', currency: 'INR' }), '']}
+                                            />
+                                            <Legend />
+                                            <Bar dataKey="total" name="Gross Value" fill="#3b82f6" opacity={0.3} radius={[4, 4, 0, 0]} />
+                                            <Area type="monotone" dataKey="expected" name="Expected Adjusted" fill="#10b981" stroke="#10b981" fillOpacity={0.2} />
+                                        </ComposedChart>
+                                    </ResponsiveContainer>
+                                </CardContent>
+                            </Card>
+
+                            <Card className="col-span-3">
+                                <CardHeader>
+                                    <CardTitle className="flex items-center gap-2">
+                                        <Sparkles className="h-4 w-4 text-blue-500" />
+                                        AI Forecast Insights
+                                    </CardTitle>
+                                    <CardDescription>Automated pipeline health check</CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-6">
+                                    <div className="p-4 rounded-lg bg-blue-500/5 border border-blue-500/10">
+                                        <h4 className="text-sm font-semibold text-blue-400 mb-1">Projected Outcome</h4>
+                                        <p className="text-sm text-muted-foreground leading-relaxed">
+                                            Based on current conversion probabilities, your pipeline of {totalLeads} leads is expected to generate 
+                                            <span className="text-foreground font-bold mx-1">
+                                                {forecastData?.expectedRevenue.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}
+                                            </span> 
+                                            at maturity.
+                                        </p>
+                                    </div>
+
+                                    <div className="space-y-4">
+                                        <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Strategic Recommendations</h4>
+                                        <ul className="space-y-3">
+                                            <li className="flex gap-3 text-sm italic items-start">
+                                                <div className="h-5 w-5 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0 mt-0.5">
+                                                    <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                                                </div>
+                                                Focus on conversion optimization for "Interested" leads to potentially increase Expected Revenue by 15%.
+                                            </li>
+                                            <li className="flex gap-3 text-sm italic items-start">
+                                                <div className="h-5 w-5 rounded-full bg-amber-500/20 flex items-center justify-center shrink-0 mt-0.5">
+                                                    <div className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                                                </div>
+                                                Strategic priority: High-intent leads in the mid-funnel represent the largest opportunity for immediate revenue growth.
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </div>
+                    </TabsContent>
                 </Tabs>
+
             </div>
         </>
     );

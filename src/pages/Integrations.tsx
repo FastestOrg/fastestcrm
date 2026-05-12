@@ -4,8 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from "@/components/ui/switch";
-import { Mail, MessageSquare, Phone, CreditCard, Calendar, FileSpreadsheet, Webhook, Loader2, Megaphone, Bot } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import { Mail, MessageSquare, Phone, CreditCard, Calendar, FileSpreadsheet, Webhook, Loader2, Megaphone, Bot, Search, Trash2 } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { AddIntegrationDialog } from '@/components/integrations/AddIntegrationDialog';
@@ -13,6 +13,7 @@ import { PerformanceMarketingDialog } from '@/components/integrations/Performanc
 import { EmailIntegrationDialog } from '@/components/integrations/EmailIntegrationDialog';
 import { useCompany } from '@/hooks/useCompany';
 import { useEmailAccounts } from '@/hooks/useEmailAccounts';
+import { useToast } from '@/hooks/use-toast';
 
 const integrationTypes = [
     { id: 'performance_marketing', name: 'Performance Marketing', icon: Megaphone, description: 'Meta, Google & LinkedIn Ads', category: 'Lead Generation', isSpecial: true },
@@ -24,6 +25,7 @@ const integrationTypes = [
     { id: 'google_sheets', name: 'Google Sheets', icon: FileSpreadsheet, description: 'Export/Import leads', category: 'Data' },
     { id: 'webhooks', name: 'Webhooks', icon: Webhook, description: 'Connect custom apps', category: 'Developer' },
     { id: 'gemini', name: 'Google Gemini AI', icon: Bot, description: 'Power your WhatsApp AI Agent', category: 'AI' },
+    { id: 'apollo', name: 'Apollo.io', icon: Search, description: 'Find leads and contact info', category: 'Lead Generation' },
 ];
 
 export default function Integrations() {
@@ -37,17 +39,20 @@ export default function Integrations() {
     // Unified email account check
     const { accounts: emailAccounts } = useEmailAccounts();
 
+    const { toast } = useToast();
+    const queryClient = useQueryClient();
+
     const { data: connectedKeys, isLoading } = useQuery({
         queryKey: ['integration-keys', user?.id],
-        queryFn: async (): Promise<{ service_name: string; is_active: boolean | null }[]> => {
+        queryFn: async (): Promise<{ id: string; service_name: string; is_active: boolean | null }[]> => {
             if (!user?.id) return [];
             const { data, error } = await supabase
                 .from('integration_api_keys')
-                .select('service_name, is_active')
+                .select('id, service_name, is_active')
                 .eq('user_id', user.id);
 
             if (error) throw error;
-            return (data || []) as { service_name: string; is_active: boolean | null }[];
+            return (data || []) as { id: string; service_name: string; is_active: boolean | null }[];
         },
         enabled: !!user?.id
     });
@@ -110,6 +115,41 @@ export default function Integrations() {
         setIsDialogOpen(true);
     };
 
+    const disconnectMutation = useMutation({
+        mutationFn: async (serviceId: string) => {
+            if (!user?.id) return;
+            
+            // For standard API keys
+            const { error } = await supabase
+                .from('integration_api_keys')
+                .delete()
+                .eq('user_id', user.id)
+                .eq('service_name', serviceId);
+
+            if (error) throw error;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['integration-keys'] });
+            toast({
+                title: "Integration removed",
+                description: "The connection has been successfully disconnected."
+            });
+        },
+        onError: (error) => {
+            toast({
+                title: "Error",
+                description: "Failed to disconnect integration.",
+                variant: "destructive"
+            });
+        }
+    });
+
+    const handleDisconnect = (serviceId: string) => {
+        if (window.confirm(`Are you sure you want to remove the ${serviceId} connection?`)) {
+            disconnectMutation.mutate(serviceId);
+        }
+    };
+
     return (
         <>
             <div className="p-8 space-y-8">
@@ -143,16 +183,28 @@ export default function Integrations() {
                                     <CardContent>
                                         <div className="flex items-center justify-between pt-4 border-t border-border">
                                             <span className="text-xs text-muted-foreground uppercase tracking-wider font-medium">{integration.category}</span>
-                                            {integration.id === 'performance_marketing' ? (
-                                                <Button
-                                                    size="sm"
-                                                    variant={connected ? "secondary" : "outline"}
-                                                    onClick={() => handleConnect(integration)}
-                                                >
-                                                    {connected ? 'Manage' : 'Connect'}
-                                                </Button>
-                                            ) : connected ? (
-                                                <Switch checked={true} />
+                                            {connected ? (
+                                                <div className="flex gap-2">
+                                                    {(integration.id === 'performance_marketing' || integration.id === 'gmail') ? (
+                                                        <Button
+                                                            size="sm"
+                                                            variant="secondary"
+                                                            onClick={() => handleConnect(integration)}
+                                                        >
+                                                            Manage
+                                                        </Button>
+                                                    ) : (
+                                                        <Button 
+                                                            size="sm" 
+                                                            variant="ghost" 
+                                                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                                            onClick={() => handleDisconnect(integration.id)}
+                                                        >
+                                                            <Trash2 className="h-4 w-4 mr-2" />
+                                                            Disconnect
+                                                        </Button>
+                                                    )}
+                                                </div>
                                             ) : (
                                                 <Button size="sm" variant="outline" onClick={() => handleConnect(integration)}>
                                                     Connect

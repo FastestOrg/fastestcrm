@@ -7,6 +7,8 @@ import { Workflow, Plus, Zap, ArrowRight, Mail, Phone, UserPlus, Loader2, Trash2
 import { Switch } from "@/components/ui/switch";
 import { automationService, Automation } from '@/services/automationService';
 import { CreateAutomationDialog } from '@/components/automations/CreateAutomationDialog';
+import { WorkflowCanvas } from '@/components/automations/WorkflowCanvas';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 
 const EXAMPLE_AUTOMATIONS = [
@@ -34,6 +36,8 @@ export default function Automations() {
     const [automations, setAutomations] = useState<Automation[]>([]);
     const [loading, setLoading] = useState(true);
     const [isCreateOpen, setIsCreateOpen] = useState(false);
+    const [viewMode, setViewMode] = useState<'list' | 'visual'>('visual');
+    const [editingAutomation, setEditingAutomation] = useState<Automation | null>(null);
     const { toast } = useToast();
 
     const fetchAutomations = async () => {
@@ -105,10 +109,18 @@ export default function Automations() {
                         <h1 className="text-2xl font-bold">Workflow Automations</h1>
                         <p className="text-muted-foreground">Automate repetitive tasks and scale your sales process.</p>
                     </div>
-                    <Button className="gradient-primary w-full sm:w-auto" onClick={() => setIsCreateOpen(true)}>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Create Automation
-                    </Button>
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                        <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as any)} className="w-[180px]">
+                            <TabsList className="grid grid-cols-2">
+                                <TabsTrigger value="list">List</TabsTrigger>
+                                <TabsTrigger value="visual">Visual</TabsTrigger>
+                            </TabsList>
+                        </Tabs>
+                        <Button className="gradient-primary w-full sm:w-auto" onClick={() => setIsCreateOpen(true)}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Create Automation
+                        </Button>
+                    </div>
                 </div>
 
                 {loading ? (
@@ -119,7 +131,6 @@ export default function Automations() {
                     <div className="space-y-4">
                         {automations.length === 0 ? (
                             <div className="space-y-6">
-                                {/* Empty hero */}
                                 <div className="text-center py-10 px-6 rounded-2xl border border-dashed border-border bg-muted/10">
                                     <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
                                         <Workflow className="h-8 w-8 text-primary" />
@@ -134,7 +145,6 @@ export default function Automations() {
                                     </Button>
                                 </div>
 
-                                {/* Example automation cards */}
                                 <div>
                                     <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3 px-1">
                                         Popular automations
@@ -162,19 +172,17 @@ export default function Automations() {
                                     </div>
                                 </div>
                             </div>
-                        ) : (
+                        ) : viewMode === 'list' ? (
                             automations.map((auto) => (
                                 <Card key={auto.id} className="glass hover:border-primary/50 transition-colors">
                                     <CardContent className="p-4 md:p-6">
                                         <div className="flex items-start justify-between gap-4">
-                                            {/* Left: icon + info */}
                                             <div className="flex items-start gap-4 min-w-0">
                                                 <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${auto.is_active ? 'bg-primary/10' : 'bg-muted'}`}>
                                                     <Workflow className={`h-5 w-5 ${auto.is_active ? 'text-primary' : 'text-muted-foreground'}`} />
                                                 </div>
                                                 <div className="min-w-0">
                                                     <h3 className="font-semibold text-base mb-1.5 leading-snug">{auto.name}</h3>
-                                                    {/* Trigger → Action badges — wrap on mobile */}
                                                     <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                                                         <Badge variant="outline" className="bg-background flex items-center gap-1 text-xs">
                                                             {auto.trigger_type.replace('_', ' ')}
@@ -194,7 +202,6 @@ export default function Automations() {
                                                 </div>
                                             </div>
 
-                                            {/* Right: toggle + delete */}
                                             <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2 shrink-0">
                                                 <span className="text-xs text-muted-foreground hidden sm:inline">
                                                     {auto.is_active ? 'Active' : 'Paused'}
@@ -216,13 +223,25 @@ export default function Automations() {
                                     </CardContent>
                                 </Card>
                             ))
+                        ) : (
+                          <WorkflowCanvas 
+                            automations={automations} 
+                            onNodeClick={(auto) => {
+                                setEditingAutomation(auto);
+                                setIsCreateOpen(true);
+                            }} 
+                          />
                         )}
                     </div>
                 )}
 
                 <CreateAutomationDialog
                     isOpen={isCreateOpen}
-                    onOpenChange={setIsCreateOpen}
+                    automation={editingAutomation}
+                    onOpenChange={(open) => {
+                        setIsCreateOpen(open);
+                        if (!open) setEditingAutomation(null);
+                    }}
                     onSuccess={fetchAutomations}
                 />
             </div>

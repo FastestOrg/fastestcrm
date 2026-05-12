@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { Switch } from '@/components/ui/switch';
@@ -20,9 +21,10 @@ interface CreateAutomationDialogProps {
     isOpen: boolean;
     onOpenChange: (open: boolean) => void;
     onSuccess: () => void;
+    automation?: Automation | null;
 }
 
-export function CreateAutomationDialog({ isOpen, onOpenChange, onSuccess }: CreateAutomationDialogProps) {
+export function CreateAutomationDialog({ isOpen, onOpenChange, onSuccess, automation }: CreateAutomationDialogProps) {
     const [name, setName] = useState('');
     const [triggerType, setTriggerType] = useState<TriggerType>('lead_created');
     const [actionType, setActionType] = useState<ActionType>('send_email');
@@ -38,46 +40,63 @@ export function CreateAutomationDialog({ isOpen, onOpenChange, onSuccess }: Crea
     const { members } = useTeam();
     const { data: forms, isLoading: isLoadingForms } = useForms();
 
+    // Populate state for editing
+    useEffect(() => {
+        if (automation) {
+            setName(automation.name);
+            setTriggerType(automation.trigger_type);
+            setActionType(automation.action_type);
+            setTriggerConfig(automation.trigger_config || {});
+            setActionConfig(automation.action_config || {});
+        } else {
+            setName('');
+            setTriggerType('lead_created');
+            setActionType('send_email');
+            setTriggerConfig({});
+            setActionConfig({});
+        }
+    }, [automation, isOpen]);
+
     // Reset config when action type changes
     useEffect(() => {
-        setActionConfig({});
-    }, [actionType]);
+        if (!automation) {
+            setActionConfig({});
+        }
+    }, [actionType, automation]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!name) return;
 
-        // Validation for assign_lead
-        if (actionType === 'assign_lead') {
-            if (!actionConfig.distribution_logic) {
-                toast({ title: 'Error', description: 'Please select a distribution logic', variant: 'destructive' });
-                return;
-            }
-            if (!actionConfig.target_users || actionConfig.target_users.length === 0) {
-                toast({ title: 'Error', description: 'Please select at least one user', variant: 'destructive' });
-                return;
-            }
-        }
-
         setLoading(true);
         try {
-            await automationService.createAutomation({
-                name,
-                trigger_type: triggerType,
-                trigger_config: triggerConfig,
-                action_type: actionType,
-                action_config: actionConfig
-            });
+            if (automation?.id) {
+                await automationService.updateAutomation(automation.id, {
+                    name,
+                    trigger_type: triggerType,
+                    trigger_config: triggerConfig,
+                    action_type: actionType,
+                    action_config: actionConfig
+                });
+                toast({ title: 'Success', description: 'Automation updated successfully' });
+            } else {
+                await automationService.createAutomation({
+                    name,
+                    trigger_type: triggerType,
+                    trigger_config: triggerConfig,
+                    action_type: actionType,
+                    action_config: actionConfig
+                });
+                toast({ title: 'Success', description: 'Automation created successfully' });
+            }
 
-            toast({
-                title: 'Success',
-                description: 'Automation created successfully',
-            });
             onSuccess();
             onOpenChange(false);
-            setName('');
-            setTriggerConfig({});
-            setActionConfig({});
+            if (!automation) {
+                setName('');
+                setTriggerConfig({});
+                setActionConfig({});
+            }
         } catch (error: any) {
             toast({
                 title: 'Error',
@@ -104,7 +123,7 @@ export function CreateAutomationDialog({ isOpen, onOpenChange, onSuccess }: Crea
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
-                    <DialogTitle>Create New Automation</DialogTitle>
+                    <DialogTitle>{automation ? 'Edit Automation' : 'Create New Automation'}</DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-6 py-4">
                     <div className="space-y-2">
@@ -275,11 +294,41 @@ export function CreateAutomationDialog({ isOpen, onOpenChange, onSuccess }: Crea
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="send_email">Send Email</SelectItem>
+                                        <SelectItem value="ai_personalized_followup">AI Personalized Follow-up</SelectItem>
                                         <SelectItem value="webhook">Call Webhook</SelectItem>
                                         <SelectItem value="assign_lead">Assign Lead</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
+
+                            {actionType === 'ai_personalized_followup' && (
+                                <div className="space-y-3">
+                                    <div className="p-3 bg-primary/5 rounded-lg border border-primary/10 mb-2">
+                                        <p className="text-[11px] text-primary font-medium flex items-center gap-1">
+                                            <Loader2 className="h-3 w-3 animate-pulse" /> 
+                                            AGENTIC MODE ENABLED
+                                        </p>
+                                        <p className="text-[10px] text-muted-foreground mt-1">
+                                            The AI will analyze the lead profile and recent history to craft a unique message.
+                                        </p>
+                                    </div>
+                                    <Label>Instructions for AI Agent</Label>
+                                    <Textarea
+                                        placeholder="e.g. Ask them if they're still looking for a 2BHK in Mumbai. Mention our 15% discount for this month."
+                                        value={actionConfig.instructions || ''}
+                                        onChange={(e) => setActionConfig({ ...actionConfig, instructions: e.target.value })}
+                                        className="min-h-[100px]"
+                                    />
+                                    <div className="flex items-center space-x-2 pt-2">
+                                        <Switch 
+                                            id="auto-send" 
+                                            checked={actionConfig.auto_send || false} 
+                                            onCheckedChange={(val) => setActionConfig({ ...actionConfig, auto_send: val })}
+                                        />
+                                        <Label htmlFor="auto-send" className="text-xs cursor-pointer">Auto-send without review</Label>
+                                    </div>
+                                </div>
+                            )}
 
                             {actionType === 'send_email' && (
                                 <div className="space-y-2">

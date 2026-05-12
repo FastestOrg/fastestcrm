@@ -6,7 +6,7 @@ import { useCompany } from '@/hooks/useCompany';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { LayoutDashboard, Users, UserCheck, CreditCard, Settings, LogOut, Phone, Workflow, Link2, BarChart3, Brain, Calendar, FileText, Building2, Shield, Package, PieChart, Database, CheckSquare, AlertTriangle, Clock, ChevronDown, ChevronUp, Mail, PanelLeftClose, PanelLeftOpen, MessageCircle, Receipt } from 'lucide-react';
+import { LayoutDashboard, Users, UserCheck, CreditCard, Settings, LogOut, Phone, Workflow, Link2, BarChart3, Brain, Calendar, FileText, Building2, Shield, Package, PieChart, Database, CheckSquare, AlertTriangle, Clock, ChevronDown, ChevronUp, Mail, PanelLeftClose, PanelLeftOpen, MessageCircle, Receipt, Sparkles, Wand2, ShieldCheck, Bot, Zap, Target, Heart, Globe } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -17,7 +17,7 @@ import { AnnouncementBanner } from './AnnouncementBanner';
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import SEO from '@/components/SEO';
 
-type NavSection = 'FastBoard' | 'FastEngage' | 'Data Enrichment' | 'Accounts';
+type NavSection = 'FastBoard' | 'FastestAI' | 'FastEngage' | 'Data Enrichment' | 'Accounts';
 
 interface NavItem {
     icon: any;
@@ -113,14 +113,74 @@ const navItems: NavItem[] = [{
     path: '/dashboard/calendar',
     section: 'FastEngage'
 }, {
-    icon: PieChart,
-    label: 'Report',
-    path: '/dashboard/report',
-    section: 'Data Enrichment'
+    icon: ShieldCheck,
+    label: 'Mission Control',
+    path: '/dashboard/ai-mission-control',
+    section: 'FastestAI'
+}, {
+    icon: Bot,
+    label: 'AI Agent Hub',
+    path: '/dashboard/fastest-ai',
+    section: 'FastestAI'
+}, {
+    icon: Zap,
+    label: 'Agentic Workflows',
+    path: '/dashboard/agentic-workflows',
+    section: 'FastestAI'
+}, {
+    icon: Target,
+    label: 'Deal Intelligence',
+    path: '/dashboard/deal-intelligence',
+    section: 'FastestAI'
+}, {
+    icon: BarChart3,
+    label: 'Revenue Forecast',
+    path: '/dashboard/revenue-forecast',
+    section: 'FastestAI'
+}, {
+    icon: Heart,
+    label: 'Customer Health',
+    path: '/dashboard/customer-health',
+    section: 'FastestAI'
+}, {
+    icon: Sparkles,
+    label: 'Personalization',
+    path: '/dashboard/personalization',
+    section: 'FastestAI'
+}, {
+    icon: Wand2,
+    label: 'AI Growth Hacker',
+    path: '/dashboard/lg',
+    section: 'FastestAI'
+}, {
+    icon: Sparkles,
+    label: 'AI Closing Assistant',
+    path: '/dashboard/ai-closing',
+    section: 'FastestAI'
+}, {
+    icon: ShieldCheck,
+    label: 'AI Ops Center',
+    path: '/dashboard/ai-ops',
+    section: 'FastestAI'
+}, {
+    icon: Globe,
+    label: 'Fastest Scout',
+    path: '/dashboard/fastest-scout',
+    section: 'FastestAI'
+}, {
+    icon: Users,
+    label: 'AI Employees',
+    path: '/dashboard/ai-employees',
+    section: 'FastestAI'
 }, {
     icon: Brain,
     label: 'AI Insights',
     path: '/dashboard/ai',
+    section: 'FastestAI'
+}, {
+    icon: PieChart,
+    label: 'Report',
+    path: '/dashboard/report',
     section: 'Data Enrichment'
 }, {
     icon: Database,
@@ -337,7 +397,7 @@ export default function AppLayout() {
                 </div>
 
                 <nav className="flex-1 p-3 space-y-4 overflow-y-auto overflow-x-hidden">
-                    {(['FastBoard', 'FastEngage', 'Data Enrichment', 'Accounts'] as NavSection[]).map(section => {
+                    {(['FastBoard', 'FastestAI', 'FastEngage', 'Data Enrichment', 'Accounts'] as NavSection[]).map(section => {
                         const sectionItems = filteredNavItems.filter((item: any) => item.section === section);
                         const hasEmailItems = section === 'FastEngage' && emailDashboardEnabled;
                         const hasTasksItems = section === 'FastBoard';
