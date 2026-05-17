@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,12 +8,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Plus, Trash2, Loader2, Save, Package, Sparkles, Wand2, Zap, Edit, ArrowRightCircle, Mail } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Loader2, Save, Package, Wand2, Edit, ArrowRightCircle, Mail } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { useQuotations, QuotationItem, Quotation } from '@/hooks/useQuotations';
 import { SendDocumentDialog } from '@/components/financial/SendDocumentDialog';
 import { DocumentView } from '@/components/financial/DocumentView';
-import PublicDocument from './PublicDocument';
+
 import { useInvoiceTaxes } from '@/hooks/useInvoiceSettings';
 import { useProducts } from '@/hooks/useProducts';
 import { useToast } from '@/hooks/use-toast';
@@ -23,7 +23,7 @@ import { useLeadsTable } from '@/hooks/useLeadsTable';
 import { useDebounce } from '@/hooks/useDebounce';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { Check, ChevronsUpDown, User, Search } from 'lucide-react';
+import { Check, ChevronsUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const CURRENCIES = ['INR', 'USD', 'EUR', 'GBP', 'AED', 'SAR', 'SGD', 'AUD', 'CAD', 'JPY'];
@@ -373,6 +373,7 @@ export default function QuotationBuilder() {
         </div>
       </header>
 
+      {viewMode === 'edit' && (
       <div className="p-4 md:p-8 space-y-6">
         {/* Client Details */}
         <Card className="glass">
@@ -720,6 +721,7 @@ export default function QuotationBuilder() {
             </CardContent>
           </Card>
         </div>
+      </div>
       )}
 
       {viewMode === 'preview' && (

@@ -20,7 +20,7 @@ const NotFound = () => {
         </div>
       </div>
       <footer className="py-6 text-center text-sm text-muted-foreground">
-        © 2025-∞ Fastest CRM by Upmarking.com. Built for Fastest Sales Teams.
+        © {new Date().getFullYear()}-∞ Fastest CRM by Upmarking.com. Built for Fastest Sales Teams.
       </footer>
     </div>
   );

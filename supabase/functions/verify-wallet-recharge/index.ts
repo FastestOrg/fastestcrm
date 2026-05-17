@@ -115,10 +115,50 @@ serve(async (req) => {
 
         if (walletError) {
             console.error('Wallet Update Error', walletError)
-            // CRITICAL: We marked TX as success but failed to credit wallet.
-            // In prod, we'd want a rollback or better error handling. 
-            // For now, throw error.
             throw new Error('Failed to credit wallet')
+        }
+
+        // --- SEND NOTIFICATION EMAIL TO ADMIN ---
+        try {
+            const { data: companyAdmin } = await supabaseAdmin
+                .from('companies')
+                .select('name, admin_id')
+                .eq('id', transaction.wallet_id) // wallet_id is company_id here
+                .single()
+
+            if (companyAdmin) {
+                const { data: adminProfile } = await supabaseAdmin
+                    .from('profiles')
+                    .select('email, full_name')
+                    .eq('id', companyAdmin.admin_id)
+                    .single()
+
+                if (adminProfile?.email) {
+                    const { sendSystemEmail, getEmailTemplate } = await import("../_shared/email.ts");
+                    
+                    const emailBody = `
+                        <p>Hello ${adminProfile.full_name || 'Admin'},</p>
+                        <p>We are pleased to inform you that your wallet for <strong>${companyAdmin.name}</strong> has been successfully recharged.</p>
+                        <div class="info-box">
+                            <div class="info-item"><span class="info-label">Recharge Amount:</span> ₹${transaction.amount}</div>
+                            <div class="info-item"><span class="info-label">New Balance:</span> ₹${newBalance}</div>
+                            <div class="info-item"><span class="info-label">Transaction ID:</span> ${razorpay_payment_id}</div>
+                        </div>
+                        <p>Thank you for using FastestCRM!</p>
+                    `;
+
+                    const emailHtml = getEmailTemplate("Wallet Recharge Successful", emailBody);
+                    
+                    await sendSystemEmail({
+                        to: adminProfile.email,
+                        subject: `Wallet Recharged: ₹${transaction.amount} Added`,
+                        html: emailHtml
+                    });
+                    console.log(`Recharge notification sent to ${adminProfile.email}`);
+                }
+            }
+        } catch (emailErr) {
+            console.error("Failed to send recharge notification (non-blocking):", emailErr);
         }
 
         return new Response(

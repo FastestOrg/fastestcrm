@@ -621,7 +621,12 @@ export default function Team() {
                 <Dialog open={!!selectedMember} onOpenChange={(open) => !open && setSelectedMember(null)}>
                     <DialogContent>
                         <DialogHeader>
-                            <DialogTitle>Manage {members.find(m => m.id === selectedMember)?.full_name}</DialogTitle>
+                            <DialogTitle className="flex flex-col gap-1">
+                                <span>Manage {members.find(m => m.id === selectedMember)?.full_name}</span>
+                                <span className="text-sm font-normal text-muted-foreground">
+                                    ({members.find(m => m.id === selectedMember)?.email})
+                                </span>
+                            </DialogTitle>
                             <DialogDescription>
                                 Update role or reporting structure
                             </DialogDescription>

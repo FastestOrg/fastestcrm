@@ -99,6 +99,49 @@ serve(async (req) => {
 
         if (walletError) throw new Error('Failed to update wallet balance')
 
+        // --- SEND NOTIFICATION EMAIL TO ADMIN ---
+        try {
+            const { data: companyAdmin } = await supabaseAdmin
+                .from('companies')
+                .select('name, admin_id')
+                .eq('id', companyId)
+                .single()
+
+            if (companyAdmin) {
+                const { data: adminProfile } = await supabaseAdmin
+                    .from('profiles')
+                    .select('email, full_name')
+                    .eq('id', companyAdmin.admin_id)
+                    .single()
+
+                if (adminProfile?.email) {
+                    const { sendSystemEmail, getEmailTemplate } = await import("../_shared/email.ts");
+                    
+                    const emailBody = `
+                        <p>Hello ${adminProfile.full_name || 'Admin'},</p>
+                        <p>A gift card has been successfully redeemed for <strong>${companyAdmin.name}</strong>.</p>
+                        <div class="info-box">
+                            <div class="info-item"><span class="info-label">Gift Card Code:</span> ${code}</div>
+                            <div class="info-item"><span class="info-label">Amount Added:</span> ₹${giftCard.amount}</div>
+                            <div class="info-item"><span class="info-label">New Balance:</span> ₹${newBalance}</div>
+                        </div>
+                        <p>Thank you for using FastestCRM!</p>
+                    `;
+
+                    const emailHtml = getEmailTemplate("Gift Card Redeemed", emailBody);
+                    
+                    await sendSystemEmail({
+                        to: adminProfile.email,
+                        subject: `Wallet Credit: ₹${giftCard.amount} Added via Gift Card`,
+                        html: emailHtml
+                    });
+                    console.log(`Gift card redemption notification sent to ${adminProfile.email}`);
+                }
+            }
+        } catch (emailErr) {
+            console.error("Failed to send gift card notification (non-blocking):", emailErr);
+        }
+
         return new Response(
             JSON.stringify({ success: true, amount: giftCard.amount, new_balance: newBalance }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

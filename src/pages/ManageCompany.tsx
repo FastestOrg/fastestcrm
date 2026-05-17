@@ -18,6 +18,7 @@ import {
   RefreshCw, Trash2, Link2, Wallet, Plus, Calendar, Gift, Tag, Shield
 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
+import { useSubscriptionStatus } from '@/hooks/useSubscriptionStatus';
 
 interface Company {
   id: string;
@@ -109,6 +110,99 @@ export default function ManageCompany() {
   const [seatsToBuy, setSeatsToBuy] = useState(1);
   const [extensionMonths, setExtensionMonths] = useState<string>('1');
   const [processingSub, setProcessingSub] = useState(false);
+
+  // ─── Subscription Grace Period ──────────────────────────────────────────────
+  const {
+    isInGracePeriod,
+    graceDaysRemaining,
+    graceTotalDays,
+    deletionDate,
+  } = useSubscriptionStatus();
+
+  const graceProgressPercent = Math.max(
+    0,
+    Math.min(100, ((graceTotalDays - graceDaysRemaining) / graceTotalDays) * 100)
+  );
+
+  const gracePeriodInfo = isInGracePeriod ? (
+    <Card className="border-2 border-red-500/60 bg-red-500/5 relative overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-to-r from-red-500/5 to-orange-500/5 pointer-events-none" />
+      <CardHeader className="relative z-10 pb-3">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-xl bg-red-500/20 shrink-0">
+            <AlertCircle className="h-6 w-6 text-red-500" />
+          </div>
+          <div>
+            <CardTitle className="text-red-500 text-lg">
+              {graceDaysRemaining <= 7 ? '🚨 CRITICAL' : '⚠️'} Subscription Expired
+            </CardTitle>
+            <CardDescription className="text-red-400/80 font-medium">
+              Your team members are locked out. Renew now to restore access.
+            </CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="relative z-10 space-y-4">
+        <div className="grid grid-cols-2 gap-4">
+          <div className="p-4 bg-red-500/10 rounded-lg border border-red-500/20 text-center">
+            <div className={`text-4xl font-bold font-mono tabular-nums ${graceDaysRemaining <= 7 ? 'text-red-500 animate-pulse' : graceDaysRemaining <= 30 ? 'text-orange-500' : 'text-amber-500'}`}>
+              {graceDaysRemaining}
+            </div>
+            <div className="text-xs text-muted-foreground mt-1 font-semibold uppercase tracking-wider">
+              Days Remaining
+            </div>
+          </div>
+          <div className="p-4 bg-red-500/10 rounded-lg border border-red-500/20 text-center">
+            <div className="text-sm font-bold text-foreground">
+              {deletionDate?.toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' }) || 'N/A'}
+            </div>
+            <div className="text-xs text-muted-foreground mt-1 font-semibold uppercase tracking-wider">
+              Data Deletion Date
+            </div>
+          </div>
+        </div>
+
+        {/* Progress bar */}
+        <div>
+          <div className="h-2 rounded-full bg-red-500/10 overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-1000 ${graceDaysRemaining <= 7 ? 'bg-red-500' : graceDaysRemaining <= 30 ? 'bg-orange-500' : 'bg-amber-500'}`}
+              style={{ width: `${graceProgressPercent}%` }}
+            />
+          </div>
+          <p className="text-[11px] text-muted-foreground mt-1.5">
+            Grace period: {Math.round(graceProgressPercent)}% elapsed
+          </p>
+        </div>
+
+        <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20">
+          <p className="text-sm text-foreground">
+            <strong>What will happen:</strong> After {graceDaysRemaining} days, ALL company data — 
+            leads, contacts, forms, invoices, quotations, and team accounts — will be 
+            <strong className="text-red-500"> permanently and irreversibly deleted</strong>.
+          </p>
+        </div>
+
+        <div className="flex gap-3 pt-1">
+          <Button
+            className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold"
+            onClick={() => setAddCreditOpen(true)}
+          >
+            <Wallet className="h-4 w-4 mr-2" />
+            Add Funds to Wallet
+          </Button>
+          <Button
+            variant="outline"
+            className="flex-1 border-red-500/50 text-red-500 hover:bg-red-500/10 font-bold"
+            onClick={() => setExtendSubOpen(true)}
+          >
+            <Calendar className="h-4 w-4 mr-2" />
+            Extend Subscription
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  ) : null;
 
   useEffect(() => {
     if (user) {
@@ -538,6 +632,9 @@ export default function ManageCompany() {
           <h1 className="text-2xl font-bold">Manage Company</h1>
           <p className="text-muted-foreground">Configure your company settings, wallet, and subscription.</p>
         </div>
+
+        {/* ═══ Subscription Expired Warning ═══ */}
+        {gracePeriodInfo}
 
         <div className="grid gap-6 md:grid-cols-2">
 

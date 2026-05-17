@@ -70,7 +70,9 @@ serve(async (req) => {
                 daysRemaining = 30;
                 updates = {
                     subscription_valid_until: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-                    subscription_status: 'active'
+                    subscription_status: 'active',
+                    grace_period_start: null,
+                    data_deletion_scheduled_at: null,
                 }
             }
 
@@ -112,7 +114,10 @@ serve(async (req) => {
 
             updates = {
                 subscription_valid_until: newValidUntil.toISOString(),
-                subscription_status: 'active'
+                subscription_status: 'active',
+                // Clear grace period on re-subscription (DB trigger also reactivates users)
+                grace_period_start: null,
+                data_deletion_scheduled_at: null,
             };
         } else {
             throw new Error('Invalid action');

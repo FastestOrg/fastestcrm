@@ -35,6 +35,7 @@ import { toast } from 'sonner';
 import { Plus } from 'lucide-react';
 import { useLeadStatuses, CompanyLeadStatus } from '@/hooks/useLeadStatuses';
 import { StatusReminderDialog } from './StatusReminderDialog';
+import { useLeadsTable } from '@/hooks/useLeadsTable';
 
 const formSchema = z.object({
     name: z.string().min(2, 'Name must be at least 2 characters'),
@@ -59,6 +60,7 @@ export function AddLeadDialog({ open: controlledOpen, onOpenChange, trigger }: A
     const { user } = useAuth();
     const { company } = useCompany();
     const createLead = useCreateLead();
+    const { tableName } = useLeadsTable();
     const { statuses } = useLeadStatuses();
     const [statusReminderOpen, setStatusReminderOpen] = useState(false);
     const [pendingStatus, setPendingStatus] = useState<CompanyLeadStatus | null>(null);
@@ -111,26 +113,43 @@ export function AddLeadDialog({ open: controlledOpen, onOpenChange, trigger }: A
         }
 
         try {
-            await createLead.mutateAsync({
+            const payload: any = {
                 name: values.name,
                 email: values.email || null,
                 phone: values.phone || null,
-                college: values.college || null,
                 status: values.status as any,
                 lead_source: values.lead_source || null,
                 created_by_id: user.id,
                 sales_owner_id: user.id,
                 company_id: company.id,
                 reminder_at: reminderAt ? reminderAt.toISOString() : null,
-                ...(reminderAt && sendWebPush ? { send_web_push: true } : {}),
-            });
+            };
+
+            // Only add industry-specific fields if they exist in the target table or the value is provided
+            // 'leads' and 'leads_weskill' support 'college'
+            if (tableName === 'leads' || tableName === 'leads_weskill') {
+                payload.college = values.college || null;
+            }
+
+            // Only add 'send_web_push' if the table supports it (mostly the generic 'leads' table)
+            if (reminderAt && sendWebPush && tableName === 'leads') {
+                payload.send_web_push = true;
+            }
+
+            await createLead.mutateAsync(payload);
             toast.success('Lead added successfully');
             setOpen(false);
             form.reset();
             setReminderAt(null);
         } catch (error: any) {
-            console.error('Error adding lead:', error);
-            toast.error(error.message || 'Failed to add lead. Please try again.');
+            console.error('Detailed Error adding lead:', {
+                message: error.message,
+                details: error.details,
+                hint: error.hint,
+                code: error.code,
+                raw: error
+            });
+            toast.error(error.message || 'Failed to add lead. Please check the console for details.');
         }
     };
 

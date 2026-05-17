@@ -13,7 +13,7 @@ import { ArrowLeft, Plus, Trash2, Loader2, Save, Package, DollarSign, CreditCard
 import { useInvoices, InvoiceItem, Invoice } from '@/hooks/useInvoices';
 import { SendDocumentDialog } from '@/components/financial/SendDocumentDialog';
 import { DocumentView } from '@/components/financial/DocumentView';
-import PublicDocument from './PublicDocument';
+
 import { useQuotations } from '@/hooks/useQuotations';
 import { useInvoiceTaxes } from '@/hooks/useInvoiceSettings';
 import { useProducts } from '@/hooks/useProducts';
@@ -24,7 +24,7 @@ import { useLeadsTable } from '@/hooks/useLeadsTable';
 import { useDebounce } from '@/hooks/useDebounce';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { Check, ChevronsUpDown, Search } from 'lucide-react';
+import { Check, ChevronsUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const CURRENCIES = ['INR', 'USD', 'EUR', 'GBP', 'AED', 'SAR', 'SGD', 'AUD', 'CAD', 'JPY'];
@@ -341,6 +341,7 @@ export default function InvoiceBuilder() {
         </div>
       </header>
 
+      {viewMode === 'edit' && (
       <div className="p-4 md:p-8 space-y-6">
         {/* Client Details */}
         <Card className="glass">
@@ -636,6 +637,7 @@ export default function InvoiceBuilder() {
             </CardContent>
           </Card>
         </div>
+      </div>
       )}
 
       {viewMode === 'preview' && (

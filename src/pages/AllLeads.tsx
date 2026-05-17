@@ -7,25 +7,35 @@ import TravelAllLeads from '@/industries/travel/TravelAllLeads';
 import GenericAllLeads from './GenericAllLeads';
 
 export default function AllLeads() {
-  const { company } = useCompany();
+  const { company, loading } = useCompany();
 
-  if ((company as any)?.industry === 'saas') {
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  const industry = (company as any)?.industry?.toLowerCase();
+
+  if (industry === 'saas') {
     return <SaaSAllLeads />;
   }
 
-  if ((company as any)?.industry === 'real_estate') {
+  if (industry === 'real_estate') {
     return <RealEstateAllLeads />;
   }
 
-  if ((company as any)?.industry === 'healthcare') {
+  if (industry === 'healthcare') {
     return <HealthcareAllLeads />;
   }
 
-  if ((company as any)?.industry === 'insurance') {
+  if (industry === 'insurance') {
     return <InsuranceAllLeads />;
   }
 
-  if ((company as any)?.industry === 'travel') {
+  if (industry === 'travel') {
     return <TravelAllLeads />;
   }
 

@@ -178,6 +178,9 @@ function TreeItem({ node, onManage, currentUserId, getRoleLabel }: { node: TreeN
                     <h4 className="font-semibold text-xs truncate max-w-[130px]" title={node.member.full_name}>
                         {node.member.full_name || 'Unnamed'}
                     </h4>
+                    <div className="text-[9px] text-muted-foreground truncate max-w-[130px] mb-1">
+                        ({node.member.email})
+                    </div>
                     <div className="flex items-center justify-center gap-1 flex-wrap">
                         <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-normal">
                             {getRoleLabel(node.member.role)}

@@ -14,6 +14,8 @@ import { useTaskLeads } from '@/hooks/useTaskLeads';
 import MobileBottomNav from './MobileBottomNav';
 import { NotificationsBell } from './NotificationsBell';
 import { AnnouncementBanner } from './AnnouncementBanner';
+import { SubscriptionExpiredBanner } from '@/components/SubscriptionExpiredBanner';
+import { SubscriptionExpiredGuard } from '@/components/SubscriptionExpiredGuard';
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import SEO from '@/components/SEO';
 
@@ -621,10 +623,11 @@ export default function AppLayout() {
 
             {/* Main Content */}
             <main className={`flex-1 overflow-auto ${isMobile ? 'pb-20' : ''}`}>
+                <SubscriptionExpiredBanner />
                 <AnnouncementBanner />
                 <div className="p-4 md:p-8 min-h-[calc(100vh-2rem)] flex flex-col">
                     <div className="flex-1 max-w-full">
-                        <Outlet />
+                        <SubscriptionExpiredGuard />
                     </div>
                     <footer className="mt-auto pt-6 border-t border-border flex flex-col md:flex-row items-center justify-between gap-4">
                         <p className="text-sm text-muted-foreground order-2 md:order-1">

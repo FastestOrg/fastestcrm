@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Vite hot-reload artifacts
+vite.config.ts.timestamp-*
