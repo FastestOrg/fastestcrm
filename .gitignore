@@ -25,3 +25,6 @@ dist-ssr
 
 # Vite hot-reload artifacts
 vite.config.ts.timestamp-*
+
+# output folder
+graphify-out
