@@ -7,7 +7,9 @@ queue_rules:
 pull_request_rules:
   - name: Automatic merge for Jules AI agent PRs with no conflicts
     conditions:
-      - author=jules-ai-bot[bot]    
+      -or:
+      - author=jules-ai-bot[bot] 
+      - author=prashantprakashdubey
       - conflict=false             
       - check-success=build        
     actions:
