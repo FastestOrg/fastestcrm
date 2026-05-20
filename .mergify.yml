@@ -1,0 +1,15 @@
+queue_rules:
+  - name: default
+    queue_conditions:
+      - check-success=build        
+      - conflict=false             
+
+pull_request_rules:
+  - name: Automatic merge for Jules AI agent PRs with no conflicts
+    conditions:
+      - author=jules-ai-bot[bot]    
+      - conflict=false             
+      - check-success=build        
+    actions:
+      merge:
+        method: squash              
