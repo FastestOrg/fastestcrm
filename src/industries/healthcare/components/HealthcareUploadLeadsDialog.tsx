@@ -130,19 +130,35 @@ export function HealthcareUploadLeadsDialog() {
           for (let i = 0; i < enrichedLeads.length; i += BATCH_SIZE) {
             if (abortRef.current) break;
             const batch = enrichedLeads.slice(i, i + BATCH_SIZE);
-            const results = await Promise.all(batch.map(async (lead: any) => {
-              try {
-                const { error } = await supabase.from('leads_healthcare' as any).insert(lead);
-                if (error) return error.code === '23505' ? 'duplicate' : 'error';
-                return 'success';
-              } catch { return 'error'; }
-            }));
-            cp = {
-              ...cp, processed: cp.processed + batch.length,
-              success: cp.success + results.filter(r => r === 'success').length,
-              duplicates: cp.duplicates + results.filter(r => r === 'duplicate').length,
-              errors: cp.errors + results.filter(r => r === 'error').length,
-            };
+
+            // Try bulk insert first for performance
+            const { error: bulkError } = await supabase.from('leads_healthcare' as any).insert(batch).select('id');
+
+            if (!bulkError) {
+              // Bulk insert successful
+              cp = {
+                ...cp,
+                processed: cp.processed + batch.length,
+                success: cp.success + batch.length,
+              };
+            } else {
+              // Fallback to individual inserts if bulk fails (e.g., due to a duplicate)
+              const results = await Promise.all(batch.map(async (lead: any) => {
+                try {
+                  const { error } = await supabase.from('leads_healthcare' as any).insert(lead);
+                  if (error) return error.code === '23505' ? 'duplicate' : 'error';
+                  return 'success';
+                } catch { return 'error'; }
+              }));
+
+              cp = {
+                ...cp,
+                processed: cp.processed + batch.length,
+                success: cp.success + results.filter(r => r === 'success').length,
+                duplicates: cp.duplicates + results.filter(r => r === 'duplicate').length,
+                errors: cp.errors + results.filter(r => r === 'error').length,
+              };
+            }
             setProgress({ ...cp });
           }
           queryClient.invalidateQueries({ queryKey: ['healthcare-leads'] });
