@@ -174,8 +174,26 @@ export const automationService = {
 
         try {
             if (auto.action_type === 'send_email') {
+                const subjectTemplate = auto.action_config?.subject || 'Update on your lead';
+                const bodyTemplate = auto.action_config?.body || 'We have an update regarding your inquiry.';
 
-                // Automated email sending is handled by the notify_lead_owner database-level trigger or equivalent service.
+                const subject = subjectTemplate
+                    .replace(/\{\{name\}\}/g, data.name || '')
+                    .replace(/\{\{email\}\}/g, data.email || '');
+
+                const body = bodyTemplate
+                    .replace(/\{\{name\}\}/g, data.name || '')
+                    .replace(/\{\{email\}\}/g, data.email || '');
+
+                const { error: emailError } = await supabase.functions.invoke('send-email', {
+                    body: {
+                        to: data.email,
+                        subject: subject,
+                        html: body
+                    }
+                });
+
+                if (emailError) throw new Error(`Email sending failed: ${emailError.message}`);
             } else if (auto.action_type === 'ai_personalized_followup') {
                 const instructions = auto.action_config?.instructions || 'Follow up with the lead about their interest.';
                 
