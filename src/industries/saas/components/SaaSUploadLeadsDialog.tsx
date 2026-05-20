@@ -34,6 +34,62 @@ export function SaaSUploadLeadsDialog() {
   const queryClient = useQueryClient();
   const abortRef = useRef(false);
 
+  const insertLeadWithRetry = async (lead: any): Promise<'success' | 'duplicate' | 'error'> => {
+    try {
+      const { error } = await supabase.from('leads_saas' as any).insert(lead);
+      if (error) {
+        if (error.code === '23505' || error.message?.toLowerCase().includes('duplicate') || error.message?.toLowerCase().includes('unique')) {
+          return 'duplicate';
+        }
+        return 'error';
+      }
+      return 'success';
+    } catch {
+      return 'error';
+    }
+  };
+
+  const processBatch = async (leads: any[], currentProgress: UploadProgress): Promise<UploadProgress> => {
+    try {
+      const { error } = await supabase.from('leads_saas' as any).insert(leads);
+      if (error) {
+        // Fallback to individual if unique constraint or similar error
+        if (error.code === '23505' || error.message?.toLowerCase().includes('duplicate') || error.message?.toLowerCase().includes('unique')) {
+          const results = await Promise.all(leads.map(lead => insertLeadWithRetry(lead)));
+          return {
+            ...currentProgress,
+            processed: currentProgress.processed + leads.length,
+            success: currentProgress.success + results.filter(r => r === 'success').length,
+            duplicates: currentProgress.duplicates + results.filter(r => r === 'duplicate').length,
+            errors: currentProgress.errors + results.filter(r => r === 'error').length,
+          };
+        }
+        // If it's a completely different error, mark all as errors
+        return {
+          ...currentProgress,
+          processed: currentProgress.processed + leads.length,
+          errors: currentProgress.errors + leads.length,
+        };
+      }
+      // If bulk insert is fully successful
+      return {
+        ...currentProgress,
+        processed: currentProgress.processed + leads.length,
+        success: currentProgress.success + leads.length,
+      };
+    } catch (err) {
+      // Complete fallback
+      const results = await Promise.all(leads.map(lead => insertLeadWithRetry(lead)));
+      return {
+        ...currentProgress,
+        processed: currentProgress.processed + leads.length,
+        success: currentProgress.success + results.filter(r => r === 'success').length,
+        duplicates: currentProgress.duplicates + results.filter(r => r === 'duplicate').length,
+        errors: currentProgress.errors + results.filter(r => r === 'error').length,
+      };
+    }
+  };
+
   const handleDownloadFormat = () => {
     const csvContent =
       'Name,Email,Phone,WhatsApp,Company Name,Company Size,Company Website,Job Title,Product Interest,Plan Type,Seats,MRR,Deal Stage,Current Solution,Status,Lead Source,Lead Owner\n' +
@@ -150,24 +206,7 @@ export function SaaSUploadLeadsDialog() {
           for (let i = 0; i < enrichedLeads.length; i += BATCH_SIZE) {
             if (abortRef.current) break;
             const batch = enrichedLeads.slice(i, i + BATCH_SIZE);
-            const results = await Promise.all(batch.map(async (lead: any) => {
-              try {
-                const { error } = await supabase.from('leads_saas' as any).insert(lead);
-                if (error) {
-                  if (error.code === '23505') return 'duplicate';
-                  return 'error';
-                }
-                return 'success';
-              } catch { return 'error'; }
-            }));
-
-            currentProgress = {
-              ...currentProgress,
-              processed: currentProgress.processed + batch.length,
-              success: currentProgress.success + results.filter(r => r === 'success').length,
-              duplicates: currentProgress.duplicates + results.filter(r => r === 'duplicate').length,
-              errors: currentProgress.errors + results.filter(r => r === 'error').length,
-            };
+            currentProgress = await processBatch(batch, currentProgress);
             setProgress({ ...currentProgress });
           }
 
