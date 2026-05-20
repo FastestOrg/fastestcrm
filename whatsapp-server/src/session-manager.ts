@@ -43,7 +43,9 @@ interface SessionInfo {
 class SessionManager extends EventEmitter {
     private sessions: Map<string, SessionInfo> = new Map();
     private aiDebounceTimers: Map<string, NodeJS.Timeout> = new Map();
+    private companyApiKeysCache: Map<string, { apiKey: string | null; expiresAt: number }> = new Map();
     private readonly MAX_RETRIES = 3;
+    private readonly CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
     /**
      * Get all active sessions.
@@ -250,21 +252,37 @@ class SessionManager extends EventEmitter {
                             return; // Stop AI processing
                         }
 
-                        // 5. Find Company API Key
-                        const { data: profiles } = await supabase.from('profiles').select('id').eq('company_id', account.company_id);
-                        const userIds = profiles?.map(p => p.id) || [];
-                        if (userIds.length === 0) return;
+                        // 5. Find Company API Key (with caching)
+                        let apiKey: string | null = null;
+                        const now = Date.now();
+                        const cached = this.companyApiKeysCache.get(account.company_id);
 
-                        const { data: integration } = await supabase
-                            .from('integration_api_keys')
-                            .select('api_key')
-                            .in('user_id', userIds)
-                            .eq('service_name', 'gemini')
-                            .eq('is_active', true)
-                            .limit(1)
-                            .maybeSingle();
+                        if (cached && cached.expiresAt > now) {
+                            apiKey = cached.apiKey;
+                        } else {
+                            const { data: profiles } = await supabase.from('profiles').select('id').eq('company_id', account.company_id);
+                            const userIds = profiles?.map(p => p.id) || [];
 
-                        if (!integration?.api_key) {
+                            if (userIds.length > 0) {
+                                const { data: integration } = await supabase
+                                    .from('integration_api_keys')
+                                    .select('api_key')
+                                    .in('user_id', userIds)
+                                    .eq('service_name', 'gemini')
+                                    .eq('is_active', true)
+                                    .limit(1)
+                                    .maybeSingle();
+
+                                apiKey = integration?.api_key || null;
+                            }
+
+                            this.companyApiKeysCache.set(account.company_id, {
+                                apiKey,
+                                expiresAt: now + this.CACHE_TTL_MS
+                            });
+                        }
+
+                        if (!apiKey) {
                             console.log(`[AI Responder] Skipping: No Gemini key for company ${account.company_id}`);
                             return;
                         }
@@ -287,7 +305,7 @@ class SessionManager extends EventEmitter {
                         }
 
                         // 7. Generate AI Response
-                        const ai = new GoogleGenAI({ apiKey: integration.api_key });
+                        const ai = new GoogleGenAI({ apiKey });
                         const fullPrompt = `You are the official AI representative for this business on WhatsApp.
 Goal: ${account.ai_goal}
 Instructions: ${account.ai_prompt}
