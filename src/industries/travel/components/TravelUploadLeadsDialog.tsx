@@ -118,14 +118,33 @@ export function TravelUploadLeadsDialog() {
           for (let i = 0; i < enrichedLeads.length; i += BATCH_SIZE) {
             if (abortRef.current) break;
             const batch = enrichedLeads.slice(i, i + BATCH_SIZE);
-            const results = await Promise.all(batch.map(async (lead: any) => {
-              try {
-                const { error } = await supabase.from('leads_travel' as any).insert(lead);
-                if (error) return error.code === '23505' ? 'duplicate' : 'error';
-                return 'success';
-              } catch { return 'error'; }
-            }));
-            cp = { ...cp, processed: cp.processed + batch.length, success: cp.success + results.filter(r => r === 'success').length, duplicates: cp.duplicates + results.filter(r => r === 'duplicate').length, errors: cp.errors + results.filter(r => r === 'error').length };
+
+            try {
+              // Try bulk insert first
+              const { error } = await supabase.from('leads_travel' as any).insert(batch);
+
+              if (error && error.code === '23505') {
+                // Fallback to individual inserts if unique constraint (duplicate) error occurs
+                const results = await Promise.all(batch.map(async (lead: any) => {
+                  try {
+                    const { error: indError } = await supabase.from('leads_travel' as any).insert(lead);
+                    if (indError) return indError.code === '23505' ? 'duplicate' : 'error';
+                    return 'success';
+                  } catch { return 'error'; }
+                }));
+                cp = { ...cp, processed: cp.processed + batch.length, success: cp.success + results.filter(r => r === 'success').length, duplicates: cp.duplicates + results.filter(r => r === 'duplicate').length, errors: cp.errors + results.filter(r => r === 'error').length };
+              } else if (error) {
+                // Other bulk error
+                cp = { ...cp, processed: cp.processed + batch.length, errors: cp.errors + batch.length };
+              } else {
+                // Bulk success
+                cp = { ...cp, processed: cp.processed + batch.length, success: cp.success + batch.length };
+              }
+            } catch {
+              // Network or other catastrophic error
+              cp = { ...cp, processed: cp.processed + batch.length, errors: cp.errors + batch.length };
+            }
+
             setProgress({ ...cp });
           }
           queryClient.invalidateQueries({ queryKey: ['travel-leads'] });
