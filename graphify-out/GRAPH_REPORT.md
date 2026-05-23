@@ -1,16 +1,16 @@
 # Graph Report - FastestCRM  (2026-05-23)
 
 ## Corpus Check
-- 515 files · ~463,783 words
+- 515 files · ~464,013 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 2203 nodes · 6808 edges · 147 communities (133 shown, 14 thin omitted)
+- 2203 nodes · 6812 edges · 156 communities (139 shown, 17 thin omitted)
 - Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS · INFERRED: 18 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `e5028751`
+- Built from commit: `31af82bf`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -141,12 +141,21 @@
 - [[_COMMUNITY_Community 123|Community 123]]
 - [[_COMMUNITY_Community 124|Community 124]]
 - [[_COMMUNITY_Community 125|Community 125]]
+- [[_COMMUNITY_Community 126|Community 126]]
+- [[_COMMUNITY_Community 127|Community 127]]
 - [[_COMMUNITY_Community 128|Community 128]]
 - [[_COMMUNITY_Community 129|Community 129]]
 - [[_COMMUNITY_Community 130|Community 130]]
 - [[_COMMUNITY_Community 131|Community 131]]
 - [[_COMMUNITY_Community 132|Community 132]]
+- [[_COMMUNITY_Community 133|Community 133]]
+- [[_COMMUNITY_Community 134|Community 134]]
 - [[_COMMUNITY_Community 137|Community 137]]
+- [[_COMMUNITY_Community 138|Community 138]]
+- [[_COMMUNITY_Community 139|Community 139]]
+- [[_COMMUNITY_Community 140|Community 140]]
+- [[_COMMUNITY_Community 141|Community 141]]
+- [[_COMMUNITY_Community 146|Community 146]]
 
 ## God Nodes (most connected - your core abstractions)
 1. `useCompany()` - 190 edges
@@ -172,7 +181,7 @@
 - `BreadcrumbEllipsis()` --calls--> `cn()`  [EXTRACTED]
   src/components/ui/breadcrumb.tsx → src/lib/utils.ts
 
-## Communities (147 total, 14 thin omitted)
+## Communities (156 total, 17 thin omitted)
 
 ### Community 0 - "Community 0"
 Cohesion: 0.05
@@ -183,396 +192,396 @@ Cohesion: 0.02
 Nodes (77): AuthProvider(), AgenticWorkflows, AIClosingAssistant, AIGrowthHacker, AIInsights, AIMissionControl, AIOpsDashboard, AllLeads (+69 more)
 
 ### Community 2 - "Community 2"
-Cohesion: 0.08
-Nodes (42): CreateAutomationDialogProps, HealthcareAssignLeadsDialogProps, Profile, Props, OwnerType, Profile, RealEstateAssignLeadsDialogProps, Profile (+34 more)
+Cohesion: 0.13
+Nodes (40): HealthcareLeadsTableProps, InsuranceLeadsTableProps, ColumnConfigItem, ProfileLevel, RealEstateLeadsTableProps, SaaSLeadsTableProps, SiteVisitCameraDialog(), TravelLeadsTableProps (+32 more)
 
 ### Community 3 - "Community 3"
 Cohesion: 0.05
-Nodes (49): CreateAutomationDialog(), INDUSTRY_ID, getIndustryById(), getIndustryName(), INDUSTRIES, Industry, IndustryType, INDUSTRY_ID (+41 more)
-
-### Community 4 - "Community 4"
-Cohesion: 0.09
-Nodes (47): formSchema, HealthcareEditLeadDialogProps, formSchema, InsuranceAddLeadDialogProps, formSchema, Props, formSchema, RealEstateEditLeadDialogProps (+39 more)
-
-### Community 5 - "Community 5"
-Cohesion: 0.08
-Nodes (44): HealthcareLeadDetailsDialog(), HealthcareLeadDetailsDialogProps, HealthcareLead, HealthcareLeadsTableProps, Props, InsuranceLead, InsuranceLeadsTableProps, RealEstateLeadDetailsDialog() (+36 more)
-
-### Community 6 - "Community 6"
-Cohesion: 0.05
 Nodes (49): adminClient, authHeader, corsHeaders, getValidAccessToken(), now, readResponse(), refreshGoogleAccessToken(), sendCommand() (+41 more)
 
-### Community 7 - "Community 7"
+### Community 4 - "Community 4"
 Cohesion: 0.13
-Nodes (32): ActionCenter(), ActionCenterProps, useActionCenter(), DEFAULT_INSURANCE_CONFIG, ProfileLevel, ProfilingConfig, LeadTimeline(), LeadTimelineProps (+24 more)
+Nodes (32): ActionCenter(), ActionCenterProps, useActionCenter(), DEFAULT_INSURANCE_CONFIG, InsuranceLeadProfiling(), ProfileLevel, ProfilingConfig, Battlecard (+24 more)
+
+### Community 5 - "Community 5"
+Cohesion: 0.06
+Nodes (37): CreateAutomationDialog(), INDUSTRY_ID, getIndustryById(), getIndustryName(), INDUSTRIES, Industry, IndustryType, INDUSTRY_ID (+29 more)
+
+### Community 6 - "Community 6"
+Cohesion: 0.09
+Nodes (39): HealthcareAssignLeadsDialog(), HealthcareLeadDetailsDialog(), HealthcareLeadsTable(), HealthcareUploadLeadsDialog(), InsuranceAssignLeadsDialog(), InsuranceLeadDetailsDialog(), InsuranceUploadLeadsDialog(), SaaSAssignLeadsDialog() (+31 more)
+
+### Community 7 - "Community 7"
+Cohesion: 0.09
+Nodes (37): formSchema, HealthcareEditLeadDialogProps, formSchema, RealEstateAddLeadDialogProps, formSchema, RealEstateEditLeadDialogProps, formSchema, TravelAddLeadDialogProps (+29 more)
 
 ### Community 8 - "Community 8"
-Cohesion: 0.1
-Nodes (43): HealthcareAssignLeadsDialog(), HealthcareUploadLeadsDialog(), InsuranceAssignLeadsDialog(), InsuranceUploadLeadsDialog(), RealEstateAssignLeadsDialog(), RealEstateUploadLeadsDialog(), SaaSAssignLeadsDialog(), SaaSUploadLeadsDialog() (+35 more)
+Cohesion: 0.11
+Nodes (31): CreateAutomationDialogProps, HealthcareAssignLeadsDialogProps, Profile, Props, OwnerType, Profile, RealEstateAssignLeadsDialogProps, Profile (+23 more)
 
 ### Community 9 - "Community 9"
-Cohesion: 0.16
-Nodes (29): InsuranceLeadDetailsDialog(), HealthcareAllLeads(), useIsMobile(), useDebounce(), useHealthcareLeads(), UseHealthcareLeadsOptions, AppRole, HierarchyUser (+21 more)
-
-### Community 10 - "Community 10"
 Cohesion: 0.04
 Nodes (43): authHeader, authMap, cards, companyNameMap, corsHeaders, created, d, daysLeft (+35 more)
 
-### Community 11 - "Community 11"
+### Community 10 - "Community 10"
 Cohesion: 0.08
 Nodes (26): activeCampaigns, CampaignJob, executeCampaign(), getCampaignProgress(), pauseCampaign(), pickAccount(), randomDelay(), resumeCampaign() (+18 more)
 
-### Community 12 - "Community 12"
-Cohesion: 0.13
-Nodes (28): useDeleteForm(), useFormResponseCounts(), QueryResponse, TableSchema, Forms(), statusConfig, Company, DiscountCode (+20 more)
-
-### Community 13 - "Community 13"
-Cohesion: 0.07
-Nodes (31): useToast(), PropertyFormData, RealEstateProperty, useRealEstateProperties(), AddIntegrationDialog(), GoogleAdsSetupDialog(), LinkedInAdsSetupDialog(), MetaAdsSetupDialog() (+23 more)
-
-### Community 14 - "Community 14"
-Cohesion: 0.08
-Nodes (28): NavLink, NavLinkCompatProps, PriorityLevel, KanbanLeadCard(), PriorityBadge(), PriorityBadgeProps, cn(), Avatar (+20 more)
-
-### Community 15 - "Community 15"
-Cohesion: 0.2
-Nodes (20): UploadProgress, UnlockFeatureModalProps, SendDocumentDialogProps, AddIntegrationDialogProps, EmailIntegrationDialogProps, GoogleAdsSetupDialogProps, LinkedInAdsSetupDialogProps, WhatsAppAccountAddDialogProps (+12 more)
-
-### Community 16 - "Community 16"
-Cohesion: 0.06
-Nodes (33): SheetContent, SheetContentProps, SheetDescription, SheetFooter(), SheetHeader(), SheetOverlay, SheetTitle, sheetVariants (+25 more)
-
-### Community 17 - "Community 17"
+### Community 11 - "Community 11"
 Cohesion: 0.06
 Nodes (35): Basic Content Creation, code:block1 (Write an SEO-optimized article about [topic] targeting the k), code:markdown (### Link Recommendations), code:block11 (Write a how-to guide for [task] targeting [keyword]), code:block12 (Write a comparison article: [Option A] vs [Option B] for [ke), code:block13 (Write a list post: "X Best [Items] for [Audience/Purpose]" t), code:block14 (Write an ultimate guide about [topic] (3,000+ words) targeti), code:block2 (Create a blog post for [topic] with these keywords: [keyword) (+27 more)
 
-### Community 18 - "Community 18"
-Cohesion: 0.16
+### Community 12 - "Community 12"
+Cohesion: 0.15
+Nodes (22): RealEstateAssignLeadsDialog(), RealEstateLeadsTable(), Company, fetchCompanyData(), useUpdateLead(), UseRealEstateLeadsOptions, ColumnConfig, ColumnConfigDialog() (+14 more)
+
+### Community 13 - "Community 13"
+Cohesion: 0.09
+Nodes (26): SubscriptionExpiredBanner(), ALLOWED_EXPIRED_PATHS, SubscriptionExpiredGuard(), useAnnouncements(), useNotifications(), useReminderPolling(), useSubscriptionStatus(), AppRole (+18 more)
+
+### Community 14 - "Community 14"
+Cohesion: 0.07
+Nodes (25): HealthcareLeadDetailsDialogProps, HealthcareLead, Props, InsuranceLead, RealEstateLeadDetailsDialog(), RealEstateLeadDetailsDialogProps, RealEstateLead, SaaSLeadDetailsDialogProps (+17 more)
+
+### Community 15 - "Community 15"
+Cohesion: 0.17
 Nodes (22): DocumentView(), SendDocumentDialog(), Product, ProductInput, useProducts(), useQuotations(), ManageInsurancePlans(), CURRENCIES (+14 more)
 
-### Community 19 - "Community 19"
-Cohesion: 0.09
-Nodes (25): SubscriptionExpiredBanner(), ALLOWED_EXPIRED_PATHS, SubscriptionExpiredGuard(), useAnnouncements(), GracePeriodData, SubscriptionStatus, useSubscriptionStatus(), AppRole (+17 more)
+### Community 16 - "Community 16"
+Cohesion: 0.21
+Nodes (17): UploadProgress, UploadProgress, UploadProgress, AddIntegrationDialogProps, EmailAccountAddDialogProps, EmailIntegrationDialogProps, WhatsAppAccountAddDialogProps, UploadProgress (+9 more)
 
-### Community 20 - "Community 20"
-Cohesion: 0.14
-Nodes (27): RealEstateLeadsTable(), STATUS_PROBABILITIES, useForecast(), LeadStatus, useCreateLead(), useCreateLeads(), useDeleteLead(), useLeads() (+19 more)
+### Community 17 - "Community 17"
+Cohesion: 0.12
+Nodes (15): UnlockFeatureModal(), UnlockFeatureModalProps, SendDocumentDialogProps, useWalletBalance(), GoogleAdsSetupDialogProps, LinkedInAdsSetupDialogProps, Integration, PerformanceMarketingDialog() (+7 more)
 
-### Community 21 - "Community 21"
+### Community 18 - "Community 18"
 Cohesion: 0.1
-Nodes (27): HealthcareAddLeadDialog(), HealthcareEditLeadDialog(), HealthcareLeadsTable(), InsuranceAddLeadDialog(), InsuranceEditLeadDialog(), InsuranceLeadsTable(), RealEstateAddLeadDialog(), RealEstateEditLeadDialog() (+19 more)
+Nodes (26): HealthcareAddLeadDialog(), HealthcareEditLeadDialog(), InsuranceAddLeadDialog(), InsuranceEditLeadDialog(), InsuranceLeadsTable(), RealEstateAddLeadDialog(), RealEstateEditLeadDialog(), SaaSAddLeadDialog() (+18 more)
 
-### Community 22 - "Community 22"
+### Community 19 - "Community 19"
 Cohesion: 0.1
 Nodes (23): nodeTypes, WorkflowCanvas(), WorkflowCanvasProps, AIMetadata, callGemini(), cleanAIResponse(), getGeminiKey(), ActionType (+15 more)
 
+### Community 20 - "Community 20"
+Cohesion: 0.09
+Nodes (21): adminClient, cleanedJson, result, userIds, adminClient, url, supabaseAdmin, url (+13 more)
+
+### Community 21 - "Community 21"
+Cohesion: 0.11
+Nodes (16): DialogMode, LocationData, SiteVisitCameraDialogProps, Announcement, AuthContext, AuthContextType, GracePeriodData, SubscriptionStatus (+8 more)
+
+### Community 22 - "Community 22"
+Cohesion: 0.07
+Nodes (25): Sidebar, SidebarContent, SidebarContext, SidebarFooter, SidebarGroup, SidebarGroupAction, SidebarGroupContent, SidebarGroupLabel (+17 more)
+
 ### Community 23 - "Community 23"
-Cohesion: 0.1
-Nodes (16): DialogMode, LocationData, SiteVisitCameraDialogProps, UnlockFeatureModal(), Announcement, AuthContext, AuthContextType, useWalletBalance() (+8 more)
+Cohesion: 0.12
+Nodes (24): useToast(), InvoiceSettings, InvoiceTax, InvoiceTemplate, useInvoiceSettings(), useInvoiceTaxes(), useInvoiceTemplates(), PropertyFormData (+16 more)
 
 ### Community 24 - "Community 24"
-Cohesion: 0.09
-Nodes (21): aiAction, newHistory, supabase, userIds, adminClient, url, supabaseAdmin, url (+13 more)
+Cohesion: 0.17
+Nodes (21): RealEstateUploadLeadsDialog(), useAuth(), useBookingPage(), useCalendarConnection(), useCalendarEvents(), useConnectGoogleCalendar(), useCreateBookingPage(), useExchangeCalendarCode() (+13 more)
 
 ### Community 25 - "Community 25"
-Cohesion: 0.11
-Nodes (23): Action, ActionType, actionTypes, addToRemoveQueue(), dispatch(), genId(), listeners, memoryState (+15 more)
-
-### Community 26 - "Community 26"
 Cohesion: 0.17
 Nodes (14): AnalyticsCard(), AnalyticsTab(), CampaignBuilder(), CampaignDetailView(), CampaignAnalyticsBadge(), CampaignsTab(), CampaignRecipient, CampaignSequenceStep (+6 more)
 
+### Community 26 - "Community 26"
+Cohesion: 0.1
+Nodes (20): Form, FormInsert, FormUpdate, LeadResponse, useCreateForm(), useFormResponses(), useUpdateForm(), AppRole (+12 more)
+
 ### Community 27 - "Community 27"
+Cohesion: 0.11
+Nodes (18): AccountsTab(), InboxTab(), EmailAccount, PROVIDER_DEFAULTS, useEmailAccounts(), EmailMessage, EmailThread, useEmailInbox() (+10 more)
+
+### Community 28 - "Community 28"
 Cohesion: 0.09
 Nodes (21): Advanced Team Collaboration Tools, AI-Powered Marketing, Automated Property Matching, Case Study / Real World Results, Conclusion, Custom Integrations & API Access, Customer Retention & Follow-ups, FastestCRM Key Features for an AI-Based Real Estate CRM (+13 more)
 
-### Community 28 - "Community 28"
-Cohesion: 0.12
-Nodes (15): formSchema, HealthcareAddLeadDialogProps, HEALTHCARE_DEPARTMENTS, HEALTHCARE_GENDERS, HEALTHCARE_LEAD_COLUMNS, HEALTHCARE_STATUSES, HealthcareLeadFields, INSURANCE_LEAD_COLUMNS (+7 more)
-
 ### Community 29 - "Community 29"
-Cohesion: 0.18
-Nodes (12): AccountsTab(), InboxTab(), AIEmployee, useAIEmployees(), EmailAccount, PROVIDER_DEFAULTS, useEmailAccounts(), EmailMessage (+4 more)
+Cohesion: 0.16
+Nodes (12): AIEmployee, useAIEmployees(), useWhatsAppAccounts(), WhatsAppAccount, CampaignRecipient, useWhatsAppCampaigns(), WhatsAppCampaign, WhatsAppAccountAddDialog() (+4 more)
 
 ### Community 30 - "Community 30"
-Cohesion: 0.13
-Nodes (16): Form, FormInsert, FormUpdate, LeadResponse, useCreateForm(), useFormResponses(), useUpdateForm(), FormBuilder() (+8 more)
+Cohesion: 0.16
+Nodes (15): ActionItem, Lead, LeadStatus, useCreateLead(), useCreateLeads(), useDeleteLead(), UseLeadsOptions, useLeadsTable() (+7 more)
 
 ### Community 31 - "Community 31"
-Cohesion: 0.17
-Nodes (12): SubdomainAccessGuard(), SubdomainAccessGuardProps, SubdomainGate(), SubdomainGateProps, CompanyBrandingContext, CompanyBrandingContextType, CompanyBrandingProvider(), useCompanyBranding() (+4 more)
+Cohesion: 0.13
+Nodes (17): Action, ActionType, actionTypes, addToRemoveQueue(), dispatch(), genId(), listeners, memoryState (+9 more)
 
 ### Community 32 - "Community 32"
+Cohesion: 0.13
+Nodes (14): formSchema, HealthcareAddLeadDialogProps, HEALTHCARE_DEPARTMENTS, HEALTHCARE_GENDERS, HEALTHCARE_LEAD_COLUMNS, HEALTHCARE_STATUSES, HealthcareLeadFields, INSURANCE_LEAD_COLUMNS (+6 more)
+
+### Community 33 - "Community 33"
+Cohesion: 0.14
+Nodes (12): SubdomainAccessGuard(), SubdomainAccessGuardProps, SubdomainContext, SubdomainContextType, SubdomainProvider(), DomainClassification, getWorkspaceUrl(), PLATFORM_SUBDOMAINS (+4 more)
+
+### Community 34 - "Community 34"
 Cohesion: 0.17
 Nodes (13): AnalyticsData, AnalyticsTab(), buildHeatmapGrid(), ChurnRiskCompany, exportExcel(), formatINR(), KPIs, LeadHeatmapPoint (+5 more)
 
-### Community 33 - "Community 33"
-Cohesion: 0.17
-Nodes (10): useWhatsAppAccounts(), WhatsAppAccount, CampaignRecipient, useWhatsAppCampaigns(), WhatsAppCampaign, WhatsAppAccountAddDialog(), AgenticWorkflows(), AccountsTab() (+2 more)
-
-### Community 34 - "Community 34"
-Cohesion: 0.12
-Nodes (16): AI-Powered Marketing, Case Study / Real World Results, Conclusion, Customer Retention & Follow-ups, FastestCRM Key Features for Education, FastestCRM vs Traditional CRM, Frequently Asked Questions, Getting Started with FastestCRM (+8 more)
-
 ### Community 35 - "Community 35"
-Cohesion: 0.12
-Nodes (16): AI-Powered Marketing, Case Study / Real World Results, Conclusion, Customer Retention & Follow-ups, FastestCRM Key Features for Healthcare, FastestCRM vs Traditional CRM, Frequently Asked Questions, Getting Started with FastestCRM (+8 more)
+Cohesion: 0.24
+Nodes (10): useDeleteForm(), useFormResponseCounts(), useForms(), GrowthSettings, useGrowthSettings(), LGLink, useLGLinks(), AIGrowthHacker() (+2 more)
 
 ### Community 36 - "Community 36"
-Cohesion: 0.12
-Nodes (16): Accelerate Your Policy Sales with an AI-Based Insurance CRM, AI-Powered Marketing, Case Study / Real World Results, Conclusion, Customer Retention & Follow-ups, FastestCRM Key Features for Insurance Agencies, FastestCRM vs Traditional CRM, Frequently Asked Questions (+8 more)
+Cohesion: 0.15
+Nodes (10): Lead, LeadDetailsDialogProps, EmailMessage, ViewMode, Channel, GeneratedMessage, Tone, Step (+2 more)
 
 ### Community 37 - "Community 37"
-Cohesion: 0.12
-Nodes (16): AI-Powered Marketing, Case Study / Real World Results, Conclusion, Customer Retention & Follow-ups, Drive Showroom Sales with an AI-Based Automotive CRM, FastestCRM Key Features for Dealerships, FastestCRM vs Traditional Automotive CRM, Frequently Asked Questions (+8 more)
+Cohesion: 0.2
+Nodes (14): LeadMobileCard(), KanbanLeadCard(), cn(), AIMissionControl(), CommandShortcut(), DropdownMenuShortcut(), PremiumCard(), PremiumCardContent() (+6 more)
 
 ### Community 38 - "Community 38"
 Cohesion: 0.12
-Nodes (16): AI-Powered Marketing, Case Study / Real World Results, Conclusion, Customer Retention & Follow-ups, FastestCRM Key Features for Finance, FastestCRM vs Traditional CRM, Frequently Asked Questions, Getting Started with FastestCRM (+8 more)
+Nodes (16): AI-Powered Marketing, Case Study / Real World Results, Conclusion, Customer Retention & Follow-ups, FastestCRM Key Features for Education, FastestCRM vs Traditional CRM, Frequently Asked Questions, Getting Started with FastestCRM (+8 more)
 
 ### Community 39 - "Community 39"
 Cohesion: 0.12
-Nodes (16): AI-Powered Personalization & Recommendations, Automated Lifecycle Marketing, Case Study / Real World Results, Conclusion, Customer Loyalty & VIP Programs, FastestCRM Key Features for Retail & E-commerce, FastestCRM vs Traditional Email Platforms, Frequently Asked Questions (+8 more)
+Nodes (16): AI-Powered Marketing, Case Study / Real World Results, Conclusion, Customer Retention & Follow-ups, FastestCRM Key Features for Healthcare, FastestCRM vs Traditional CRM, Frequently Asked Questions, Getting Started with FastestCRM (+8 more)
 
 ### Community 40 - "Community 40"
 Cohesion: 0.12
-Nodes (16): AI-Powered Marketing, Case Study / Real World Results, Conclusion, Customer Retention & Follow-ups, FastestCRM Key Features for Travel Agencies, FastestCRM vs Traditional CRM, Frequently Asked Questions, Getting Started with FastestCRM (+8 more)
+Nodes (16): Accelerate Your Policy Sales with an AI-Based Insurance CRM, AI-Powered Marketing, Case Study / Real World Results, Conclusion, Customer Retention & Follow-ups, FastestCRM Key Features for Insurance Agencies, FastestCRM vs Traditional CRM, Frequently Asked Questions (+8 more)
 
 ### Community 41 - "Community 41"
 Cohesion: 0.12
-Nodes (16): Accelerate Subscriptions with an AI-Based SaaS CRM, AI-Powered Marketing & Product-Led Growth (PLG), Case Study / Real World Results, Conclusion, Customer Success & Churn Prevention, FastestCRM Key Features for SaaS Companies, FastestCRM vs Traditional CRM, Frequently Asked Questions (+8 more)
+Nodes (16): AI-Powered Marketing, Case Study / Real World Results, Conclusion, Customer Retention & Follow-ups, Drive Showroom Sales with an AI-Based Automotive CRM, FastestCRM Key Features for Dealerships, FastestCRM vs Traditional Automotive CRM, Frequently Asked Questions (+8 more)
 
 ### Community 42 - "Community 42"
 Cohesion: 0.12
-Nodes (16): AI-Powered Personalization & Content Generation, Automated Lifecycle Marketing, Case Study / Real World Results, Conclusion, Dominate Your Market with an AI-Based Real Estate Marketing CRM, FastestCRM Key Features for Real Estate Marketing, FastestCRM vs Traditional Email Platforms, Frequently Asked Questions (+8 more)
+Nodes (16): AI-Powered Marketing, Case Study / Real World Results, Conclusion, Customer Retention & Follow-ups, FastestCRM Key Features for Finance, FastestCRM vs Traditional CRM, Frequently Asked Questions, Getting Started with FastestCRM (+8 more)
 
 ### Community 43 - "Community 43"
 Cohesion: 0.12
-Nodes (16): AI-Powered Personalization & Content Generation, Automated Lifecycle Marketing, Boost Enrollment Campaigns with an AI-Based Education Marketing CRM, Case Study / Real World Results, Conclusion, FastestCRM Key Features for Education Marketing, FastestCRM vs Traditional Email Platforms, Frequently Asked Questions (+8 more)
+Nodes (16): AI-Powered Personalization & Recommendations, Automated Lifecycle Marketing, Case Study / Real World Results, Conclusion, Customer Loyalty & VIP Programs, FastestCRM Key Features for Retail & E-commerce, FastestCRM vs Traditional Email Platforms, Frequently Asked Questions (+8 more)
 
 ### Community 44 - "Community 44"
+Cohesion: 0.12
+Nodes (16): AI-Powered Marketing, Case Study / Real World Results, Conclusion, Customer Retention & Follow-ups, FastestCRM Key Features for Travel Agencies, FastestCRM vs Traditional CRM, Frequently Asked Questions, Getting Started with FastestCRM (+8 more)
+
+### Community 45 - "Community 45"
+Cohesion: 0.12
+Nodes (16): Accelerate Subscriptions with an AI-Based SaaS CRM, AI-Powered Marketing & Product-Led Growth (PLG), Case Study / Real World Results, Conclusion, Customer Success & Churn Prevention, FastestCRM Key Features for SaaS Companies, FastestCRM vs Traditional CRM, Frequently Asked Questions (+8 more)
+
+### Community 46 - "Community 46"
+Cohesion: 0.12
+Nodes (16): AI-Powered Personalization & Content Generation, Automated Lifecycle Marketing, Case Study / Real World Results, Conclusion, Dominate Your Market with an AI-Based Real Estate Marketing CRM, FastestCRM Key Features for Real Estate Marketing, FastestCRM vs Traditional Email Platforms, Frequently Asked Questions (+8 more)
+
+### Community 47 - "Community 47"
+Cohesion: 0.12
+Nodes (16): AI-Powered Personalization & Content Generation, Automated Lifecycle Marketing, Boost Enrollment Campaigns with an AI-Based Education Marketing CRM, Case Study / Real World Results, Conclusion, FastestCRM Key Features for Education Marketing, FastestCRM vs Traditional Email Platforms, Frequently Asked Questions (+8 more)
+
+### Community 48 - "Community 48"
+Cohesion: 0.23
+Nodes (15): useIsMobile(), STATUS_PROBABILITIES, useForecast(), useLeads(), useRealEstateLeads(), useUserRole(), AppLayout(), AutoDialer() (+7 more)
+
+### Community 49 - "Community 49"
 Cohesion: 0.18
 Nodes (15): adminClient, authHeader, corsHeaders, getValidAccessToken(), imapResult, readImapResponse(), readSmtpResponse(), refreshGoogleAccessToken() (+7 more)
 
-### Community 45 - "Community 45"
-Cohesion: 0.16
-Nodes (10): SubdomainContext, SubdomainContextType, SubdomainProvider(), DomainClassification, getWorkspaceUrl(), PLATFORM_SUBDOMAINS, SubdomainCompany, SubdomainResult (+2 more)
-
-### Community 46 - "Community 46"
+### Community 50 - "Community 50"
 Cohesion: 0.19
 Nodes (11): Invoice, InvoiceInput, InvoiceItem, InvoicePayment, PublicDocumentData, usePublicDocument(), Quotation, QuotationInput (+3 more)
 
-### Community 47 - "Community 47"
-Cohesion: 0.16
-Nodes (11): ACTION_TEMPLATES, AIWorkflow, AutonomyMode, DEFAULT_STEP, OUTCOME_OPTIONS, OutcomeGoal, TRIGGER_OPTIONS, TriggerType (+3 more)
-
-### Community 48 - "Community 48"
-Cohesion: 0.19
-Nodes (9): ActionItem, Lead, calculateLeadScore(), calculatePriorityLevel(), ScoringResult, useLeadScoring(), KanbanStatusColumn(), LeadsKanbanBoardProps (+1 more)
-
-### Community 49 - "Community 49"
-Cohesion: 0.14
-Nodes (11): adminClient, authHeader, corsHeaders, delayMs, lastSent, projectId, resolvedBody, resolvedSubject (+3 more)
-
-### Community 50 - "Community 50"
-Cohesion: 0.14
-Nodes (13): action, adminClient, authHeader, authUrl, code, corsHeaders, error, expiresAt (+5 more)
-
 ### Community 51 - "Community 51"
+Cohesion: 0.24
+Nodes (11): formSchema, InsuranceAddLeadDialogProps, formSchema, Props, CONTRIBUTION_FREQUENCIES, GENDERS, INSURANCE_STATUSES, INSURANCE_TYPES (+3 more)
+
+### Community 52 - "Community 52"
+Cohesion: 0.16
+Nodes (12): ButtonProps, buttonVariants, Calendar(), CalendarProps, Pagination(), PaginationContent, PaginationEllipsis(), PaginationItem (+4 more)
+
+### Community 53 - "Community 53"
+Cohesion: 0.21
+Nodes (10): SubdomainGate(), SubdomainGateProps, CompanyBrandingContext, CompanyBrandingContextType, CompanyBrandingProvider(), useCompanyBranding(), useSubdomainContext(), Auth() (+2 more)
+
+### Community 54 - "Community 54"
 Cohesion: 0.15
 Nodes (12): challenge, getFieldValue(), leadData, LeadFieldData, mapMetaLeadToDbFields(), mappedFields, MetaLeadData, minimalLead (+4 more)
 
-### Community 52 - "Community 52"
-Cohesion: 0.32
-Nodes (7): useForms(), GrowthSettings, useGrowthSettings(), LGLink, useLGLinks(), AIGrowthHacker(), LGDashboard()
-
-### Community 53 - "Community 53"
-Cohesion: 0.17
-Nodes (9): Company, fetchCompanyData(), useInsuranceLeads(), UseInsuranceLeadsOptions, useSaaSLeads(), UseSaaSLeadsOptions, useTravelLeads(), UseTravelLeadsOptions (+1 more)
-
-### Community 54 - "Community 54"
-Cohesion: 0.26
-Nodes (9): formSchema, SaaSAddLeadDialogProps, UploadProgress, COMPANY_SIZES, DEAL_STAGES, LOSS_REASONS, PLAN_TYPES, SAAS_STATUSES (+1 more)
-
 ### Community 55 - "Community 55"
-Cohesion: 0.17
-Nodes (10): adminClient, authHeader, corsHeaders, message, page, pageSize, sendBody, supabase (+2 more)
+Cohesion: 0.14
+Nodes (11): adminClient, authHeader, corsHeaders, delayMs, lastSent, projectId, resolvedBody, resolvedSubject (+3 more)
 
 ### Community 56 - "Community 56"
+Cohesion: 0.14
+Nodes (13): action, adminClient, authHeader, authUrl, code, corsHeaders, error, expiresAt (+5 more)
+
+### Community 57 - "Community 57"
+Cohesion: 0.24
+Nodes (10): formSchema, SaaSAddLeadDialogProps, formSchema, SaaSEditLeadDialogProps, COMPANY_SIZES, DEAL_STAGES, LOSS_REASONS, PLAN_TYPES (+2 more)
+
+### Community 58 - "Community 58"
+Cohesion: 0.24
+Nodes (10): Toast, ToastAction, ToastActionElement, ToastClose, ToastDescription, ToastProps, ToastTitle, toastVariants (+2 more)
+
+### Community 59 - "Community 59"
 Cohesion: 0.17
 Nodes (10): authHeader, bigdataDbUrl, client, conditions, params, QueryRequest, sanitizedColumn, sanitizedCountTableName (+2 more)
 
-### Community 57 - "Community 57"
+### Community 60 - "Community 60"
+Cohesion: 0.17
+Nodes (10): adminClient, authHeader, corsHeaders, message, page, pageSize, sendBody, supabase (+2 more)
+
+### Community 61 - "Community 61"
 Cohesion: 0.17
 Nodes (11): 1. Analysis (Think First), 2. Safeguarding, 3. Execution (The Refactor), 4. Verification, Code Improvement Specialist, code:javascript (function process(items) {), code:javascript (const TAX_RATE = 1.1;), Example Improvement (+3 more)
 
-### Community 58 - "Community 58"
+### Community 62 - "Community 62"
 Cohesion: 0.18
 Nodes (7): ChartConfig, ChartContainer, ChartContext, ChartContextProps, ChartLegendContent, ChartTooltipContent, THEMES
 
-### Community 59 - "Community 59"
-Cohesion: 0.29
-Nodes (7): Notification, useNotifications(), subscribeToPush(), urlBase64ToUint8Array(), isSupported(), requestWebNotificationPermission(), sendWebNotification()
+### Community 63 - "Community 63"
+Cohesion: 0.16
+Nodes (9): adminClient, aiResponse, geminiKey, results, thresholdDate, authHeader, newFeatures, supabaseAdmin (+1 more)
 
-### Community 60 - "Community 60"
+### Community 64 - "Community 64"
 Cohesion: 0.22
 Nodes (8): Announcement, AnnouncementsTab(), AnnType, Company, emptyForm(), SUB_STATUSES, TargetType, TYPE_META
 
-### Community 61 - "Community 61"
-Cohesion: 0.31
-Nodes (7): formSchema, RealEstateAddLeadDialogProps, UploadProgress, REAL_ESTATE_PROPERTY_TYPES, REAL_ESTATE_PURPOSES, REAL_ESTATE_STATUSES, RealEstateLeadFields
-
-### Community 62 - "Community 62"
-Cohesion: 0.2
-Nodes (6): authHeader, corsHeaders, RZP_KEY_ID, RZP_KEY_SECRET, sanitizedCustomerName, supabase
-
-### Community 63 - "Community 63"
-Cohesion: 0.2
-Nodes (9): accountResult, adminClient, client, corsHeaders, projectId, results, threadSubject, uniqueThreadsToNotify (+1 more)
-
-### Community 64 - "Community 64"
-Cohesion: 0.2
-Nodes (9): employeeMetrics, fieldsToTrack, industries, now, profileMap, statusCounts, summary, supabase (+1 more)
-
 ### Community 65 - "Community 65"
-Cohesion: 0.31
-Nodes (9): base64UrlDecode(), base64UrlEncode(), buildVapidJWT(), concat(), encryptPushPayload(), endpointUrl, expiredIds, payloadStr (+1 more)
+Cohesion: 0.24
+Nodes (7): calculateLeadScore(), calculatePriorityLevel(), PriorityLevel, ScoringResult, useLeadScoring(), PriorityBadge(), PriorityBadgeProps
 
 ### Community 66 - "Community 66"
-Cohesion: 0.2
-Nodes (9): code, error, googleClientId, googleClientSecret, redirectTo, state, supabase, tokenExpiresAt (+1 more)
+Cohesion: 0.33
+Nodes (6): Notification, subscribeToPush(), urlBase64ToUint8Array(), isSupported(), requestWebNotificationPermission(), sendWebNotification()
 
 ### Community 67 - "Community 67"
-Cohesion: 0.22
-Nodes (6): addDomainToVercel(), authHeader, DnsRecord, getVercelDomainConfig(), supabase, VercelDomainConfig
-
-### Community 68 - "Community 68"
-Cohesion: 0.2
-Nodes (9): ALLOWED_ATTRIBUTES, ExternalSubmission, formFields, leadData, matchingField, now, rateData, rateLimitMap (+1 more)
-
-### Community 69 - "Community 69"
 Cohesion: 0.2
 Nodes (9): authHeader, daysRemaining, durationMonths, newValidUntil, now, qty, supabaseAdmin, token (+1 more)
 
-### Community 70 - "Community 70"
-Cohesion: 0.2
-Nodes (9): code, error, errorDescription, metaAppId, metaAppSecret, redirectTo, supabase, tokenExpiresAt (+1 more)
-
-### Community 71 - "Community 71"
+### Community 68 - "Community 68"
 Cohesion: 0.2
 Nodes (9): ALLOWED_ATTRIBUTES, fields, FormSubmission, leadData, now, numValue, rateData, rateLimitMap (+1 more)
 
+### Community 69 - "Community 69"
+Cohesion: 0.22
+Nodes (6): addDomainToVercel(), authHeader, DnsRecord, getVercelDomainConfig(), supabase, VercelDomainConfig
+
+### Community 70 - "Community 70"
+Cohesion: 0.2
+Nodes (9): employeeMetrics, fieldsToTrack, industries, now, profileMap, statusCounts, summary, supabase (+1 more)
+
+### Community 71 - "Community 71"
+Cohesion: 0.2
+Nodes (9): ALLOWED_ATTRIBUTES, ExternalSubmission, formFields, leadData, matchingField, now, rateData, rateLimitMap (+1 more)
+
 ### Community 72 - "Community 72"
-Cohesion: 0.44
-Nodes (7): InvoiceSettings, InvoiceTax, InvoiceTemplate, useInvoiceSettings(), useInvoiceTaxes(), useInvoiceTemplates(), InvoiceSettings()
+Cohesion: 0.31
+Nodes (9): base64UrlDecode(), base64UrlEncode(), buildVapidJWT(), concat(), encryptPushPayload(), endpointUrl, expiredIds, payloadStr (+1 more)
 
 ### Community 73 - "Community 73"
-Cohesion: 0.22
-Nodes (6): apolloPayload, corsHeaders, industries, insertData, leads, supabase
+Cohesion: 0.2
+Nodes (9): code, error, errorDescription, metaAppId, metaAppSecret, redirectTo, supabase, tokenExpiresAt (+1 more)
 
 ### Community 74 - "Community 74"
-Cohesion: 0.22
-Nodes (8): authHeader, corsHeaders, orderAmountPaise, RechargeRequest, rzpKeyId, rzpKeySecret, supabase, supabaseAdmin
+Cohesion: 0.2
+Nodes (9): code, error, googleClientId, googleClientSecret, redirectTo, state, supabase, tokenExpiresAt (+1 more)
 
 ### Community 75 - "Community 75"
+Cohesion: 0.2
+Nodes (6): authHeader, corsHeaders, RZP_KEY_ID, RZP_KEY_SECRET, sanitizedCustomerName, supabase
+
+### Community 76 - "Community 76"
+Cohesion: 0.2
+Nodes (9): accountResult, adminClient, client, corsHeaders, projectId, results, threadSubject, uniqueThreadsToNotify (+1 more)
+
+### Community 77 - "Community 77"
+Cohesion: 0.22
+Nodes (8): SheetContent, SheetContentProps, SheetDescription, SheetFooter(), SheetHeader(), SheetOverlay, SheetTitle, sheetVariants
+
+### Community 78 - "Community 78"
+Cohesion: 0.28
+Nodes (6): AddIntegrationDialog(), Automations(), EXAMPLE_AUTOMATIONS, Integrations(), integrationTypes, Switch
+
+### Community 79 - "Community 79"
 Cohesion: 0.22
 Nodes (7): allTables, customTables, notifications, now, pushTargets, standardTables, supabaseClient
 
-### Community 76 - "Community 76"
+### Community 80 - "Community 80"
 Cohesion: 0.22
 Nodes (7): allLeads, authHeader, phoneStr, supabaseAdmin, supabaseAuth, targetDigits, updatesToPerform
 
-### Community 77 - "Community 77"
+### Community 81 - "Community 81"
+Cohesion: 0.22
+Nodes (6): apolloPayload, corsHeaders, industries, insertData, leads, supabase
+
+### Community 82 - "Community 82"
+Cohesion: 0.22
+Nodes (8): authHeader, corsHeaders, orderAmountPaise, RechargeRequest, rzpKeyId, rzpKeySecret, supabase, supabaseAdmin
+
+### Community 83 - "Community 83"
 Cohesion: 0.36
 Nodes (6): leads, main(), mockInsertBulk(), runBulk(), runSequential(), start
 
-### Community 78 - "Community 78"
-Cohesion: 0.25
-Nodes (3): ErrorBoundary, Props, State
-
-### Community 79 - "Community 79"
-Cohesion: 0.25
-Nodes (7): Breadcrumb, BreadcrumbEllipsis(), BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator()
-
-### Community 80 - "Community 80"
-Cohesion: 0.25
-Nodes (7): corsHeaders, encoder, payload, signature, signatureHex, supabase, webhookSecret
-
-### Community 81 - "Community 81"
-Cohesion: 0.25
-Nodes (7): corsHeaders, encoder, payload, signature, signatureHex, supabase, webhookSecret
-
-### Community 82 - "Community 82"
-Cohesion: 0.25
-Nodes (6): adminClient, authHeader, corsHeaders, msUser, supabase, token
-
-### Community 83 - "Community 83"
-Cohesion: 0.25
-Nodes (7): authHeader, corsHeaders, PurchaseRequest, rzpKeyId, rzpKeySecret, supabase, supabaseAdmin
-
 ### Community 84 - "Community 84"
 Cohesion: 0.25
-Nodes (6): answers, challengeCode, companyId, leadData, supabase, url
+Nodes (6): DrawerContent, DrawerDescription, DrawerFooter(), DrawerHeader(), DrawerOverlay, DrawerTitle
 
 ### Community 85 - "Community 85"
 Cohesion: 0.25
-Nodes (7): authHeader, deleteTables, errors, leadTables, ROLE_LEVELS, supabaseAdmin, supabaseAuth
+Nodes (7): Breadcrumb, BreadcrumbEllipsis(), BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator()
 
 ### Community 86 - "Community 86"
 Cohesion: 0.25
-Nodes (6): authHeader, corsHeaders, emailHtml, rzpKeySecret, supabase, supabaseAdmin
+Nodes (3): ErrorBoundary, Props, State
 
 ### Community 87 - "Community 87"
-Cohesion: 0.33
-Nodes (3): benchmark(), ConnectionPool, simulateNetworkRequest()
+Cohesion: 0.25
+Nodes (7): authHeader, deleteTables, errors, leadTables, ROLE_LEVELS, supabaseAdmin, supabaseAuth
 
 ### Community 88 - "Community 88"
-Cohesion: 0.29
-Nodes (6): adminClient, authHeader, corsHeaders, expiresAt, supabase, token
+Cohesion: 0.25
+Nodes (6): answers, challengeCode, companyId, leadData, supabase, url
 
 ### Community 89 - "Community 89"
-Cohesion: 0.29
-Nodes (6): adminClient, headers, now, pixelId, TRANSPARENT_GIF, url
+Cohesion: 0.25
+Nodes (7): corsHeaders, encoder, payload, signature, signatureHex, supabase, webhookSecret
 
 ### Community 90 - "Community 90"
-Cohesion: 0.29
-Nodes (6): companyId, leadData, supabase, url, userData, webhookKey
+Cohesion: 0.25
+Nodes (7): corsHeaders, encoder, payload, signature, signatureHex, supabase, webhookSecret
 
 ### Community 91 - "Community 91"
-Cohesion: 0.33
-Nodes (4): BLOGS_FILE, __dirname, __filename, PUBLIC_DIR
+Cohesion: 0.25
+Nodes (6): adminClient, authHeader, corsHeaders, msUser, supabase, token
 
 ### Community 92 - "Community 92"
-Cohesion: 0.33
-Nodes (5): EMPLOYMENT_TYPES, FINANCE_LEAD_COLUMNS, FINANCE_STATUSES, FinanceLeadFields, LOAN_TYPES
+Cohesion: 0.25
+Nodes (7): authHeader, corsHeaders, PurchaseRequest, rzpKeyId, rzpKeySecret, supabase, supabaseAdmin
 
 ### Community 93 - "Community 93"
-Cohesion: 0.33
-Nodes (5): adminClient, conversationHistory, corsHeaders, projectId, userIds
+Cohesion: 0.25
+Nodes (6): authHeader, corsHeaders, emailHtml, rzpKeySecret, supabase, supabaseAdmin
 
 ### Community 94 - "Community 94"
 Cohesion: 0.33
-Nodes (5): companyId, corsHeaders, leadId, supabase, url
+Nodes (3): benchmark(), ConnectionPool, simulateNetworkRequest()
 
 ### Community 95 - "Community 95"
-Cohesion: 0.33
-Nodes (5): authHeader, corsHeaders, emailHtml, supabaseAdmin, token
+Cohesion: 0.29
+Nodes (6): companyId, leadData, supabase, url, userData, webhookKey
 
 ### Community 96 - "Community 96"
-Cohesion: 0.33
-Nodes (4): corsHeaders, RegisterRequest, slug, supabaseAdmin
+Cohesion: 0.29
+Nodes (6): adminClient, authHeader, corsHeaders, expiresAt, supabase, token
 
 ### Community 97 - "Community 97"
-Cohesion: 0.33
-Nodes (5): authHeader, corsHeaders, response, supabase, supabaseAdmin
+Cohesion: 0.29
+Nodes (6): adminClient, headers, now, pixelId, TRANSPARENT_GIF, url
 
 ### Community 98 - "Community 98"
 Cohesion: 0.33
-Nodes (5): busyTimes, freeBusyReq, googleClientId, googleClientSecret, supabase
+Nodes (4): BLOGS_FILE, __dirname, __filename, PUBLIC_DIR
 
 ### Community 99 - "Community 99"
 Cohesion: 0.33
-Nodes (5): adminClient, aiResponse, geminiKey, results, thresholdDate
+Nodes (5): EMPLOYMENT_TYPES, FINANCE_LEAD_COLUMNS, FINANCE_STATUSES, FinanceLeadFields, LOAN_TYPES
 
 ### Community 100 - "Community 100"
 Cohesion: 0.33
@@ -580,85 +589,109 @@ Nodes (5): googleClientId, googleClientSecret, state, supabase, tokenExpiresAt
 
 ### Community 101 - "Community 101"
 Cohesion: 0.33
-Nodes (5): accounts, googleClientId, googleClientSecret, googleDevToken, supabase
+Nodes (5): busyTimes, freeBusyReq, googleClientId, googleClientSecret, supabase
 
 ### Community 102 - "Community 102"
 Cohesion: 0.33
-Nodes (5): Can I connect a custom domain to my Lovable project?, code:sh (# Step 1: Clone the repository using the project's Git URL.), How can I deploy this project?, How can I edit this code?, What technologies are used for this project?
+Nodes (5): accounts, googleClientId, googleClientSecret, googleDevToken, supabase
 
 ### Community 103 - "Community 103"
 Cohesion: 0.33
-Nodes (5): 🚀 100,000X SEO: Backlink Submission Checklist, 🤖 AI Tool Hubs (Critical for Fastest CRM), 🎯 High-Impact Global SaaS Directories, 🇮🇳 India-Specific Listings (Local SEO), 🛠️ Submission Strategy
+Nodes (5): adminClient, conversationHistory, corsHeaders, projectId, userIds
 
 ### Community 104 - "Community 104"
-Cohesion: 0.4
-Nodes (4): blogsContent, blogsPath, routes, slugs
+Cohesion: 0.33
+Nodes (5): companyId, corsHeaders, leadId, supabase, url
 
 ### Community 105 - "Community 105"
-Cohesion: 0.4
-Nodes (4): AUTOMOTIVE_LEAD_COLUMNS, AUTOMOTIVE_STATUSES, AutomotiveLeadFields, VEHICLE_TYPES
+Cohesion: 0.33
+Nodes (5): authHeader, corsHeaders, emailHtml, supabaseAdmin, token
 
 ### Community 106 - "Community 106"
-Cohesion: 0.4
-Nodes (4): EDUCATION_LEAD_COLUMNS, EDUCATION_PRODUCT_CATEGORIES, EDUCATION_STATUSES, EducationLeadFields
+Cohesion: 0.33
+Nodes (4): corsHeaders, RegisterRequest, slug, supabaseAdmin
 
 ### Community 107 - "Community 107"
-Cohesion: 0.4
-Nodes (4): CUSTOMER_TYPES, RETAIL_LEAD_COLUMNS, RETAIL_STATUSES, RetailLeadFields
+Cohesion: 0.33
+Nodes (5): authHeader, corsHeaders, response, supabase, supabaseAdmin
 
 ### Community 108 - "Community 108"
-Cohesion: 0.4
-Nodes (4): authHeader, corsHeaders, supabaseAdmin, supabaseAnon
+Cohesion: 0.33
+Nodes (5): Can I connect a custom domain to my Lovable project?, code:sh (# Step 1: Clone the repository using the project's Git URL.), How can I deploy this project?, How can I edit this code?, What technologies are used for this project?
 
 ### Community 109 - "Community 109"
-Cohesion: 0.4
-Nodes (4): authHeader, ROLE_LEVELS, supabaseAdmin, supabaseAuth
+Cohesion: 0.33
+Nodes (5): 🚀 100,000X SEO: Backlink Submission Checklist, 🤖 AI Tool Hubs (Critical for Fastest CRM), 🎯 High-Impact Global SaaS Directories, 🇮🇳 India-Specific Listings (Local SEO), 🛠️ Submission Strategy
 
 ### Community 110 - "Community 110"
 Cohesion: 0.4
-Nodes (4): adminClient, cleanedJson, result, userIds
+Nodes (4): blogsContent, blogsPath, routes, slugs
 
 ### Community 111 - "Community 111"
 Cohesion: 0.4
-Nodes (4): response, selectedPage, supabase, tokenExpiresAt
+Nodes (4): AUTOMOTIVE_LEAD_COLUMNS, AUTOMOTIVE_STATUSES, AutomotiveLeadFields, VEHICLE_TYPES
 
 ### Community 112 - "Community 112"
 Cohesion: 0.4
-Nodes (4): adminClient, braveKey, cleanedJson, enrichmentData
+Nodes (4): EDUCATION_LEAD_COLUMNS, EDUCATION_PRODUCT_CATEGORIES, EDUCATION_STATUSES, EducationLeadFields
 
 ### Community 113 - "Community 113"
 Cohesion: 0.4
-Nodes (4): authHeader, ROLE_LEVELS, supabaseAdmin, supabaseAuth
+Nodes (4): CUSTOMER_TYPES, RETAIL_LEAD_COLUMNS, RETAIL_STATUSES, RetailLeadFields
 
 ### Community 114 - "Community 114"
 Cohesion: 0.4
-Nodes (4): gcalEvent, googleClientId, googleClientSecret, supabase
+Nodes (4): aiAction, newHistory, supabase, userIds
 
 ### Community 115 - "Community 115"
+Cohesion: 0.4
+Nodes (4): authHeader, ROLE_LEVELS, supabaseAdmin, supabaseAuth
+
+### Community 116 - "Community 116"
+Cohesion: 0.4
+Nodes (4): googleClientId, googleClientSecret, googleDevToken, supabase
+
+### Community 117 - "Community 117"
+Cohesion: 0.4
+Nodes (4): gcalEvent, googleClientId, googleClientSecret, supabase
+
+### Community 118 - "Community 118"
+Cohesion: 0.4
+Nodes (4): adminClient, braveKey, cleanedJson, enrichmentData
+
+### Community 119 - "Community 119"
+Cohesion: 0.4
+Nodes (4): authHeader, corsHeaders, supabaseAdmin, supabaseAnon
+
+### Community 120 - "Community 120"
 Cohesion: 0.67
 Nodes (3): deployFunction(), __dirname, main()
 
-### Community 117 - "Community 117"
+### Community 122 - "Community 122"
 Cohesion: 0.67
 Nodes (3): leads, mockInsert(), runBenchmark()
 
-### Community 118 - "Community 118"
+### Community 123 - "Community 123"
 Cohesion: 0.83
 Nodes (3): runBenchmark(), simulateNetworkDelay(), simulatePromiseAllWithConnectionLimit()
+
+### Community 124 - "Community 124"
+Cohesion: 0.5
+Nodes (3): Avatar, AvatarFallback, AvatarImage
 
 ## Knowledge Gaps
 - **1120 isolated node(s):** `__dirname`, `supabase`, `options`, `mockSupabase`, `leads` (+1115 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **14 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **17 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `useCompany()` connect `Community 8` to `Community 1`, `Community 2`, `Community 3`, `Community 4`, `Community 5`, `Community 7`, `Community 9`, `Community 12`, `Community 13`, `Community 14`, `Community 15`, `Community 18`, `Community 19`, `Community 20`, `Community 21`, `Community 23`, `Community 26`, `Community 28`, `Community 29`, `Community 30`, `Community 31`, `Community 33`, `Community 46`, `Community 47`, `Community 53`, `Community 54`, `Community 61`, `Community 72`?**
+- **Why does `useCompany()` connect `Community 6` to `Community 1`, `Community 2`, `Community 4`, `Community 5`, `Community 7`, `Community 8`, `Community 12`, `Community 13`, `Community 15`, `Community 16`, `Community 17`, `Community 18`, `Community 21`, `Community 23`, `Community 24`, `Community 25`, `Community 26`, `Community 27`, `Community 29`, `Community 30`, `Community 31`, `Community 32`, `Community 33`, `Community 36`, `Community 37`, `Community 48`, `Community 50`, `Community 51`, `Community 57`, `Community 78`?**
   _High betweenness centrality (0.040) - this node is a cross-community bridge._
-- **Why does `Button` connect `Community 2` to `Community 0`, `Community 3`, `Community 4`, `Community 5`, `Community 7`, `Community 8`, `Community 9`, `Community 12`, `Community 13`, `Community 14`, `Community 15`, `Community 16`, `Community 18`, `Community 19`, `Community 20`, `Community 23`, `Community 26`, `Community 28`, `Community 29`, `Community 31`, `Community 32`, `Community 33`, `Community 46`, `Community 47`, `Community 48`, `Community 52`, `Community 54`, `Community 60`, `Community 61`, `Community 72`?**
+- **Why does `Button` connect `Community 17` to `Community 0`, `Community 2`, `Community 4`, `Community 5`, `Community 6`, `Community 7`, `Community 8`, `Community 12`, `Community 13`, `Community 14`, `Community 15`, `Community 16`, `Community 21`, `Community 22`, `Community 23`, `Community 24`, `Community 25`, `Community 27`, `Community 29`, `Community 30`, `Community 31`, `Community 32`, `Community 34`, `Community 35`, `Community 36`, `Community 37`, `Community 50`, `Community 51`, `Community 53`, `Community 57`, `Community 64`, `Community 78`?**
   _High betweenness centrality (0.034) - this node is a cross-community bridge._
-- **Why does `cn()` connect `Community 14` to `Community 0`, `Community 2`, `Community 3`, `Community 4`, `Community 5`, `Community 7`, `Community 9`, `Community 12`, `Community 15`, `Community 16`, `Community 18`, `Community 19`, `Community 21`, `Community 25`, `Community 26`, `Community 47`, `Community 48`, `Community 58`, `Community 79`?**
+- **Why does `cn()` connect `Community 37` to `Community 0`, `Community 129`, `Community 130`, `Community 2`, `Community 4`, `Community 5`, `Community 6`, `Community 7`, `Community 8`, `Community 131`, `Community 12`, `Community 13`, `Community 14`, `Community 15`, `Community 16`, `Community 17`, `Community 22`, `Community 25`, `Community 30`, `Community 36`, `Community 52`, `Community 58`, `Community 62`, `Community 65`, `Community 77`, `Community 78`, `Community 84`, `Community 85`, `Community 124`?**
   _High betweenness centrality (0.025) - this node is a cross-community bridge._
 - **Are the 4 inferred relationships involving `useToast()` (e.g. with `AIClosingAssistant()` and `AIGrowthHacker()`) actually correct?**
   _`useToast()` has 4 INFERRED edges - model-reasoned connections that need verification._

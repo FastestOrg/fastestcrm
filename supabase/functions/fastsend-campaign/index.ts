@@ -17,8 +17,15 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 function resolveVariables(template: string, leadData: Record<string, any>): string {
-  return template.replace(/%([a-zA-Z_]+)%/g, (_, key) => {
-    return leadData[key] ?? leadData[key.toLowerCase()] ?? `%${key}%`;
+  return template.replace(/%([a-zA-Z_]+)%/g, (_, rawKey) => {
+    const key = rawKey.toLowerCase();
+    if (key === 'company' && leadData['company_name'] !== undefined && leadData['company_name'] !== null) {
+      return String(leadData['company_name']);
+    }
+    if (key === 'company_name' && leadData['company'] !== undefined && leadData['company'] !== null) {
+      return String(leadData['company']);
+    }
+    return leadData[rawKey] ?? leadData[key] ?? `%${rawKey}%`;
   });
 }
 
