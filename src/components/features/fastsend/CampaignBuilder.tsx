@@ -8,7 +8,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { useCompany } from '@/hooks/useCompany';
 import { useEmailAccounts } from '@/hooks/useEmailAccounts';
@@ -49,7 +48,6 @@ export function CampaignBuilder({ onCancel, initialData, initialSequences }: { o
     const [isGenerating, setIsGenerating] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [autopilotEnabled, setAutopilotEnabled] = useState((initialData as any)?.ai_auto_reply_enabled || false);
-    const [aiGenerated, setAiGenerated] = useState(initialData?.ai_generated || false);
     
     // Sequences state
     const [sequences, setSequences] = useState<any[]>(initialSequences || []);
@@ -78,7 +76,6 @@ export function CampaignBuilder({ onCancel, initialData, initialSequences }: { o
                 numberOfSteps: stepsCount,
             });
             setSequences(aiEmails);
-            setAiGenerated(true);
             toast.success('Campaign sequence generated!');
         } catch (e: any) {
             toast.error(e.message);
@@ -123,15 +120,15 @@ export function CampaignBuilder({ onCancel, initialData, initialSequences }: { o
                 await createCampaign.mutateAsync({
                     name,
                     campaignGoal: goal,
-                    campaignMode: aiGenerated ? 'agentic' : 'guided',
+                    campaignMode: 'agentic',
                     accountIds: selectedAccounts,
                     delayBetweenEmailsMs: delayMs,
-                    aiGenerated: aiGenerated,
-                    aiPerspective: perspective || null,
-                    productInfo: productInfo || null,
+                    aiGenerated: true,
+                    aiPerspective: perspective,
+                    productInfo,
                     aiAutoReplyEnabled: autopilotEnabled,
                     aiAutoReplyGoal: goal,
-                    aiAutoReplyPerspective: perspective || null,
+                    aiAutoReplyPerspective: perspective,
                     sequences,
                     leadStatusFilter: leadStatus,
                     emailField,
@@ -254,29 +251,12 @@ export function CampaignBuilder({ onCancel, initialData, initialSequences }: { o
                         </CardHeader>
                         <CardContent className="space-y-6">
                             {sequences.length === 0 ? (
-                                <div className="space-y-4">
-                                    <div className="text-center py-8 border-2 border-dashed bg-muted/10 rounded-lg">
-                                        <Wand2 className="mx-auto h-8 w-8 text-primary mb-3" />
-                                        <p className="font-medium">Use the AI panel to generate your sequence</p>
-                                        <p className="text-sm text-muted-foreground mt-1 text-balance">
-                                            Describe your goals on the right, and Gemini will instantly write a full multi-step drip campaign.
-                                        </p>
-                                    </div>
-                                    <div className="flex justify-center">
-                                        <Button variant="outline" className="border-dashed" onClick={() => {
-                                            setSequences([{
-                                                step_number: 1,
-                                                subject: '',
-                                                body_html: '',
-                                                body_text: '',
-                                                delay_after_ms: 0,
-                                                send_condition: 'always'
-                                            }]);
-                                            setAiGenerated(false);
-                                        }}>
-                                            <Plus className="mr-2 h-4 w-4" /> Create Sequence Manually
-                                        </Button>
-                                    </div>
+                                <div className="text-center py-8 border-2 border-dashed bg-muted/10 rounded-lg">
+                                    <Wand2 className="mx-auto h-8 w-8 text-primary mb-3" />
+                                    <p className="font-medium">Use the AI panel to generate your sequence</p>
+                                    <p className="text-sm text-muted-foreground mt-1 text-balance">
+                                        Describe your goals on the right, and Gemini will instantly write a full multi-step drip campaign.
+                                    </p>
                                 </div>
                             ) : (
                                 <div className="space-y-6 relative border-l-2 border-muted ml-4 pl-6 pb-4">
@@ -307,42 +287,17 @@ export function CampaignBuilder({ onCancel, initialData, initialSequences }: { o
                                                     <Label className="text-xs">Subject</Label>
                                                     <Input value={seq.subject} onChange={(e) => updateSequence(idx, 'subject', e.target.value)} />
                                                 </div>
-                                                <Tabs defaultValue="text" className="w-full">
-                                                    <div className="flex justify-between items-center mb-1">
-                                                        <Label className="text-xs font-semibold">Body</Label>
-                                                        <TabsList className="h-7 bg-muted/50 p-0.5">
-                                                            <TabsTrigger value="text" className="text-xs px-2 h-6">Text</TabsTrigger>
-                                                            <TabsTrigger value="html" className="text-xs px-2 h-6">HTML Code</TabsTrigger>
-                                                        </TabsList>
-                                                    </div>
-                                                    <TabsContent value="text" className="mt-0">
-                                                        <Textarea 
-                                                            value={seq.body_text || stripHtml(seq.body_html)} 
-                                                            onChange={(e) => {
-                                                                updateSequence(idx, 'body_text', e.target.value);
-                                                                updateSequence(idx, 'body_html', `<div style="font-family: sans-serif; line-height: 1.6; color: #1a1a1a; max-width: 600px;"><p>${e.target.value.replace(/\n/g, '<br/>')}</p></div>`);
-                                                            }}
-                                                            className="min-h-[120px] text-sm leading-relaxed"
-                                                            placeholder="Write your email body text..."
-                                                        />
-                                                        {aiGenerated && (
-                                                            <p className="text-[10px] text-muted-foreground mt-1">
-                                                                💡 Tip: Switch to the HTML Code tab to edit link URLs and keep custom button styling generated by AI.
-                                                            </p>
-                                                        )}
-                                                    </TabsContent>
-                                                    <TabsContent value="html" className="mt-0">
-                                                        <Textarea 
-                                                            value={seq.body_html} 
-                                                            onChange={(e) => {
-                                                                updateSequence(idx, 'body_html', e.target.value);
-                                                                updateSequence(idx, 'body_text', stripHtml(e.target.value));
-                                                            }}
-                                                            className="min-h-[120px] font-mono text-xs leading-relaxed"
-                                                            placeholder="HTML code..."
-                                                        />
-                                                    </TabsContent>
-                                                </Tabs>
+                                                <div className="space-y-1">
+                                                    <Label className="text-xs">Body</Label>
+                                                    <Textarea 
+                                                        value={seq.body_text || stripHtml(seq.body_html)} 
+                                                        onChange={(e) => {
+                                                            updateSequence(idx, 'body_text', e.target.value);
+                                                            updateSequence(idx, 'body_html', `<p>${e.target.value.replace(/\n/g, '<br/>')}</p>`);
+                                                        }}
+                                                        className="min-h-[120px] font-mono text-sm leading-relaxed"
+                                                    />
+                                                </div>
                                             </div>
                                         </div>
                                     ))}
