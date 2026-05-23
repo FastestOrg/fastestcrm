@@ -51,6 +51,26 @@
     "mtime": 1773219996.8526733,
     "hash": "d766c413c557c490830dfd8821618d5d"
   },
+  "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\scripts\\benchmark_bulk_insert.ts": {
+    "mtime": 1779312467.067163,
+    "hash": "31d3953695bfe23c19b5f7741d69900a"
+  },
+  "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\scripts\\benchmark_healthcare_upload.ts": {
+    "mtime": 1779312467.0858521,
+    "hash": "784cbcf345656f73bf97965f0a7d72b6"
+  },
+  "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\scripts\\benchmark_saas_upload.ts": {
+    "mtime": 1779312467.1023493,
+    "hash": "0e5b25359575f8920e3e9ad553432d12"
+  },
+  "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\scripts\\benchmark_upload_insurance.ts": {
+    "mtime": 1779312467.1313503,
+    "hash": "e95c552c29e8737cca6f07c5a6cffc54"
+  },
+  "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\scripts\\benchmark_upload_optimization.ts": {
+    "mtime": 1779312467.1523478,
+    "hash": "afd8549900628827f8ce2972872c82c0"
+  },
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\scripts\\generate-rss.mjs": {
     "mtime": 1776196550.114353,
     "hash": "d1fb7c58185a48659b40b9d6dec2194d"
@@ -736,8 +756,8 @@
     "hash": "3db4a6ccc4dfff11c26b955fb1f3a11d"
   },
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\src\\industries\\healthcare\\components\\HealthcareUploadLeadsDialog.tsx": {
-    "mtime": 1773233563.4043484,
-    "hash": "ca15838c75ddb9607a2cc864872f7949"
+    "mtime": 1779312467.182348,
+    "hash": "304eb30af135b4d6c291a004bca43b09"
   },
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\src\\industries\\healthcare\\hooks\\useHealthcareLeads.ts": {
     "mtime": 1773752401.924428,
@@ -784,8 +804,8 @@
     "hash": "16d154746a3d68266495a6260a55ed47"
   },
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\src\\industries\\insurance\\components\\InsuranceUploadLeadsDialog.tsx": {
-    "mtime": 1773233516.6837175,
-    "hash": "d8f4b9fd74b46b3475c6b7f578e7db72"
+    "mtime": 1779312467.2023554,
+    "hash": "689d29e66b15bc8d9a65829352d48138"
   },
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\src\\industries\\insurance\\hooks\\useInsuranceLeads.ts": {
     "mtime": 1773752401.9264412,
@@ -884,8 +904,8 @@
     "hash": "712a768806a5054fb666896b900fc75c"
   },
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\src\\industries\\saas\\components\\SaaSUploadLeadsDialog.tsx": {
-    "mtime": 1773233419.91915,
-    "hash": "8241cae2345999c334e70d296afd4ce4"
+    "mtime": 1779312467.2463603,
+    "hash": "74dcaaf12703f30488b0847205a640c6"
   },
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\src\\industries\\saas\\hooks\\useSaaSLeads.ts": {
     "mtime": 1773752401.933689,
@@ -924,8 +944,8 @@
     "hash": "7b3598484bcc4ed316b61ecfa5020fc3"
   },
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\src\\industries\\travel\\components\\TravelUploadLeadsDialog.tsx": {
-    "mtime": 1773233467.400426,
-    "hash": "731887d22eb0764966dd28a9ad7496bb"
+    "mtime": 1779312467.2703593,
+    "hash": "638748b0797097cd7df171ebf44ca5cf"
   },
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\src\\industries\\travel\\hooks\\useTravelLeads.ts": {
     "mtime": 1773752401.9357278,
@@ -1364,8 +1384,8 @@
     "hash": "c5ba864252f035b6a2e2b281a9a24317"
   },
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\supabase\\functions\\fastsend-send\\index.ts": {
-    "mtime": 1778427441.4959996,
-    "hash": "0900ff97772bd342a8d08063299fc7cd"
+    "mtime": 1779536392.1832662,
+    "hash": "518d7c4d7604c2ed55d364f048b20902"
   },
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\supabase\\functions\\fastsend-sync\\index.ts": {
     "mtime": 1775481851.207799,
@@ -1947,6 +1967,14 @@
     "mtime": 1779026664.7932858,
     "hash": "3f1f8b07c93e7f3f93445b2e025f24e5"
   },
+  "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\whatsapp-server\\scripts\\benchmark_cache.ts": {
+    "mtime": 1779312467.3503547,
+    "hash": "25810300731efec5c8ebe44e5991f154"
+  },
+  "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\whatsapp-server\\scripts\\benchmark_cache_mock.ts": {
+    "mtime": 1779312467.3533485,
+    "hash": "10443f6d8371ff37a934652a4102250e"
+  },
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\whatsapp-server\\src\\campaign-worker.ts": {
     "mtime": 1774529824.5692139,
     "hash": "5e10c5f539684ebedcc7bcf295edebf4"
@@ -1960,8 +1988,8 @@
     "hash": "b60b501ee95ef213abbff275eef8f838"
   },
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\whatsapp-server\\src\\session-manager.ts": {
-    "mtime": 1774474390.4733655,
-    "hash": "af6cedc3c231de03490dfe8feedadc69"
+    "mtime": 1779312467.377391,
+    "hash": "beb5d7957b1c3cf8eea4ff07f8d00e1a"
   },
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\whatsapp-server\\src\\spintax.ts": {
     "mtime": 1774299068.9435174,
@@ -1970,10 +1998,6 @@
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\whatsapp-server\\src\\supabase.ts": {
     "mtime": 1774299066.9060402,
     "hash": "02a568fa38672fd4159371579c219c52"
-  },
-  "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\AI Feature.md": {
-    "mtime": 1777204048.353065,
-    "hash": "4fdfab6fedcef15cf13a2e4fe8376efc"
   },
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\codeimprovement.md": {
     "mtime": 1778569647.1302886,
@@ -2019,9 +2043,49 @@
     "mtime": 1774364468.9300804,
     "hash": "4339ee9824cf90e5df00f8c0b8e0fc1f"
   },
-  "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\urgent.md": {
-    "mtime": 1778330625.1370437,
-    "hash": "d41d8cd98f00b204e9800998ecf8427e"
+  "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\blogs\\001-real-estate-sales-crm.md": {
+    "mtime": 1779533943.2572143,
+    "hash": "bd6a9f1353ee5c330e96e85bbe413ef0"
+  },
+  "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\blogs\\002-education-sales-crm.md": {
+    "mtime": 1779533943.289485,
+    "hash": "cddfde315d50cfe9facf2c8984b3b4fb"
+  },
+  "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\blogs\\003-healthcare-marketing-crm.md": {
+    "mtime": 1779533943.3114126,
+    "hash": "1ad9e084f1ab2f2b948faf8d54755134"
+  },
+  "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\blogs\\004-insurance-sales-crm.md": {
+    "mtime": 1779533943.3489785,
+    "hash": "6025c7724a30fca29ebc599334d0c02f"
+  },
+  "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\blogs\\005-automotive-marketing-crm.md": {
+    "mtime": 1779533943.3819985,
+    "hash": "917884668528c8c52c95cb0a0d1cfe98"
+  },
+  "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\blogs\\006-finance-sales-crm.md": {
+    "mtime": 1779533943.4095778,
+    "hash": "dbb622c73b93b9aba9f4a50434af5a20"
+  },
+  "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\blogs\\007-retail-marketing-crm.md": {
+    "mtime": 1779533943.427074,
+    "hash": "a2289d105b7d6a4320aed2f6362e0da9"
+  },
+  "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\blogs\\008-travel-sales-crm.md": {
+    "mtime": 1779533943.4418237,
+    "hash": "b7ac9e335b4939a78e1db8ba057f70ff"
+  },
+  "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\blogs\\009-saas-marketing-crm.md": {
+    "mtime": 1779533943.461089,
+    "hash": "67c94ab445088b2781f34908f78af94a"
+  },
+  "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\blogs\\010-real-estate-marketing-crm.md": {
+    "mtime": 1779533943.5123305,
+    "hash": "3122c6949e40bf1219ce3d2eef8f2dd0"
+  },
+  "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\blogs\\011-education-marketing-crm.md": {
+    "mtime": 1779533943.5438187,
+    "hash": "3476bc4b6d6d3f18d9f951eaaf89f02f"
   },
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\public\\robots.txt": {
     "mtime": 1776178000.4926434,
