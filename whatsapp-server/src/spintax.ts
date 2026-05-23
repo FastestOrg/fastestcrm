@@ -22,15 +22,6 @@ export function resolveSpintax(text: string): string {
 export function resolveVariables(text: string, leadData: Record<string, any>): string {
     return text.replace(/%([^%]+)%/g, (_match, field: string) => {
         const key = field.trim().toLowerCase();
-        
-        // Handle special aliases
-        if (key === 'company' && leadData['company_name'] !== undefined && leadData['company_name'] !== null) {
-            return String(leadData['company_name']);
-        }
-        if (key === 'company_name' && leadData['company'] !== undefined && leadData['company'] !== null) {
-            return String(leadData['company']);
-        }
-
         // Try exact match first, then case-insensitive search
         if (leadData[field] !== undefined && leadData[field] !== null) {
             return String(leadData[field]);
