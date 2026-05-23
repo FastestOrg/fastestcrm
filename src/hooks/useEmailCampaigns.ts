@@ -64,6 +64,7 @@ export interface CampaignRecipient {
     opened_at: string | null;
     replied_at: string | null;
     clicked_at: string | null;
+    error_message?: string | null;
     created_at: string;
 }
 
@@ -332,6 +333,7 @@ export function useEmailCampaigns() {
                     campaign_goal: params.campaignGoal,
                     account_ids: params.accountIds,
                     delay_between_emails_ms: params.delayBetweenEmailsMs || 60000,
+                    ai_generated: params.sequences.some(s => s.ai_generated || false),
                     ai_perspective: params.aiPerspective || null,
                     product_info: params.productInfo || null,
                     ai_auto_reply_enabled: params.aiAutoReplyEnabled || false,

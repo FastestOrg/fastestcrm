@@ -160,15 +160,15 @@
     "hash": "07f8ec24544e3cc2779cfcd033fc0942"
   },
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\src\\components\\features\\fastsend\\CampaignBuilder.tsx": {
-    "mtime": 1779538055.050083,
-    "hash": "79a2576024f2108a40f75203446964d2"
+    "mtime": 1779542060.7298024,
+    "hash": "d5c8734a92db80a54c5a5f3bca7b24df"
   },
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\src\\components\\features\\fastsend\\CampaignDetailView.tsx": {
-    "mtime": 1778398195.66327,
-    "hash": "e7597e1a8d6dbc2323ff0fadad807a2b"
+    "mtime": 1779542444.0811493,
+    "hash": "a52ecc078cbd1b89bde1ba7f8322ae7f"
   },
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\src\\components\\features\\fastsend\\CampaignsTab.tsx": {
-    "mtime": 1778398174.423493,
+    "mtime": 1779541887.9048035,
     "hash": "a2e5ac5c64b541c81327025441965ebd"
   },
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\src\\components\\features\\fastsend\\InboxTab.tsx": {
@@ -584,8 +584,8 @@
     "hash": "b4c260f18fac581f54c74592f3a70320"
   },
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\src\\hooks\\useEmailCampaigns.ts": {
-    "mtime": 1778427462.806233,
-    "hash": "cbe7ea63890ce64a1268cd244d2c1491"
+    "mtime": 1779542428.6611428,
+    "hash": "df4a0ab7fab07f1b9aa3d6a9840e0592"
   },
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\src\\hooks\\useEmailInbox.ts": {
     "mtime": 1775417027.091872,
@@ -1376,8 +1376,8 @@
     "hash": "79467d1ff1aa51da84093cdfa52bc1c4"
   },
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\supabase\\functions\\fastsend-campaign\\index.ts": {
-    "mtime": 1779538894.8126912,
-    "hash": "cf0c23a2d8df53f9e42342009ba74ecf"
+    "mtime": 1779542412.888638,
+    "hash": "17169f83fe028bde3947cf07788c5787"
   },
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\supabase\\functions\\fastsend-oauth\\index.ts": {
     "mtime": 1775413650.3457193,
@@ -1967,6 +1967,10 @@
     "mtime": 1779026664.7932858,
     "hash": "3f1f8b07c93e7f3f93445b2e025f24e5"
   },
+  "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\supabase\\migrations\\20260523180000_add_error_message_to_recipients.sql": {
+    "mtime": 1779542379.1186197,
+    "hash": "ea48238bb8b1813d8afa87c375ddf20c"
+  },
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\whatsapp-server\\scripts\\benchmark_cache.ts": {
     "mtime": 1779312467.3503547,
     "hash": "25810300731efec5c8ebe44e5991f154"
@@ -1992,8 +1996,8 @@
     "hash": "beb5d7957b1c3cf8eea4ff07f8d00e1a"
   },
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\whatsapp-server\\src\\spintax.ts": {
-    "mtime": 1779538908.9769359,
-    "hash": "9fd77e78089974b8d2ef29a433461ab9"
+    "mtime": 1779540669.9320743,
+    "hash": "6714595375ef5db92bb47ffee1fc0be9"
   },
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\whatsapp-server\\src\\supabase.ts": {
     "mtime": 1774299066.9060402,

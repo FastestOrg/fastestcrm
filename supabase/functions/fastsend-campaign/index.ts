@@ -232,13 +232,47 @@ Deno.serve(async (req) => {
             // Account limit reached — skip to next account
             continue;
           } else {
+            const now = new Date().toISOString();
             await adminClient
               .from("email_campaign_recipients")
-              .update({ status: "failed" })
+              .update({ status: "failed", error_message: sendResult.error || "Unknown error" })
               .eq("id", recipient.id);
+
+            // Log failed status in email_campaign_logs
+            await adminClient.from("email_campaign_logs").insert({
+              company_id: campaign.company_id,
+              campaign_id: campaignId,
+              recipient_id: recipient.id,
+              sequence_step_id: sequence.id,
+              sent_by_account_id: accountId,
+              recipient_email: recipient.lead_email,
+              subject: resolvedSubject,
+              status: "failed",
+              error_message: sendResult.error || "Unknown error",
+              sent_at: now,
+            });
           }
         } catch (sendErr: any) {
           console.error("Send error:", sendErr);
+          const now = new Date().toISOString();
+          await adminClient
+            .from("email_campaign_recipients")
+            .update({ status: "failed", error_message: sendErr.message || "Unknown execution error" })
+            .eq("id", recipient.id);
+
+          // Log caught failed status in email_campaign_logs
+          await adminClient.from("email_campaign_logs").insert({
+            company_id: campaign.company_id,
+            campaign_id: campaignId,
+            recipient_id: recipient.id,
+            sequence_step_id: sequence.id,
+            sent_by_account_id: accountId,
+            recipient_email: recipient.lead_email,
+            subject: resolvedSubject,
+            status: "failed",
+            error_message: sendErr.message || "Unknown execution error",
+            sent_at: now,
+          });
         }
 
         processed++;

@@ -75,7 +75,12 @@ export function CampaignBuilder({ onCancel, initialData, initialSequences }: { o
                 productInfo,
                 numberOfSteps: stepsCount,
             });
-            setSequences(aiEmails);
+            // Mark each step as AI generated
+            const aiEmailsWithFlag = aiEmails.map(email => ({
+                ...email,
+                ai_generated: true
+            }));
+            setSequences(aiEmailsWithFlag);
             toast.success('Campaign sequence generated!');
         } catch (e: any) {
             toast.error(e.message);
@@ -123,7 +128,7 @@ export function CampaignBuilder({ onCancel, initialData, initialSequences }: { o
                     campaignMode: 'agentic',
                     accountIds: selectedAccounts,
                     delayBetweenEmailsMs: delayMs,
-                    aiGenerated: true,
+                    aiGenerated: sequences.some(s => s.ai_generated || false),
                     aiPerspective: perspective,
                     productInfo,
                     aiAutoReplyEnabled: autopilotEnabled,
@@ -152,8 +157,8 @@ export function CampaignBuilder({ onCancel, initialData, initialSequences }: { o
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="flex items-center justify-between">
                 <div>
-                    <h2 className="text-2xl font-bold tracking-tight">{initialData ? 'Edit AI Campaign' : 'AI Campaign Builder'}</h2>
-                    <p className="text-muted-foreground">{initialData ? 'Update your campaign settings and sequence' : 'Instantly generate high-converting drip sequences'}</p>
+                    <h2 className="text-2xl font-bold tracking-tight">{initialData ? 'Edit Campaign' : 'Email Campaign Builder'}</h2>
+                    <p className="text-muted-foreground">{initialData ? 'Update your campaign settings and sequence' : 'Create manual campaigns or generate drip sequences with AI'}</p>
                 </div>
                 <div className="flex gap-2">
                     <Button variant="outline" onClick={() => {
@@ -251,12 +256,27 @@ export function CampaignBuilder({ onCancel, initialData, initialSequences }: { o
                         </CardHeader>
                         <CardContent className="space-y-6">
                             {sequences.length === 0 ? (
-                                <div className="text-center py-8 border-2 border-dashed bg-muted/10 rounded-lg">
+                                <div className="text-center py-8 border-2 border-dashed bg-muted/10 rounded-lg p-6">
                                     <Wand2 className="mx-auto h-8 w-8 text-primary mb-3" />
                                     <p className="font-medium">Use the AI panel to generate your sequence</p>
-                                    <p className="text-sm text-muted-foreground mt-1 text-balance">
+                                    <p className="text-sm text-muted-foreground mt-1 mb-4 text-balance">
                                         Describe your goals on the right, and Gemini will instantly write a full multi-step drip campaign.
                                     </p>
+                                    <div className="flex justify-center gap-3">
+                                        <Button variant="outline" onClick={() => {
+                                            setSequences([{
+                                                step_number: 1,
+                                                subject: '',
+                                                body_html: '',
+                                                body_text: '',
+                                                delay_after_ms: 0,
+                                                send_condition: 'always',
+                                                ai_generated: false
+                                            }]);
+                                        }}>
+                                            <Plus className="mr-2 h-4 w-4" /> Start from Scratch (Manual)
+                                        </Button>
+                                    </div>
                                 </div>
                             ) : (
                                 <div className="space-y-6 relative border-l-2 border-muted ml-4 pl-6 pb-4">
@@ -283,6 +303,39 @@ export function CampaignBuilder({ onCancel, initialData, initialSequences }: { o
                                             </div>
                                             
                                             <div className="space-y-3">
+                                                {idx > 0 && (
+                                                    <div className="grid grid-cols-2 gap-4 bg-muted/30 p-2.5 rounded-md border border-muted/50 mb-2">
+                                                        <div className="space-y-1">
+                                                            <Label className="text-[11px] font-medium text-muted-foreground">Send Condition</Label>
+                                                            <Select 
+                                                                value={seq.send_condition} 
+                                                                onValueChange={(val) => updateSequence(idx, 'send_condition', val)}
+                                                            >
+                                                                <SelectTrigger className="h-8 text-xs bg-background">
+                                                                    <SelectValue />
+                                                                </SelectTrigger>
+                                                                <SelectContent>
+                                                                    <SelectItem value="always" className="text-xs">Always Send</SelectItem>
+                                                                    <SelectItem value="if_no_reply" className="text-xs">If No Reply</SelectItem>
+                                                                    <SelectItem value="if_no_open" className="text-xs">If Not Opened</SelectItem>
+                                                                </SelectContent>
+                                                            </Select>
+                                                        </div>
+                                                        <div className="space-y-1">
+                                                            <Label className="text-[11px] font-medium text-muted-foreground">Delay (Hours)</Label>
+                                                            <Input 
+                                                                type="number" 
+                                                                min="0"
+                                                                className="h-8 text-xs bg-background" 
+                                                                value={seq.delay_after_ms ? Math.round(seq.delay_after_ms / 3600000) : 0}
+                                                                onChange={(e) => {
+                                                                    const hours = Math.max(0, parseInt(e.target.value) || 0);
+                                                                    updateSequence(idx, 'delay_after_ms', hours * 3600000);
+                                                                }}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                )}
                                                 <div className="space-y-1">
                                                     <Label className="text-xs">Subject</Label>
                                                     <Input value={seq.subject} onChange={(e) => updateSequence(idx, 'subject', e.target.value)} />
@@ -309,7 +362,8 @@ export function CampaignBuilder({ onCancel, initialData, initialSequences }: { o
                                             body_html: '',
                                             body_text: '',
                                             delay_after_ms: 86400000,
-                                            send_condition: 'if_no_reply'
+                                            send_condition: 'if_no_reply',
+                                            ai_generated: false
                                         }]);
                                     }}>
                                         <Plus className="mr-2 h-4 w-4" /> Add Manual Step

@@ -288,7 +288,12 @@ export function CampaignDetailView({ campaign, onBack, onEdit }: { campaign: Ema
                                                 <TableCell className="font-medium">{r.lead_name || '—'}</TableCell>
                                                 <TableCell className="text-muted-foreground">{r.lead_email}</TableCell>
                                                 <TableCell>
-                                                    <Badge variant="outline" className={statusColors[r.status] || ''}>{r.status}</Badge>
+                                                    <div className="space-y-1">
+                                                        <Badge variant="outline" className={statusColors[r.status] || ''}>{r.status}</Badge>
+                                                        {r.status === 'failed' && r.error_message && (
+                                                            <p className="text-[10px] text-destructive max-w-[180px] break-words leading-tight" title={r.error_message}>{r.error_message}</p>
+                                                        )}
+                                                    </div>
                                                 </TableCell>
                                                 <TableCell className="text-center">{r.current_step}/{stats?.totalSteps || '?'}</TableCell>
                                                 <TableCell className="text-center">{r.opened_at ? <Eye className="h-4 w-4 text-blue-500 mx-auto" /> : <span className="text-muted-foreground">—</span>}</TableCell>
@@ -336,6 +341,9 @@ export function CampaignDetailView({ campaign, onBack, onEdit }: { campaign: Ema
                                         <div className="flex-1 min-w-0">
                                             <p className="text-sm font-medium truncate">{log.recipient_email}</p>
                                             <p className="text-xs text-muted-foreground truncate">{log.subject || 'No subject'}</p>
+                                            {log.error_message && (
+                                                <p className="text-xs text-destructive mt-0.5 font-medium">{log.error_message}</p>
+                                            )}
                                         </div>
                                         <div className="text-right shrink-0">
                                             <Badge variant="outline" className="text-[10px]">{log.status}</Badge>
