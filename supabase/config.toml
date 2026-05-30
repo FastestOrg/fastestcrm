@@ -113,3 +113,8 @@ verify_jwt = false
 
 [functions.fastsend-track]
 verify_jwt = false
+
+[functions.ai-caller]
+verify_jwt = false
+
+

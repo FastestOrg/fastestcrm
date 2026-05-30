@@ -11,6 +11,8 @@ import { format } from 'date-fns';
 import type { SaaSLead } from './SaaSLeadsTable';
 import { MaskedValue } from '@/components/ui/MaskedValue';
 import { DEAL_STAGES } from '../config';
+import { useCompany } from '@/hooks/useCompany';
+import { AICallerCallButton } from '@/components/ai-caller/AICallerCallButton';
 
 interface SaaSLeadDetailsDialogProps {
   open: boolean;
@@ -21,6 +23,7 @@ interface SaaSLeadDetailsDialogProps {
 }
 
 export function SaaSLeadDetailsDialog({ open, onOpenChange, lead, owners = [], maskLeads = false }: SaaSLeadDetailsDialogProps) {
+  const { company } = useCompany();
   if (!lead) return null;
 
   const getOwnerName = (ownerId: string | null) => {
@@ -44,11 +47,22 @@ export function SaaSLeadDetailsDialog({ open, onOpenChange, lead, owners = [], m
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[700px] max-h-[90vh]">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <User className="h-5 w-5" />
-            {lead.name}
-            {lead.company_name && (
-              <span className="text-muted-foreground font-normal text-sm">@ {lead.company_name}</span>
+          <DialogTitle className="flex items-center justify-between w-full pr-6 gap-2">
+            <div className="flex items-center gap-2">
+              <User className="h-5 w-5" />
+              {lead.name}
+              {lead.company_name && (
+                <span className="text-muted-foreground font-normal text-sm">@ {lead.company_name}</span>
+              )}
+            </div>
+            {company?.ai_calling_button_active && lead.phone && company.id && (
+              <AICallerCallButton
+                leadId={lead.id}
+                leadPhone={lead.phone}
+                leadName={lead.name}
+                companyId={company.id}
+                size="sm"
+              />
             )}
           </DialogTitle>
         </DialogHeader>

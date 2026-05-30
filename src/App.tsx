@@ -94,6 +94,7 @@ const MarketScout = lazy(() => import("./pages/MarketScout"));
 const FastestScout = lazy(() => import("./pages/FastestScout"));
 const AIMissionControl = lazy(() => import("./pages/AIMissionControl"));
 const PublicDocument = lazy(() => import("./pages/PublicDocument"));
+const AICallerPage = lazy(() => import("./pages/AICallerPage"));
 
 import { useCompany } from "@/hooks/useCompany";
 import { solutionsData } from "./data/solutions";
@@ -298,6 +299,7 @@ function AppRoutes() {
           <Route path="/dashboard/email-settings" element={<ManageEmailAliases />} />
           <Route path="/dashboard/fastsend" element={<FastSend />} />
           <Route path="/dashboard/whatsapp" element={<WhatsAppCampaign />} />
+          <Route path="/dashboard/ai-caller" element={<AICallerPage />} />
           <Route path="/dashboard/quotations" element={<Quotations />} />
           <Route path="/dashboard/quotations/new" element={<QuotationBuilder />} />
           <Route path="/dashboard/quotations/:id" element={<QuotationBuilder />} />

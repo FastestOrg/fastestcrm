@@ -6,6 +6,8 @@ import { Phone, Mail, User, Clock, Shield, CalendarDays, CreditCard, FileText, H
 import { format } from 'date-fns';
 import type { InsuranceLead } from './InsuranceLeadsTable';
 import { MaskedValue } from '@/components/ui/MaskedValue';
+import { useCompany } from '@/hooks/useCompany';
+import { AICallerCallButton } from '@/components/ai-caller/AICallerCallButton';
 
 interface Props {
   open: boolean;
@@ -16,6 +18,7 @@ interface Props {
 }
 
 export function InsuranceLeadDetailsDialog({ open, onOpenChange, lead, owners = [], maskLeads = false }: Props) {
+  const { company } = useCompany();
   if (!lead) return null;
 
   const getOwnerName = (ownerId: string | null) => {
@@ -34,9 +37,20 @@ export function InsuranceLeadDetailsDialog({ open, onOpenChange, lead, owners = 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[700px] max-h-[90vh]">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <User className="h-5 w-5" /> {lead.name}
-            {lead.insurance_type && <Badge variant="outline" className="ml-2">{lead.insurance_type}</Badge>}
+          <DialogTitle className="flex items-center justify-between w-full pr-6 gap-2">
+            <div className="flex items-center gap-2">
+              <User className="h-5 w-5" /> {lead.name}
+              {lead.insurance_type && <Badge variant="outline" className="ml-2">{lead.insurance_type}</Badge>}
+            </div>
+            {company?.ai_calling_button_active && lead.phone && company.id && (
+              <AICallerCallButton
+                leadId={lead.id}
+                leadPhone={lead.phone}
+                leadName={lead.name}
+                companyId={company.id}
+                size="sm"
+              />
+            )}
           </DialogTitle>
         </DialogHeader>
         <ScrollArea className="max-h-[70vh]">

@@ -404,6 +404,7 @@ export type Database = {
           unique_constraints: string[] | null
           updated_at: string | null
           used_licenses: number
+          ai_calling_button_active: boolean
         }
         Insert: {
           admin_id: string
@@ -428,6 +429,7 @@ export type Database = {
           unique_constraints?: string[] | null
           updated_at?: string | null
           used_licenses?: number
+          ai_calling_button_active?: boolean
         }
         Update: {
           admin_id?: string
@@ -452,6 +454,7 @@ export type Database = {
           unique_constraints?: string[] | null
           updated_at?: string | null
           used_licenses?: number
+          ai_calling_button_active?: boolean
         }
         Relationships: []
       }

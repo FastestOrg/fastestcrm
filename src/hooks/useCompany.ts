@@ -18,6 +18,7 @@ interface Company {
   mask_leads?: boolean;
   features?: Record<string, any> | null;
   default_currency?: string | null;
+  ai_calling_button_active?: boolean;
 }
 
 async function fetchCompanyData(userId: string): Promise<Company | null> {

@@ -16,6 +16,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import { useAICallerAgents } from '@/hooks/useAICallerAgents';
+import { PhoneCall, Bot } from 'lucide-react';
 
 interface CreateAutomationDialogProps {
     isOpen: boolean;
@@ -39,6 +41,7 @@ export function CreateAutomationDialog({ isOpen, onOpenChange, onSuccess, automa
     const { toast } = useToast();
     const { members } = useTeam();
     const { data: forms, isLoading: isLoadingForms } = useForms();
+    const { agents: aiAgents, isLoading: isLoadingAgents } = useAICallerAgents();
 
     // Populate state for editing
     useEffect(() => {
@@ -295,11 +298,74 @@ export function CreateAutomationDialog({ isOpen, onOpenChange, onSuccess, automa
                                     <SelectContent>
                                         <SelectItem value="send_email">Send Email</SelectItem>
                                         <SelectItem value="ai_personalized_followup">AI Personalized Follow-up</SelectItem>
+                                        <SelectItem value="ai_call">
+                                            <div className="flex items-center gap-2">
+                                                <PhoneCall className="h-3.5 w-3.5 text-primary" />
+                                                AI Phone Call
+                                            </div>
+                                        </SelectItem>
                                         <SelectItem value="webhook">Call Webhook</SelectItem>
                                         <SelectItem value="assign_lead">Assign Lead</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
+
+                            {actionType === 'ai_call' && (
+                                <div className="space-y-3">
+                                    <div className="p-3 bg-primary/5 rounded-lg border border-primary/10 mb-2 flex items-start gap-2">
+                                        <PhoneCall className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+                                        <div>
+                                            <p className="text-[11px] text-primary font-medium">AI CALLER MODE</p>
+                                            <p className="text-[10px] text-muted-foreground mt-0.5">
+                                                An AI agent will call the lead using Gemini 3.1 Flash Live via Vobiz telephony.
+                                                Calls are queued and processed sequentially.
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>AI Caller Agent</Label>
+                                        <Select
+                                            value={actionConfig.agent_id || ''}
+                                            onValueChange={(val) => setActionConfig({ ...actionConfig, agent_id: val })}
+                                        >
+                                            <SelectTrigger>
+                                                <SelectValue placeholder={isLoadingAgents ? 'Loading agents...' : 'Select an AI agent'} />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {aiAgents.length === 0 ? (
+                                                    <SelectItem value="none" disabled>
+                                                        No agents — create one in FastEngage → AI Caller
+                                                    </SelectItem>
+                                                ) : (
+                                                    aiAgents.filter(a => a.is_active).map(agent => (
+                                                        <SelectItem key={agent.id} value={agent.id}>
+                                                            <div className="flex items-center gap-2">
+                                                                <Bot className="h-3.5 w-3.5 text-primary" />
+                                                                {agent.name}
+                                                            </div>
+                                                        </SelectItem>
+                                                    ))
+                                                )}
+                                            </SelectContent>
+                                        </Select>
+                                        {aiAgents.length === 0 && !isLoadingAgents && (
+                                            <p className="text-xs text-orange-500">
+                                                ⚠ No active agents found.{' '}
+                                                <a href="/dashboard/ai-caller" className="underline">Create an AI agent first →</a>
+                                            </p>
+                                        )}
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Custom Call Instructions <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                                        <Textarea
+                                            placeholder="Override agent prompt for this specific automation, e.g. 'Start the call by asking about their budget range'"
+                                            value={actionConfig.custom_instructions || ''}
+                                            onChange={(e) => setActionConfig({ ...actionConfig, custom_instructions: e.target.value })}
+                                            className="min-h-[80px]"
+                                        />
+                                    </div>
+                                </div>
+                            )}
 
                             {actionType === 'ai_personalized_followup' && (
                                 <div className="space-y-3">

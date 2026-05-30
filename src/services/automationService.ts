@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { generateAgenticReply } from './emailAIService';
 
 export type TriggerType = 'lead_created' | 'status_changed' | 'tag_added' | 'form_submitted';
-export type ActionType = 'send_email' | 'webhook' | 'create_task' | 'assign_lead' | 'ai_personalized_followup';
+export type ActionType = 'send_email' | 'webhook' | 'create_task' | 'assign_lead' | 'ai_personalized_followup' | 'ai_call';
 
 export interface Automation {
     id: string;
@@ -226,6 +226,43 @@ export const automationService = {
 
                 const sendResult = await res.json();
                 if (sendResult.error) throw new Error(sendResult.error);
+
+            } else if (auto.action_type === 'ai_call' as any) {
+                // AI Caller: enqueue call (FIFO queue — processed sequentially via Edge Function)
+                const agentId = auto.action_config?.agent_id;
+                if (!agentId) {
+                    throw new Error('No AI agent configured for this automation');
+                }
+
+                const phone = lead.phone || lead.mobile_number || lead.whatsapp_number;
+                if (!phone) {
+                    throw new Error('Lead has no phone number for AI call');
+                }
+
+                const { data: sessionData } = await supabase.auth.getSession();
+                const token = sessionData.session?.access_token;
+
+                const res = await fetch(
+                    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/trigger-ai-call`,
+                    {
+                        method: 'POST',
+                        headers: {
+                            Authorization: `Bearer ${token}`,
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            lead_id: lead.id,
+                            lead_phone: phone,
+                            lead_name: lead.name,
+                            agent_id: agentId,
+                            automation_id: auto.id,
+                            company_id: lead.company_id,
+                        }),
+                    }
+                );
+
+                const callResult = await res.json();
+                if (!res.ok) throw new Error(callResult?.error || 'Failed to queue AI call');
 
             } else if (auto.action_type === 'whatsapp' as any) {
                 const apiKey = await this.getIntegrationKey('whatsapp');

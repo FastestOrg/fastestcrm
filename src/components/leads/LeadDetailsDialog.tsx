@@ -8,7 +8,7 @@ import {
 import { Tables } from '@/integrations/supabase/types';
 import { format } from 'date-fns';
 import { useState, useEffect } from 'react';
-import { Mail, Phone, Building, Calendar, User, CreditCard, Link, MapPin, Home, DollarSign, Megaphone, Globe, Layers, CalendarClock, Pencil, Save } from 'lucide-react';
+import { Mail, Phone, Building, Calendar, User, CreditCard, Link, MapPin, Home, DollarSign, Megaphone, Globe, Layers, CalendarClock, Pencil, Save, Shield } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { MaskedValue } from '@/components/ui/MaskedValue';
@@ -35,6 +35,8 @@ import { toast } from 'sonner';
 import { PriorityBadge } from './PriorityBadge';
 import { CompetitorBattleCard } from './CompetitorBattleCard';
 import { useLeadScoring } from '@/hooks/useLeadScoring';
+import { useCompany } from '@/hooks/useCompany';
+import { AICallerCallButton } from '@/components/ai-caller/AICallerCallButton';
 
 type Lead = Tables<'leads'> & Partial<Tables<'leads_real_estate'>> & {
     sales_owner?: {
@@ -55,6 +57,7 @@ interface LeadDetailsDialogProps {
 export function LeadDetailsDialog({ open, onOpenChange, lead, owners, maskLeads = false, onEdit, onUpdate }: LeadDetailsDialogProps) {
     const updateLead = useUpdateLead();
     const { statuses } = useLeadStatuses();
+    const { company } = useCompany();
     const [quickStatus, setQuickStatus] = useState(lead?.status || 'new');
     const [quickNotes, setQuickNotes] = useState(lead?.notes || '');
     const [isSaving, setIsSaving] = useState(false);
@@ -155,6 +158,15 @@ export function LeadDetailsDialog({ open, onOpenChange, lead, owners, maskLeads 
                         </div>
                         <div className="flex flex-col items-end gap-2">
                              <div className="flex items-center gap-2">
+                                 {company?.ai_calling_button_active && lead.phone && company.id && (
+                                     <AICallerCallButton
+                                         leadId={lead.id}
+                                         leadPhone={lead.phone}
+                                         leadName={lead.name}
+                                         companyId={company.id}
+                                         size="sm"
+                                     />
+                                 )}
                                  <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20">
                                     {lead.status?.replace('_', ' ').toUpperCase()}
                                  </Badge>

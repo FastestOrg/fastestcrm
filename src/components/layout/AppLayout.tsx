@@ -6,7 +6,7 @@ import { useCompany } from '@/hooks/useCompany';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { LayoutDashboard, Users, UserCheck, CreditCard, Settings, LogOut, Phone, Workflow, Link2, BarChart3, Brain, Calendar, FileText, Building2, Shield, Package, PieChart, Database, CheckSquare, AlertTriangle, Clock, ChevronDown, ChevronUp, Mail, PanelLeftClose, PanelLeftOpen, MessageCircle, Receipt, Sparkles, Wand2, ShieldCheck, Bot, Zap, Target, Heart, Globe } from 'lucide-react';
+import { LayoutDashboard, Users, UserCheck, CreditCard, Settings, LogOut, Phone, Workflow, Link2, BarChart3, Brain, Calendar, FileText, Building2, Shield, Package, PieChart, Database, CheckSquare, AlertTriangle, Clock, ChevronDown, ChevronUp, Mail, PanelLeftClose, PanelLeftOpen, MessageCircle, Receipt, Sparkles, Wand2, ShieldCheck, Bot, Zap, Target, Heart, Globe, PhoneCall } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -113,6 +113,11 @@ const navItems: NavItem[] = [{
     icon: Calendar,
     label: 'Calendar',
     path: '/dashboard/calendar',
+    section: 'FastEngage'
+}, {
+    icon: PhoneCall,
+    label: 'AI Caller',
+    path: '/dashboard/ai-caller',
     section: 'FastEngage'
 }, {
     icon: ShieldCheck,

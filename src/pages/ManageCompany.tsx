@@ -36,6 +36,7 @@ interface Company {
   features: Record<string, boolean> | null;
   mask_leads: boolean;
   default_currency: string | null;
+  ai_calling_button_active: boolean;
 }
 
 interface WalletData {
@@ -82,6 +83,7 @@ export default function ManageCompany() {
   const [slugError, setSlugError] = useState('');
   const [maskLeads, setMaskLeads] = useState(false);
   const [defaultCurrency, setDefaultCurrency] = useState('INR');
+  const [aiCallingButtonActive, setAiCallingButtonActive] = useState(false);
 
   // Data Sync
   const [syncCountryCode, setSyncCountryCode] = useState('91');
@@ -251,6 +253,7 @@ export default function ManageCompany() {
         features: (companyData.features as Record<string, boolean>) || null,
         mask_leads: companyData.mask_leads || false,
         default_currency: companyData.default_currency || 'INR',
+        ai_calling_button_active: companyData.ai_calling_button_active || false,
       };
 
       setCompany(mappedCompany);
@@ -261,6 +264,7 @@ export default function ManageCompany() {
       setLogoUrl(proxifySupabaseUrl(mappedCompany.logo_url));
       setMaskLeads(mappedCompany.mask_leads);
       setDefaultCurrency(mappedCompany.default_currency || 'INR');
+      setAiCallingButtonActive(mappedCompany.ai_calling_button_active);
 
       // Get Wallet
       const { data: walletData } = await supabase
@@ -324,6 +328,7 @@ export default function ManageCompany() {
           logo_url: logoUrl,
           mask_leads: maskLeads,
           default_currency: defaultCurrency,
+          ai_calling_button_active: aiCallingButtonActive,
         })
         .eq('id', company.id);
 
@@ -1117,6 +1122,21 @@ export default function ManageCompany() {
                     id="mask-leads"
                     checked={maskLeads}
                     onCheckedChange={setMaskLeads}
+                  />
+                </div>
+                <Separator />
+
+                <div className="flex items-center justify-between space-x-2">
+                  <div className="space-y-1">
+                    <Label htmlFor="ai-calling-button-active" className="text-base">AI Calling Button Activation</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Enable manual AI call initiation button in the lead panel.
+                    </p>
+                  </div>
+                  <Switch
+                    id="ai-calling-button-active"
+                    checked={aiCallingButtonActive}
+                    onCheckedChange={setAiCallingButtonActive}
                   />
                 </div>
                 <Separator />
