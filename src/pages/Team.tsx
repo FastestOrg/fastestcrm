@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 // DashboardLayout removed
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,7 @@ import { z } from 'zod';
 import { useCompany } from '@/hooks/useCompany';
 import { useNavigate } from 'react-router-dom';
 import { OrgChart } from '@/components/team/OrgChart';
+import { Switch } from '@/components/ui/switch';
 
 // Validation schema for team member invitation
 const inviteSchema = z.object({
@@ -63,6 +64,7 @@ export default function Team() {
         setManager,
         deleteMember,
         toggleMemberStatus,
+        updateIncentive,
         getRoleLabel,
         getAssignableRoles,
         refetch,
@@ -99,6 +101,81 @@ export default function Team() {
     // Deactivation State
     const [deactivateDialogOpen, setDeactivateDialogOpen] = useState(false);
     const [isTogglingStatus, setIsTogglingStatus] = useState(false);
+
+    // Incentive Settings State
+    const [isIncentiveEnabled, setIsIncentiveEnabled] = useState(false);
+    const [incentivePercentInput, setIncentivePercentInput] = useState('0');
+    const [isSavingIncentive, setIsSavingIncentive] = useState(false);
+
+    useEffect(() => {
+        if (selectedMember) {
+            const member = members.find(m => m.id === selectedMember);
+            if (member) {
+                const hasIncentive = member.incentive_percent !== null && member.incentive_percent !== undefined;
+                setIsIncentiveEnabled(hasIncentive);
+                setIncentivePercentInput(hasIncentive ? String(member.incentive_percent) : '0');
+            }
+        } else {
+            setIsIncentiveEnabled(false);
+            setIncentivePercentInput('0');
+        }
+    }, [selectedMember, members]);
+
+    const handleIncentiveToggle = async (checked: boolean) => {
+        if (!selectedMember) return;
+        setIsIncentiveEnabled(checked);
+        
+        if (!checked) {
+            setIsSavingIncentive(true);
+            const { error } = await updateIncentive(selectedMember, null);
+            setIsSavingIncentive(false);
+            
+            if (error) {
+                toast({
+                    title: "Error",
+                    description: error.message || "Failed to update incentive setting.",
+                    variant: "destructive"
+                });
+                setIsIncentiveEnabled(true);
+            } else {
+                toast({
+                    title: "Success",
+                    description: "Incentive model disabled for this employee.",
+                });
+            }
+        }
+    };
+
+    const handleSaveIncentivePercent = async () => {
+        if (!selectedMember) return;
+        
+        const percent = parseFloat(incentivePercentInput);
+        if (isNaN(percent) || percent < 0 || percent > 100) {
+            toast({
+                title: "Invalid Percentage",
+                description: "Please enter a percentage between 0 and 100.",
+                variant: "destructive"
+            });
+            return;
+        }
+
+        setIsSavingIncentive(true);
+        const { error } = await updateIncentive(selectedMember, percent);
+        setIsSavingIncentive(false);
+
+        if (error) {
+            toast({
+                title: "Error",
+                description: error.message || "Failed to save incentive percentage.",
+                variant: "destructive"
+            });
+        } else {
+            toast({
+                title: "Success",
+                description: `Incentive percentage set to ${percent}%.`,
+            });
+        }
+    };
 
     const openEditHierarchy = () => {
         // Initialize form with current labels
@@ -700,6 +777,52 @@ export default function Team() {
                                         }
                                     </SelectContent>
                                 </Select>
+                            </div>
+
+                            {/* Incentive Section */}
+                            <div className="pt-4 border-t">
+                                <label className="text-sm font-medium mb-2 block">
+                                    Incentive Model
+                                </label>
+                                <div className="space-y-3 bg-muted/30 p-3 rounded-lg border">
+                                    <div className="flex items-center justify-between">
+                                        <div className="space-y-0.5">
+                                            <span className="text-xs font-semibold">Enable Incentive</span>
+                                            <p className="text-[10px] text-muted-foreground">Calculate team commissions for this employee</p>
+                                        </div>
+                                        <Switch
+                                            checked={isIncentiveEnabled}
+                                            onCheckedChange={handleIncentiveToggle}
+                                            disabled={isSavingIncentive}
+                                        />
+                                    </div>
+                                    {isIncentiveEnabled && (
+                                        <div className="space-y-1.5 pt-2 border-t border-border/50">
+                                            <span className="text-xs font-semibold">Incentive Percentage</span>
+                                            <div className="flex items-center gap-2">
+                                                <Input
+                                                    type="number"
+                                                    min="0"
+                                                    max="100"
+                                                    step="0.1"
+                                                    value={incentivePercentInput}
+                                                    onChange={(e) => setIncentivePercentInput(e.target.value)}
+                                                    className="w-24 h-9"
+                                                    placeholder="0.0"
+                                                />
+                                                <span className="text-sm text-muted-foreground">%</span>
+                                                <Button 
+                                                    size="sm" 
+                                                    onClick={handleSaveIncentivePercent}
+                                                    disabled={isSavingIncentive}
+                                                >
+                                                    {isSavingIncentive && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
+                                                    Save
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
 
                             <div className="pt-4 border-t">

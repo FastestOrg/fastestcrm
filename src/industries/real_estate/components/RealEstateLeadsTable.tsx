@@ -1,5 +1,5 @@
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, memo } from 'react';
 import {
   Table,
   TableBody,
@@ -118,7 +118,7 @@ interface ProfileLevel {
   children: ProfileLevel[];
 }
 
-export function RealEstateLeadsTable({
+export const RealEstateLeadsTable = memo(function RealEstateLeadsTable({
   leads,
   loading,
   selectedLeads,
@@ -303,17 +303,16 @@ export function RealEstateLeadsTable({
     return `Up to ${formatNum(max!)} `;
   };
 
-  // Define Column Renderers
-  const columnDefinitions: Record<string, { label: string, minWidth?: string, render: (lead: RealEstateLead) => React.ReactNode }> = {
+  const columnDefinitions = useMemo(() => ({
     name: {
       label: 'Name',
       minWidth: 'min-w-[150px]',
-      render: (lead) => <div className="font-medium">{lead.name}</div>
+      render: (lead: RealEstateLead) => <div className="font-medium">{lead.name}</div>
     },
     contact: {
       label: 'Contact',
       minWidth: 'min-w-[150px]',
-      render: (lead) => (
+      render: (lead: RealEstateLead) => (
         <div className="flex flex-col gap-1">
           {lead.phone && (
             <span className="flex items-center gap-1 text-muted-foreground text-xs">
@@ -331,27 +330,27 @@ export function RealEstateLeadsTable({
     property_name: {
       label: 'Property Name',
       minWidth: 'min-w-[120px]',
-      render: (lead) => lead.property_name || '-'
+      render: (lead: RealEstateLead) => lead.property_name || '-'
     },
     lead_source: {
       label: 'Lead Source',
       minWidth: 'min-w-[120px]',
-      render: (lead) => lead.lead_source || '-'
+      render: (lead: RealEstateLead) => lead.lead_source || '-'
     },
     property_type: {
       label: 'Property Type',
       minWidth: 'min-w-[120px]',
-      render: (lead) => <Badge variant="outline">{lead.property_type || '-'}</Badge>
+      render: (lead: RealEstateLead) => <Badge variant="outline">{lead.property_type || '-'}</Badge>
     },
     budget: {
       label: 'Budget',
       minWidth: 'min-w-[120px]',
-      render: (lead) => formatBudget(lead.budget_min, lead.budget_max)
+      render: (lead: RealEstateLead) => formatBudget(lead.budget_min, lead.budget_max)
     },
     location: {
       label: 'Location',
       minWidth: 'min-w-[120px]',
-      render: (lead) => lead.preferred_location ? (
+      render: (lead: RealEstateLead) => lead.preferred_location ? (
         <span className="flex items-center gap-1 text-sm">
           <MapPin className="h-3 w-3" /> {lead.preferred_location}
         </span>
@@ -360,7 +359,7 @@ export function RealEstateLeadsTable({
     lead_profile: {
       label: 'Lead Profile',
       minWidth: 'min-w-[200px]',
-      render: (lead) => (
+      render: (lead: RealEstateLead) => (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
@@ -407,7 +406,7 @@ export function RealEstateLeadsTable({
     status: {
       label: 'Status',
       minWidth: 'min-w-[150px]',
-      render: (lead) => (
+      render: (lead: RealEstateLead) => (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
@@ -435,7 +434,7 @@ export function RealEstateLeadsTable({
     pre_sales_owner: {
       label: 'Pre-Sales',
       minWidth: 'min-w-[150px]',
-      render: (lead) => (
+      render: (lead: RealEstateLead) => (
         <Select
           value={lead.pre_sales_owner_id || 'unassigned'}
           onValueChange={(val) => handleUpdateField(lead.id, 'pre_sales_owner_id', val === 'unassigned' ? null : val)}
@@ -455,7 +454,7 @@ export function RealEstateLeadsTable({
     sales_owner: {
       label: 'Sales',
       minWidth: 'min-w-[150px]',
-      render: (lead) => (
+      render: (lead: RealEstateLead) => (
         <Select
           value={lead.sales_owner_id || 'unassigned'}
           onValueChange={(val) => handleUpdateField(lead.id, 'sales_owner_id', val === 'unassigned' ? null : val)}
@@ -475,7 +474,7 @@ export function RealEstateLeadsTable({
     post_sales_owner: {
       label: 'Post-Sales',
       minWidth: 'min-w-[150px]',
-      render: (lead) => (
+      render: (lead: RealEstateLead) => (
         <Select
           value={lead.post_sales_owner_id || 'unassigned'}
           onValueChange={(val) => handleUpdateField(lead.id, 'post_sales_owner_id', val === 'unassigned' ? null : val)}
@@ -495,7 +494,7 @@ export function RealEstateLeadsTable({
     notes: {
       label: 'Notes',
       minWidth: 'min-w-[200px]',
-      render: (lead) => (
+      render: (lead: RealEstateLead) => (
         <Textarea
           className="min-h-[60px] text-xs resize-none border-transparent hover:border-input focus:border-input bg-transparent p-2 shadow-none"
           placeholder="Add notes..."
@@ -515,12 +514,12 @@ export function RealEstateLeadsTable({
     created_at: {
       label: 'Date',
       minWidth: 'min-w-[120px]',
-      render: (lead) => <span className="text-sm">{format(new Date(lead.created_at), 'MMM d, yyyy')}</span>
+      render: (lead: RealEstateLead) => <span className="text-sm">{format(new Date(lead.created_at), 'MMM d, yyyy')}</span>
     },
     site_visit: {
       label: 'Site Visit',
       minWidth: 'min-w-[100px]',
-      render: (lead) => (
+      render: (lead: RealEstateLead) => (
         <Button
           variant={lead.site_visit_photos && lead.site_visit_photos.length > 0 ? "outline" : "secondary"}
           size="sm"
@@ -532,11 +531,10 @@ export function RealEstateLeadsTable({
         </Button>
       )
     },
-    // New available columns
     email: {
       label: 'Email',
       minWidth: 'min-w-[150px]',
-      render: (lead) => lead.email ? (
+      render: (lead: RealEstateLead) => lead.email ? (
         <span className="flex items-center gap-1 text-muted-foreground text-xs">
           <Mail className="h-3 w-3" />
           <MaskedValue value={lead.email} type="email" enabled={maskLeads} />
@@ -546,7 +544,7 @@ export function RealEstateLeadsTable({
     phone: {
       label: 'Phone',
       minWidth: 'min-w-[120px]',
-      render: (lead) => lead.phone ? (
+      render: (lead: RealEstateLead) => lead.phone ? (
         <span className="flex items-center gap-1 text-muted-foreground text-xs">
           <Phone className="h-3 w-3" />
           <MaskedValue value={lead.phone} type="phone" enabled={maskLeads} />
@@ -556,7 +554,7 @@ export function RealEstateLeadsTable({
     whatsapp: {
       label: 'WhatsApp',
       minWidth: 'min-w-[120px]',
-      render: (lead) => lead.whatsapp ? (
+      render: (lead: RealEstateLead) => lead.whatsapp ? (
         <a
           href={`https://wa.me/${lead.whatsapp}`}
           target="_blank"
@@ -570,69 +568,69 @@ export function RealEstateLeadsTable({
     budget_min: {
       label: 'Min Budget',
       minWidth: 'min-w-[100px]',
-      render: (lead) => formatBudget(lead.budget_min, null)
+      render: (lead: RealEstateLead) => formatBudget(lead.budget_min, null)
     },
     budget_max: {
       label: 'Max Budget',
       minWidth: 'min-w-[100px]',
-      render: (lead) => formatBudget(null, lead.budget_max)
+      render: (lead: RealEstateLead) => formatBudget(null, lead.budget_max)
     },
     property_size: {
       label: 'Property Size',
       minWidth: 'min-w-[100px]',
-      render: (lead) => lead.property_size || '-'
+      render: (lead: RealEstateLead) => lead.property_size || '-'
     },
     possession_timeline: {
       label: 'Possession',
       minWidth: 'min-w-[120px]',
-      render: (lead) => lead.possession_timeline || '-'
+      render: (lead: RealEstateLead) => lead.possession_timeline || '-'
     },
     broker_name: {
       label: 'Broker Name',
       minWidth: 'min-w-[120px]',
-      render: (lead) => lead.broker_name || '-'
+      render: (lead: RealEstateLead) => lead.broker_name || '-'
     },
     unit_number: {
       label: 'Unit No.',
       minWidth: 'min-w-[80px]',
-      render: (lead) => lead.unit_number || '-'
+      render: (lead: RealEstateLead) => lead.unit_number || '-'
     },
     deal_value: {
       label: 'Deal Value',
       minWidth: 'min-w-[100px]',
-      render: (lead) => lead.deal_value ? `₹${lead.deal_value.toLocaleString()}` : '-'
+      render: (lead: RealEstateLead) => lead.deal_value ? `₹${lead.deal_value.toLocaleString()}` : '-'
     },
     commission_percentage: {
       label: 'Commission %',
       minWidth: 'min-w-[80px]',
-      render: (lead) => lead.commission_percentage ? `${lead.commission_percentage}%` : '-'
+      render: (lead: RealEstateLead) => lead.commission_percentage ? `${lead.commission_percentage}%` : '-'
     },
     commission_amount: {
       label: 'Commission Amount',
       minWidth: 'min-w-[100px]',
-      render: (lead) => lead.commission_amount ? `₹${lead.commission_amount.toLocaleString()}` : '-'
+      render: (lead: RealEstateLead) => lead.commission_amount ? `₹${lead.commission_amount.toLocaleString()}` : '-'
     },
     revenue_projected: {
       label: 'Revenue Projected',
       minWidth: 'min-w-[100px]',
-      render: (lead) => lead.revenue_projected ? `₹${lead.revenue_projected.toLocaleString()}` : '-'
+      render: (lead: RealEstateLead) => lead.revenue_projected ? `₹${lead.revenue_projected.toLocaleString()}` : '-'
     },
     revenue_received: {
       label: 'Revenue Received',
       minWidth: 'min-w-[100px]',
-      render: (lead) => lead.revenue_received ? `₹${lead.revenue_received.toLocaleString()}` : '-'
+      render: (lead: RealEstateLead) => lead.revenue_received ? `₹${lead.revenue_received.toLocaleString()}` : '-'
     },
     updated_at: {
       label: 'Last Updated',
       minWidth: 'min-w-[120px]',
-      render: (lead) => <span className="text-xs text-muted-foreground">{format(new Date(lead.updated_at), 'MMM d, yyyy')}</span>
+      render: (lead: RealEstateLead) => <span className="text-xs text-muted-foreground">{format(new Date(lead.updated_at), 'MMM d, yyyy')}</span>
     },
     purpose: {
       label: 'Purpose',
       minWidth: 'min-w-[100px]',
-      render: (lead) => lead.purpose || '-'
+      render: (lead: RealEstateLead) => lead.purpose || '-'
     }
-  };
+  }), [owners, maskLeads, profilingConfig, statuses, notesBuffer, handleProfileChange, handleUpdateField, handleStatusChange, getStatusColor, getStatusDisplay]);
 
 
   const visibleColumnIds = useMemo(() => {
@@ -657,7 +655,7 @@ export function RealEstateLeadsTable({
       ];
     }
     return columnConfig.filter(c => c.visible).map(c => c.id).filter(id => columnDefinitions[id]);
-  }, [columnConfig]);
+  }, [columnConfig, columnDefinitions]);
 
   if (loading) {
     return (
@@ -829,4 +827,4 @@ export function RealEstateLeadsTable({
       />
     </>
   );
-}
+});

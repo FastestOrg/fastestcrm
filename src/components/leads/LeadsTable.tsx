@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, memo } from 'react';
 import { Tables } from '@/integrations/supabase/types';
 import {
   Table,
@@ -68,7 +68,7 @@ interface LeadsTableProps {
   maskLeads?: boolean;
 }
 
-export function LeadsTable({ leads, loading, selectedLeads, onSelectionChange, owners = [], columnConfig, maskLeads = false }: LeadsTableProps) {
+export const LeadsTable = memo(function LeadsTable({ leads, loading, selectedLeads, onSelectionChange, owners = [], columnConfig, maskLeads = false }: LeadsTableProps) {
   const { products } = useProducts();
   const updateLead = useUpdateLead();
   const { data: userRole } = useUserRole();
@@ -238,8 +238,7 @@ export function LeadsTable({ leads, loading, selectedLeads, onSelectionChange, o
     }
   };
 
-  // Define Column Renderers
-  const columnDefinitions: Record<string, { label: string, render: (lead: Lead) => React.ReactNode }> = {
+  const columnDefinitions = useMemo<Record<string, { label: string, render: (lead: Lead) => React.ReactNode }>>(() => ({
     priority: {
       label: 'Priority',
       render: (lead) => {
@@ -403,7 +402,7 @@ export function LeadsTable({ leads, loading, selectedLeads, onSelectionChange, o
       label: 'Company ID',
       render: (lead) => <span className="text-xs text-muted-foreground">{lead.company_id || '-'}</span>
     }
-  };
+  }), [products, maskLeads, statuses, owners, handleStatusChange, handleProductChange, handleCreatePaymentLink, getStatusColor, getStatusDisplay]);
 
   const visibleColumnIds = useMemo(() => {
     if (!columnConfig) {
@@ -423,7 +422,7 @@ export function LeadsTable({ leads, loading, selectedLeads, onSelectionChange, o
       ];
     }
     return columnConfig.filter(c => c.visible).map(c => c.id).filter(id => columnDefinitions[id]);
-  }, [columnConfig]);
+  }, [columnConfig, columnDefinitions]);
 
 
   if (loading) {
@@ -585,4 +584,4 @@ export function LeadsTable({ leads, loading, selectedLeads, onSelectionChange, o
       )}
     </>
   );
-}
+});

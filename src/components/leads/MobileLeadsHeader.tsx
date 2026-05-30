@@ -10,7 +10,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 interface FilterOption {
   label: string;
@@ -71,6 +71,20 @@ export function MobileLeadsHeader({
   onEditLayout
 }: MobileLeadsHeaderProps) {
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [localSearch, setLocalSearch] = useState(searchValue);
+
+  useEffect(() => {
+    setLocalSearch(searchValue);
+  }, [searchValue]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (localSearch !== searchValue) {
+        onSearchChange(localSearch);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [localSearch, onSearchChange, searchValue]);
 
   const hasActiveFilters = selectedOwners.size > 0 ||
     selectedStatuses.size > 0 ||
@@ -143,8 +157,8 @@ export function MobileLeadsHeader({
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search leads..."
-            value={searchValue}
-            onChange={(e) => onSearchChange(e.target.value)}
+            value={localSearch}
+            onChange={(e) => setLocalSearch(e.target.value)}
             className="pl-9"
           />
         </div>

@@ -14,7 +14,7 @@ export interface AIMetadata {
  */
 export async function getGeminiKey(companyId: string): Promise<string> {
     // 1. Try fetching by company_id directly
-    let { data: integration, error } = await supabase
+    const { data: directKey, error } = await supabase
         .from('integration_api_keys')
         .select('api_key')
         .eq('company_id', companyId)
@@ -28,14 +28,16 @@ export async function getGeminiKey(companyId: string): Promise<string> {
         throw new Error('Database error while retrieving AI key.');
     }
 
+    let integrationApiKey: string | null = directKey?.api_key || null;
+
     // 2. Fallback to legacy user_id lookup
-    if (!integration?.api_key) {
+    if (!integrationApiKey) {
         const { data: profiles } = await supabase
             .from('profiles')
             .select('id')
             .eq('company_id', companyId);
 
-        const userIds = profiles?.map((p: any) => p.id) || [];
+        const userIds = profiles?.map((p: { id: string }) => p.id) || [];
         if (userIds.length > 0) {
             const { data: legacyKey } = await supabase
                 .from('integration_api_keys')
@@ -46,15 +48,17 @@ export async function getGeminiKey(companyId: string): Promise<string> {
                 .limit(1)
                 .maybeSingle();
             
-            if (legacyKey) integration = legacyKey as any;
+            if (legacyKey?.api_key) {
+                integrationApiKey = legacyKey.api_key;
+            }
         }
     }
 
-    if (!integration?.api_key) {
+    if (!integrationApiKey) {
         throw new Error('No active Gemini API key found for your company. Please set it up in Settings.');
     }
 
-    return integration.api_key;
+    return integrationApiKey;
 }
 
 /**
@@ -78,7 +82,7 @@ export async function callGemini(params: {
 }): Promise<string> {
     const { apiKey, prompt, imageBase64, temperature = 0.2 } = params;
 
-    const parts: any[] = [{ text: prompt }];
+    const parts: ({ text: string } | { inline_data: { mime_type: string; data: string } })[] = [{ text: prompt }];
     if (imageBase64) {
         parts.push({
             inline_data: {

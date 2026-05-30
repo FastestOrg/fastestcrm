@@ -15,8 +15,8 @@ export interface TeamMember {
   created_at: string;
   role: AppRole;
   is_deactivated?: boolean;
-  /** UI-only flag used for optimistic invitations */
   is_pending?: boolean;
+  incentive_percent?: number | null;
   manager?: {
     id: string;
     full_name: string | null;
@@ -172,7 +172,7 @@ export function useTeam() {
       // 2. Fetch profiles for THIS company
       let profilesQuery = supabase
         .from('profiles')
-        .select('id, full_name, email, phone, avatar_url, manager_id, created_at, is_deactivated')
+        .select('id, full_name, email, phone, avatar_url, manager_id, created_at, is_deactivated, incentive_percent')
         .order('created_at', { ascending: true });
 
       if (myCompanyId) {
@@ -216,6 +216,7 @@ export function useTeam() {
         created_at: profile.created_at,
         role: roleMap.get(profile.id) || 'bde',
         is_deactivated: (profile as any).is_deactivated ?? false,
+        incentive_percent: (profile as any).incentive_percent ?? null,
       }));
 
       // Populate valid manager objects
@@ -392,6 +393,23 @@ export function useTeam() {
     return { error: null };
   };
 
+  const updateIncentive = async (targetUserId: string, percent: number | null) => {
+    if (!user) return { error: new Error('Not authenticated') };
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({ incentive_percent: percent })
+      .eq('id', targetUserId);
+
+    if (!error) {
+      setMembers(prev => prev.map(m =>
+        m.id === targetUserId ? { ...m, incentive_percent: percent } : m
+      ));
+    }
+
+    return { error };
+  };
+
   const addMemberOptimistic = (newMember: TeamMember) => {
     setMembers(prev => [...prev, newMember]);
   };
@@ -411,6 +429,7 @@ export function useTeam() {
     promoteUser,
     deleteMember,
     toggleMemberStatus,
+    updateIncentive,
     setManager,
     getRoleLabel,
     getAssignableRoles,

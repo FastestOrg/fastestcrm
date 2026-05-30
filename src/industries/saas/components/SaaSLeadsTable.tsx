@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, memo } from 'react';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
@@ -87,7 +87,7 @@ interface SaaSLeadsTableProps {
   maskLeads?: boolean;
 }
 
-export function SaaSLeadsTable({
+export const SaaSLeadsTable = memo(function SaaSLeadsTable({
   leads,
   loading,
   selectedLeads,
@@ -399,4 +399,4 @@ export function SaaSLeadsTable({
       )}
     </>
   );
-}
+});

@@ -185,6 +185,11 @@ function TreeItem({ node, onManage, currentUserId, getRoleLabel }: { node: TreeN
                         <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-normal">
                             {getRoleLabel(node.member.role)}
                         </Badge>
+                        {node.member.incentive_percent !== null && node.member.incentive_percent !== undefined && (
+                            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-normal bg-emerald-50 text-emerald-700 border-emerald-200">
+                                {node.member.incentive_percent}% Inc.
+                            </Badge>
+                        )}
                         {isDeactivated && (
                             <Badge variant="destructive" className="text-[10px] px-1.5 py-0 font-normal">
                                 Deactivated

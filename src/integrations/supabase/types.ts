@@ -2960,6 +2960,7 @@ export type Database = {
           manager_id: string | null
           phone: string | null
           updated_at: string
+          incentive_percent: number | null
         }
         Insert: {
           avatar_url?: string | null
@@ -2973,6 +2974,7 @@ export type Database = {
           manager_id?: string | null
           phone?: string | null
           updated_at?: string
+          incentive_percent?: number | null
         }
         Update: {
           avatar_url?: string | null
@@ -2986,6 +2988,7 @@ export type Database = {
           manager_id?: string | null
           phone?: string | null
           updated_at?: string
+          incentive_percent?: number | null
         }
         Relationships: [
           {

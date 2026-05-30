@@ -256,6 +256,27 @@ export default function AppLayout() {
     const [searchParams] = useSearchParams();
     const isMobile = useIsMobile();
     const [tasksExpanded, setTasksExpanded] = useState(location.pathname.startsWith('/dashboard/tasks'));
+    const [fastestAiExpanded, setFastestAiExpanded] = useState(() => {
+        return navItems
+            .filter(item => item.section === 'FastestAI')
+            .some(item => location.pathname === item.path);
+    });
+    const [fastEngageExpanded, setFastEngageExpanded] = useState(() => {
+        return navItems
+            .filter(item => item.section === 'FastEngage')
+            .some(item => location.pathname === item.path) ||
+            (location.pathname === '/dashboard/email' || location.pathname === '/dashboard/email-settings');
+    });
+    const [dataEnrichmentExpanded, setDataEnrichmentExpanded] = useState(() => {
+        return navItems
+            .filter(item => item.section === 'Data Enrichment')
+            .some(item => location.pathname === item.path);
+    });
+    const [accountsExpanded, setAccountsExpanded] = useState(() => {
+        return navItems
+            .filter(item => item.section === 'Accounts')
+            .some(item => location.pathname === item.path);
+    });
     const [isCollapsed, setIsCollapsed] = useState(() => {
         const stored = localStorage.getItem('sidebar-collapsed');
         return stored ? JSON.parse(stored) : false;
@@ -301,6 +322,37 @@ export default function AppLayout() {
             navigate('/auth');
         }
     }, [user, loading, navigate]);
+
+    useEffect(() => {
+        const isFastestAiActive = navItems
+            .filter(item => item.section === 'FastestAI')
+            .some(item => location.pathname === item.path);
+        if (isFastestAiActive) {
+            setFastestAiExpanded(true);
+        }
+
+        const isFastEngageActive = navItems
+            .filter(item => item.section === 'FastEngage')
+            .some(item => location.pathname === item.path) ||
+            (location.pathname === '/dashboard/email' || location.pathname === '/dashboard/email-settings');
+        if (isFastEngageActive) {
+            setFastEngageExpanded(true);
+        }
+
+        const isDataEnrichmentActive = navItems
+            .filter(item => item.section === 'Data Enrichment')
+            .some(item => location.pathname === item.path);
+        if (isDataEnrichmentActive) {
+            setDataEnrichmentExpanded(true);
+        }
+
+        const isAccountsActive = navItems
+            .filter(item => item.section === 'Accounts')
+            .some(item => location.pathname === item.path);
+        if (isAccountsActive) {
+            setAccountsExpanded(true);
+        }
+    }, [location.pathname]);
 
     const companyIndustry = (company as any)?.industry;
     const filteredNavItems = navItems.filter(item => {
@@ -410,6 +462,461 @@ export default function AppLayout() {
                         const hasTasksItems = section === 'FastBoard';
                         
                         if (sectionItems.length === 0 && !hasEmailItems && !hasTasksItems) return null;
+
+                        // Custom dropdown design for FastestAI
+                        if (section === 'FastestAI') {
+                            const isAnyFastestAiActive = sectionItems.some((item: any) => location.pathname === item.path);
+                            
+                            if (isCollapsed) {
+                                return (
+                                    <div key={section} className="space-y-1">
+                                        <Tooltip delayDuration={0}>
+                                            <TooltipTrigger asChild>
+                                                <button
+                                                    onClick={() => {
+                                                        setIsCollapsed(false);
+                                                        localStorage.setItem('sidebar-collapsed', 'false');
+                                                        setFastestAiExpanded(true);
+                                                    }}
+                                                    className={`w-full flex items-center justify-center py-2.5 rounded-lg text-sm transition-all duration-200 cursor-pointer relative group ${
+                                                        isAnyFastestAiActive 
+                                                            ? 'bg-purple-500/10 text-purple-400' 
+                                                            : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
+                                                    }`}
+                                                >
+                                                    <div className="relative">
+                                                        <Sparkles className={`h-4 w-4 ${isAnyFastestAiActive ? 'text-purple-400 animate-pulse' : 'text-muted-foreground group-hover:text-purple-400 group-hover:animate-pulse transition-colors'}`} />
+                                                        {isAnyFastestAiActive && (
+                                                            <span className="absolute -top-1 -right-1 flex h-1.5 w-1.5">
+                                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
+                                                                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-purple-500"></span>
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </button>
+                                            </TooltipTrigger>
+                                            <TooltipContent side="right" sideOffset={10}>
+                                                <div className="flex flex-col gap-0.5">
+                                                    <span className="font-semibold text-purple-400">FastestAI</span>
+                                                    <span className="text-xs text-muted-foreground font-normal">Click to expand AI features</span>
+                                                </div>
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    </div>
+                                );
+                            }
+
+                            return (
+                                <div key={section} className="space-y-1.5 pb-1">
+                                    <button
+                                        onClick={() => setFastestAiExpanded(prev => !prev)}
+                                        className={`w-full flex items-center justify-between px-3 py-2 text-xs font-semibold tracking-wider rounded-lg transition-all duration-300 group cursor-pointer border ${
+                                            fastestAiExpanded 
+                                                ? 'bg-purple-500/5 border-purple-500/10 text-purple-300' 
+                                                : 'border-transparent text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent/30'
+                                        }`}
+                                    >
+                                        <div className="flex items-center gap-2">
+                                            <Sparkles className={`h-3.5 w-3.5 transition-all duration-300 ${
+                                                fastestAiExpanded 
+                                                    ? 'text-purple-400 scale-110 rotate-12 animate-pulse' 
+                                                    : 'text-muted-foreground group-hover:text-purple-400 group-hover:scale-110 group-hover:rotate-12'
+                                            }`} />
+                                            <span style={{ fontFamily: "'Syne', sans-serif" }} className="bg-gradient-to-r from-purple-400 via-pink-400 to-indigo-400 bg-clip-text text-transparent font-bold tracking-wider whitespace-nowrap">
+                                                FASTEST AI
+                                            </span>
+                                            {isAnyFastestAiActive && !fastestAiExpanded && (
+                                                <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse" />
+                                            )}
+                                        </div>
+                                        <div className="flex items-center gap-1.5">
+                                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold border transition-all duration-300 leading-none ${
+                                                fastestAiExpanded 
+                                                    ? 'text-purple-300 bg-purple-500/20 border-purple-500/30' 
+                                                    : 'text-purple-400 bg-purple-500/10 border-purple-500/20 group-hover:bg-purple-500/20'
+                                            }`}>
+                                                {sectionItems.length}
+                                            </span>
+                                            {fastestAiExpanded ? (
+                                                <ChevronUp className="h-3.5 w-3.5 text-purple-400/80 transition-transform duration-300" />
+                                            ) : (
+                                                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground transition-transform duration-300" />
+                                            )}
+                                        </div>
+                                    </button>
+
+                                    {fastestAiExpanded && (
+                                        <div className="mt-1 ml-3 border-l border-purple-500/20 pl-3 space-y-0.5 animate-in fade-in slide-in-from-top-1 duration-200">
+                                            {sectionItems.map((item: any) => (
+                                                <button
+                                                    key={item.label}
+                                                    onClick={() => navigate(item.path)}
+                                                    className={`w-full flex items-center gap-2.5 py-2 rounded-lg text-xs transition-all duration-200 cursor-pointer ${
+                                                        location.pathname === item.path
+                                                            ? 'bg-purple-500/15 text-purple-300 font-semibold border-l-2 border-purple-500 -ml-[13px] pl-3 shadow-sm shadow-purple-500/5'
+                                                            : 'text-sidebar-foreground hover:bg-sidebar-accent/50 border-l border-transparent px-3'
+                                                    }`}
+                                                >
+                                                    <item.icon className={`h-3.5 w-3.5 shrink-0 transition-colors ${location.pathname === item.path ? 'text-purple-400' : 'text-muted-foreground'}`} />
+                                                    <span className="flex-1 text-left whitespace-nowrap overflow-hidden text-ellipsis">{item.label}</span>
+                                                    {item.label === 'Big Data SQL' && (
+                                                        <span className="text-[10px] bg-emerald-500 text-white px-1.5 py-0.2 rounded-full shrink-0 scale-90">New</span>
+                                                    )}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        }
+
+                        // Custom dropdown design for FastEngage
+                        if (section === 'FastEngage') {
+                            const isEmailActive = location.pathname === '/dashboard/email' || location.pathname === '/dashboard/email-settings';
+                            const isAnyFastEngageActive = sectionItems.some((item: any) => location.pathname === item.path) || isEmailActive;
+                            const emailItemsCount = emailDashboardEnabled ? (isCompanyAdmin ? 2 : 1) : 0;
+                            const totalEngageItemsCount = sectionItems.length + emailItemsCount;
+
+                            if (isCollapsed) {
+                                return (
+                                    <div key={section} className="space-y-1">
+                                        <Tooltip delayDuration={0}>
+                                            <TooltipTrigger asChild>
+                                                <button
+                                                    onClick={() => {
+                                                        setIsCollapsed(false);
+                                                        localStorage.setItem('sidebar-collapsed', 'false');
+                                                        setFastEngageExpanded(true);
+                                                    }}
+                                                    className={`w-full flex items-center justify-center py-2.5 rounded-lg text-sm transition-all duration-200 cursor-pointer relative group ${
+                                                        isAnyFastEngageActive 
+                                                            ? 'bg-teal-500/10 text-teal-400' 
+                                                            : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
+                                                    }`}
+                                                >
+                                                    <div className="relative">
+                                                        <Zap className={`h-4 w-4 ${isAnyFastEngageActive ? 'text-teal-400 animate-pulse' : 'text-muted-foreground group-hover:text-teal-400 group-hover:animate-pulse transition-colors'}`} />
+                                                        {isAnyFastEngageActive && (
+                                                            <span className="absolute -top-1 -right-1 flex h-1.5 w-1.5">
+                                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75"></span>
+                                                                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-teal-500"></span>
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </button>
+                                            </TooltipTrigger>
+                                            <TooltipContent side="right" sideOffset={10}>
+                                                <div className="flex flex-col gap-0.5">
+                                                    <span className="font-semibold text-teal-400">FastEngage</span>
+                                                    <span className="text-xs text-muted-foreground font-normal">Click to expand engagement features</span>
+                                                </div>
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    </div>
+                                );
+                            }
+
+                            return (
+                                <div key={section} className="space-y-1.5 pb-1">
+                                    <button
+                                        onClick={() => setFastEngageExpanded(prev => !prev)}
+                                        className={`w-full flex items-center justify-between px-3 py-2 text-xs font-semibold tracking-wider rounded-lg transition-all duration-300 group cursor-pointer border ${
+                                            fastEngageExpanded 
+                                                ? 'bg-teal-500/5 border-teal-500/10 text-teal-300' 
+                                                : 'border-transparent text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent/30'
+                                        }`}
+                                    >
+                                        <div className="flex items-center gap-2">
+                                            <Zap className={`h-3.5 w-3.5 transition-all duration-300 ${
+                                                fastEngageExpanded 
+                                                    ? 'text-teal-400 scale-110 rotate-12 animate-pulse' 
+                                                    : 'text-muted-foreground group-hover:text-teal-400 group-hover:scale-110 group-hover:rotate-12'
+                                            }`} />
+                                            <span style={{ fontFamily: "'Syne', sans-serif" }} className="bg-gradient-to-r from-teal-400 via-cyan-400 to-sky-400 bg-clip-text text-transparent font-bold tracking-wider whitespace-nowrap">
+                                                FAST ENGAGE
+                                            </span>
+                                            {isAnyFastEngageActive && !fastEngageExpanded && (
+                                                <span className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-pulse" />
+                                            )}
+                                        </div>
+                                        <div className="flex items-center gap-1.5">
+                                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold border transition-all duration-300 leading-none ${
+                                                fastEngageExpanded 
+                                                    ? 'text-teal-300 bg-teal-500/20 border-teal-500/30' 
+                                                    : 'text-teal-400 bg-teal-500/10 border-teal-500/20 group-hover:bg-teal-500/20'
+                                            }`}>
+                                                {totalEngageItemsCount}
+                                            </span>
+                                            {fastEngageExpanded ? (
+                                                <ChevronUp className="h-3.5 w-3.5 text-teal-400/80 transition-transform duration-300" />
+                                            ) : (
+                                                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground transition-transform duration-300" />
+                                            )}
+                                        </div>
+                                    </button>
+
+                                    {fastEngageExpanded && (
+                                        <div className="mt-1 ml-3 border-l border-teal-500/20 pl-3 space-y-0.5 animate-in fade-in slide-in-from-top-1 duration-200">
+                                            {sectionItems.map((item: any) => (
+                                                <button
+                                                    key={item.label}
+                                                    onClick={() => navigate(item.path)}
+                                                    className={`w-full flex items-center gap-2.5 py-2 rounded-lg text-xs transition-all duration-200 cursor-pointer ${
+                                                        location.pathname === item.path
+                                                            ? 'bg-teal-500/15 text-teal-300 font-semibold border-l-2 border-teal-500 -ml-[13px] pl-3 shadow-sm shadow-teal-500/5'
+                                                            : 'text-sidebar-foreground hover:bg-sidebar-accent/50 border-l border-transparent px-3'
+                                                    }`}
+                                                >
+                                                    <item.icon className={`h-3.5 w-3.5 shrink-0 transition-colors ${location.pathname === item.path ? 'text-teal-400' : 'text-muted-foreground'}`} />
+                                                    <span className="flex-1 text-left whitespace-nowrap overflow-hidden text-ellipsis">{item.label}</span>
+                                                </button>
+                                            ))}
+
+                                            {/* Dynamic Email nav items */}
+                                            {emailDashboardEnabled && (
+                                                <>
+                                                    <button
+                                                        onClick={() => navigate('/dashboard/email')}
+                                                        className={`w-full flex items-center gap-2.5 py-2 rounded-lg text-xs transition-all duration-200 cursor-pointer ${
+                                                            location.pathname === '/dashboard/email'
+                                                                ? 'bg-teal-500/15 text-teal-300 font-semibold border-l-2 border-teal-500 -ml-[13px] pl-3 shadow-sm shadow-teal-500/5'
+                                                                : 'text-sidebar-foreground hover:bg-sidebar-accent/50 border-l border-transparent px-3'
+                                                        }`}
+                                                    >
+                                                        <Mail className={`h-3.5 w-3.5 shrink-0 transition-colors ${location.pathname === '/dashboard/email' ? 'text-teal-400' : 'text-muted-foreground'}`} />
+                                                        <span className="flex-1 text-left whitespace-nowrap overflow-hidden text-ellipsis">Email</span>
+                                                    </button>
+                                                    {isCompanyAdmin && (
+                                                        <button
+                                                            onClick={() => navigate('/dashboard/email-settings')}
+                                                            className={`w-full flex items-center gap-2.5 py-2 rounded-lg text-xs transition-all duration-200 cursor-pointer ${
+                                                                location.pathname === '/dashboard/email-settings'
+                                                                    ? 'bg-teal-500/15 text-teal-300 font-semibold border-l-2 border-teal-500 -ml-[13px] pl-3 shadow-sm shadow-teal-500/5'
+                                                                    : 'text-sidebar-foreground hover:bg-sidebar-accent/50 border-l border-transparent px-3'
+                                                            }`}
+                                                        >
+                                                            <Mail className={`h-3.5 w-3.5 shrink-0 transition-colors ${location.pathname === '/dashboard/email-settings' ? 'text-teal-400' : 'text-muted-foreground'}`} />
+                                                            <span className="flex-1 text-left whitespace-nowrap overflow-hidden text-ellipsis">Email Settings</span>
+                                                        </button>
+                                                    )}
+                                                </>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        }
+
+                        // Custom dropdown design for Data Enrichment
+                        if (section === 'Data Enrichment') {
+                            const isAnyDataEnrichmentActive = sectionItems.some((item: any) => location.pathname === item.path);
+
+                            if (isCollapsed) {
+                                return (
+                                    <div key={section} className="space-y-1">
+                                        <Tooltip delayDuration={0}>
+                                            <TooltipTrigger asChild>
+                                                <button
+                                                    onClick={() => {
+                                                        setIsCollapsed(false);
+                                                        localStorage.setItem('sidebar-collapsed', 'false');
+                                                        setDataEnrichmentExpanded(true);
+                                                    }}
+                                                    className={`w-full flex items-center justify-center py-2.5 rounded-lg text-sm transition-all duration-200 cursor-pointer relative group ${
+                                                        isAnyDataEnrichmentActive 
+                                                            ? 'bg-emerald-500/10 text-emerald-400' 
+                                                            : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
+                                                    }`}
+                                                >
+                                                    <div className="relative">
+                                                        <Database className={`h-4 w-4 ${isAnyDataEnrichmentActive ? 'text-emerald-400 animate-pulse' : 'text-muted-foreground group-hover:text-emerald-400 group-hover:animate-pulse transition-colors'}`} />
+                                                        {isAnyDataEnrichmentActive && (
+                                                            <span className="absolute -top-1 -right-1 flex h-1.5 w-1.5">
+                                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                                                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </button>
+                                            </TooltipTrigger>
+                                            <TooltipContent side="right" sideOffset={10}>
+                                                <div className="flex flex-col gap-0.5">
+                                                    <span className="font-semibold text-emerald-400">Data Enrichment</span>
+                                                    <span className="text-xs text-muted-foreground font-normal">Click to expand data tools</span>
+                                                </div>
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    </div>
+                                );
+                            }
+
+                            return (
+                                <div key={section} className="space-y-1.5 pb-1">
+                                    <button
+                                        onClick={() => setDataEnrichmentExpanded(prev => !prev)}
+                                        className={`w-full flex items-center justify-between px-3 py-2 text-xs font-semibold tracking-wider rounded-lg transition-all duration-300 group cursor-pointer border ${
+                                            dataEnrichmentExpanded 
+                                                ? 'bg-emerald-500/5 border-emerald-500/10 text-emerald-300' 
+                                                : 'border-transparent text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent/30'
+                                        }`}
+                                    >
+                                        <div className="flex items-center gap-2">
+                                            <Database className={`h-3.5 w-3.5 transition-all duration-300 ${
+                                                dataEnrichmentExpanded 
+                                                    ? 'text-emerald-400 scale-110 rotate-12 animate-pulse' 
+                                                    : 'text-muted-foreground group-hover:text-emerald-400 group-hover:scale-110 group-hover:rotate-12'
+                                            }`} />
+                                            <span style={{ fontFamily: "'Syne', sans-serif" }} className="bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 bg-clip-text text-transparent font-bold tracking-wider whitespace-nowrap">
+                                                DATA ENRICHMENT
+                                            </span>
+                                            {isAnyDataEnrichmentActive && !dataEnrichmentExpanded && (
+                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                            )}
+                                        </div>
+                                        <div className="flex items-center gap-1.5">
+                                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold border transition-all duration-300 leading-none ${
+                                                dataEnrichmentExpanded 
+                                                    ? 'text-emerald-300 bg-emerald-500/20 border-emerald-500/30' 
+                                                    : 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20 group-hover:bg-emerald-500/20'
+                                            }`}>
+                                                {sectionItems.length}
+                                            </span>
+                                            {dataEnrichmentExpanded ? (
+                                                <ChevronUp className="h-3.5 w-3.5 text-emerald-400/80 transition-transform duration-300" />
+                                            ) : (
+                                                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground transition-transform duration-300" />
+                                            )}
+                                        </div>
+                                    </button>
+
+                                    {dataEnrichmentExpanded && (
+                                        <div className="mt-1 ml-3 border-l border-emerald-500/20 pl-3 space-y-0.5 animate-in fade-in slide-in-from-top-1 duration-200">
+                                            {sectionItems.map((item: any) => (
+                                                <button
+                                                    key={item.label}
+                                                    onClick={() => navigate(item.path)}
+                                                    className={`w-full flex items-center gap-2.5 py-2 rounded-lg text-xs transition-all duration-200 cursor-pointer ${
+                                                        location.pathname === item.path
+                                                            ? 'bg-emerald-500/15 text-emerald-300 font-semibold border-l-2 border-emerald-500 -ml-[13px] pl-3 shadow-sm shadow-emerald-500/5'
+                                                            : 'text-sidebar-foreground hover:bg-sidebar-accent/50 border-l border-transparent px-3'
+                                                    }`}
+                                                >
+                                                    <item.icon className={`h-3.5 w-3.5 shrink-0 transition-colors ${location.pathname === item.path ? 'text-emerald-400' : 'text-muted-foreground'}`} />
+                                                    <span className="flex-1 text-left whitespace-nowrap overflow-hidden text-ellipsis">{item.label}</span>
+                                                    {item.label === 'Big Data SQL' && (
+                                                        <span className="text-[10px] bg-emerald-500 text-white px-1.5 py-0.2 rounded-full shrink-0 scale-90">New</span>
+                                                    )}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        }
+
+                        // Custom dropdown design for Accounts
+                        if (section === 'Accounts') {
+                            const isAnyAccountsActive = sectionItems.some((item: any) => location.pathname === item.path);
+
+                            if (isCollapsed) {
+                                return (
+                                    <div key={section} className="space-y-1">
+                                        <Tooltip delayDuration={0}>
+                                            <TooltipTrigger asChild>
+                                                <button
+                                                    onClick={() => {
+                                                        setIsCollapsed(false);
+                                                        localStorage.setItem('sidebar-collapsed', 'false');
+                                                        setAccountsExpanded(true);
+                                                    }}
+                                                    className={`w-full flex items-center justify-center py-2.5 rounded-lg text-sm transition-all duration-200 cursor-pointer relative group ${
+                                                        isAnyAccountsActive 
+                                                            ? 'bg-amber-500/10 text-amber-400' 
+                                                            : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
+                                                    }`}
+                                                >
+                                                    <div className="relative">
+                                                        <Settings className={`h-4 w-4 ${isAnyAccountsActive ? 'text-amber-400 animate-pulse' : 'text-muted-foreground group-hover:text-amber-400 group-hover:animate-pulse transition-colors'}`} />
+                                                        {isAnyAccountsActive && (
+                                                            <span className="absolute -top-1 -right-1 flex h-1.5 w-1.5">
+                                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                                                                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-amber-500"></span>
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </button>
+                                            </TooltipTrigger>
+                                            <TooltipContent side="right" sideOffset={10}>
+                                                <div className="flex flex-col gap-0.5">
+                                                    <span className="font-semibold text-amber-400">Accounts</span>
+                                                    <span className="text-xs text-muted-foreground font-normal">Click to expand accounts & settings</span>
+                                                </div>
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    </div>
+                                );
+                            }
+
+                            return (
+                                <div key={section} className="space-y-1.5 pb-1">
+                                    <button
+                                        onClick={() => setAccountsExpanded(prev => !prev)}
+                                        className={`w-full flex items-center justify-between px-3 py-2 text-xs font-semibold tracking-wider rounded-lg transition-all duration-300 group cursor-pointer border ${
+                                            accountsExpanded 
+                                                ? 'bg-amber-500/5 border-amber-500/10 text-amber-300' 
+                                                : 'border-transparent text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent/30'
+                                        }`}
+                                    >
+                                        <div className="flex items-center gap-2">
+                                            <Settings className={`h-3.5 w-3.5 transition-all duration-300 ${
+                                                accountsExpanded 
+                                                    ? 'text-amber-400 scale-110 rotate-12 animate-pulse' 
+                                                    : 'text-muted-foreground group-hover:text-amber-400 group-hover:scale-110 group-hover:rotate-12'
+                                            }`} />
+                                            <span style={{ fontFamily: "'Syne', sans-serif" }} className="bg-gradient-to-r from-amber-400 via-orange-400 to-rose-400 bg-clip-text text-transparent font-bold tracking-wider whitespace-nowrap">
+                                                ACCOUNTS
+                                            </span>
+                                            {isAnyAccountsActive && !accountsExpanded && (
+                                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                                            )}
+                                        </div>
+                                        <div className="flex items-center gap-1.5">
+                                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold border transition-all duration-300 leading-none ${
+                                                accountsExpanded 
+                                                    ? 'text-amber-300 bg-amber-500/20 border-amber-500/30' 
+                                                    : 'text-amber-400 bg-amber-500/10 border-amber-500/20 group-hover:bg-amber-500/20'
+                                            }`}>
+                                                {sectionItems.length}
+                                            </span>
+                                            {accountsExpanded ? (
+                                                <ChevronUp className="h-3.5 w-3.5 text-amber-400/80 transition-transform duration-300" />
+                                            ) : (
+                                                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground transition-transform duration-300" />
+                                            )}
+                                        </div>
+                                    </button>
+
+                                    {accountsExpanded && (
+                                        <div className="mt-1 ml-3 border-l border-amber-500/20 pl-3 space-y-0.5 animate-in fade-in slide-in-from-top-1 duration-200">
+                                            {sectionItems.map((item: any) => (
+                                                <button
+                                                    key={item.label}
+                                                    onClick={() => navigate(item.path)}
+                                                    className={`w-full flex items-center gap-2.5 py-2 rounded-lg text-xs transition-all duration-200 cursor-pointer ${
+                                                        location.pathname === item.path
+                                                            ? 'bg-amber-500/15 text-amber-300 font-semibold border-l-2 border-amber-500 -ml-[13px] pl-3 shadow-sm shadow-amber-500/5'
+                                                            : 'text-sidebar-foreground hover:bg-sidebar-accent/50 border-l border-transparent px-3'
+                                                    }`}
+                                                >
+                                                    <item.icon className={`h-3.5 w-3.5 shrink-0 transition-colors ${location.pathname === item.path ? 'text-amber-400' : 'text-muted-foreground'}`} />
+                                                    <span className="flex-1 text-left whitespace-nowrap overflow-hidden text-ellipsis">{item.label}</span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        }
 
                         return (
                             <div key={section} className="space-y-1">
