@@ -259,6 +259,10 @@
     "mtime": 1778669302.2586339,
     "hash": "d62ca46736b9e3968413e1354537796a"
   },
+  "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\src\\components\\leads\\AIAgentHistoryTab.tsx": {
+    "mtime": 1780174104.353421,
+    "hash": "1989e8de48939b7ebb2cf3ca65ddd7c6"
+  },
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\src\\components\\leads\\AssignLeadsDialog.tsx": {
     "mtime": 1771505887.9426584,
     "hash": "81f511e0deb0fec331016c93c8280fc8"
@@ -280,8 +284,8 @@
     "hash": "54e513244ab04f2b5631270c7c99c21b"
   },
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\src\\components\\leads\\LeadDetailsDialog.tsx": {
-    "mtime": 1780144649.4854178,
-    "hash": "3a79b48a8d1f76277b5a8625972ca42e"
+    "mtime": 1780174116.2835462,
+    "hash": "414695d862c540e80725c2e449245fed"
   },
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\src\\components\\leads\\LeadHistoryDialog.tsx": {
     "mtime": 1770721398.6965892,
@@ -567,13 +571,17 @@
     "mtime": 1776290300.3533292,
     "hash": "f083c96120b0264ab27ae9a70dfbb941"
   },
+  "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\src\\hooks\\useAIAgentMemory.ts": {
+    "mtime": 1780174090.045938,
+    "hash": "56979cdc2451cfab48bfe592a8464eeb"
+  },
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\src\\hooks\\useAICallerAgents.ts": {
     "mtime": 1779827119.2910964,
     "hash": "ed6c3eeebe62ffcb26330ef9889105e4"
   },
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\src\\hooks\\useAIEmployees.ts": {
-    "mtime": 1776370416.6316845,
-    "hash": "bf3d884a1c5d6c510777a7d964dc22aa"
+    "mtime": 1780175649.2718735,
+    "hash": "b2f1a89f6c4fc419ad32f97aefa2f13f"
   },
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\src\\hooks\\useAnnouncements.ts": {
     "mtime": 1772002434.9293418,
@@ -1156,8 +1164,8 @@
     "hash": "b33ed584693e271857dff1b98a9b76fa"
   },
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\src\\pages\\ManageAIEmployees.tsx": {
-    "mtime": 1776373954.4726634,
-    "hash": "de8f7ba9396f3136fba50430723f5328"
+    "mtime": 1780175663.8993826,
+    "hash": "12efd9ff511c5dcecc4e8f75c641995a"
   },
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\src\\pages\\ManageCompany.tsx": {
     "mtime": 1780143650.680022,
@@ -1319,6 +1327,10 @@
     "mtime": 1776263004.0730376,
     "hash": "9904fa91bae72a3aa6ef2571ac6f393b"
   },
+  "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\supabase\\functions\\ai-agent-task-executor\\index.ts": {
+    "mtime": 1780175643.2577107,
+    "hash": "d700225af2ef3f772d992b75f8667a08"
+  },
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\supabase\\functions\\ai-caller\\index.ts": {
     "mtime": 1780168286.8856149,
     "hash": "318e1f8ddcbcdc14130deef673e5810a"
@@ -1328,8 +1340,8 @@
     "hash": "88270b4a42964fbdaa5e331590d6a758"
   },
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\supabase\\functions\\ai-employee-engine\\index.ts": {
-    "mtime": 1777245179.316662,
-    "hash": "36a2f06665d4b0a4aa452757c5f13478"
+    "mtime": 1780175625.6840308,
+    "hash": "d07564e5176723eee4dad2fbdc9bd3e3"
   },
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\supabase\\functions\\ai-workflow-executor\\index.ts": {
     "mtime": 1778565415.3801436,
@@ -2006,6 +2018,14 @@
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\supabase\\migrations\\20260530180000_add_ai_calling_button_active_to_companies.sql": {
     "mtime": 1780142784.5556407,
     "hash": "ef051df48d237cfd003fdce85bea3d18"
+  },
+  "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\supabase\\migrations\\20260531000001_ai_agent_system.sql": {
+    "mtime": 1780173458.3320513,
+    "hash": "ef06c1ab35297e5110d3d85d548b88f9"
+  },
+  "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\supabase\\migrations\\20260531000002_ai_employee_working_hours.sql": {
+    "mtime": 1780175597.817356,
+    "hash": "9836534f5e4be3666c2496556204a2e0"
   },
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\whatsapp-server\\scripts\\benchmark_cache.ts": {
     "mtime": 1779312467.3503547,

@@ -17,6 +17,13 @@ export interface AIEmployee {
   dialer_phone_number: string | null;
   whatsapp_account_id: string | null;
   email_account_id: string | null;
+  ai_caller_agent_id: string | null;
+  autonomy_mode: 'guided' | 'full_pilot';
+  daily_call_limit: number;
+  channels_priority: string[];
+  working_hours_start: string;
+  working_hours_end: string;
+  timezone: string;
   is_active: boolean;
   created_at: string;
   updated_at: string;

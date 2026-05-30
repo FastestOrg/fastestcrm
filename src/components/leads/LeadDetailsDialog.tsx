@@ -8,7 +8,7 @@ import {
 import { Tables } from '@/integrations/supabase/types';
 import { format } from 'date-fns';
 import { useState, useEffect } from 'react';
-import { Mail, Phone, Building, Calendar, User, CreditCard, Link, MapPin, Home, DollarSign, Megaphone, Globe, Layers, CalendarClock, Pencil, Save, Shield } from 'lucide-react';
+import { Mail, Phone, Building, Calendar, User, CreditCard, Link, MapPin, Home, DollarSign, Megaphone, Globe, Layers, CalendarClock, Pencil, Save, Shield, Brain } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { MaskedValue } from '@/components/ui/MaskedValue';
@@ -37,6 +37,7 @@ import { CompetitorBattleCard } from './CompetitorBattleCard';
 import { useLeadScoring } from '@/hooks/useLeadScoring';
 import { useCompany } from '@/hooks/useCompany';
 import { AICallerCallButton } from '@/components/ai-caller/AICallerCallButton';
+import { AIAgentHistoryTab } from './AIAgentHistoryTab';
 
 type Lead = Tables<'leads'> & Partial<Tables<'leads_real_estate'>> & {
     sales_owner?: {
@@ -190,11 +191,14 @@ export function LeadDetailsDialog({ open, onOpenChange, lead, owners, maskLeads 
                     </div>
                 </DialogHeader>
                 <Tabs defaultValue="details" className="w-full">
-                    <TabsList className="grid w-full grid-cols-3 mb-4">
+                    <TabsList className="grid w-full grid-cols-4 mb-4">
                         <TabsTrigger value="details">Lead Details</TabsTrigger>
                         <TabsTrigger value="timeline">Activity Feed</TabsTrigger>
                         <TabsTrigger value="competitor" className="gap-2">
                             <Shield className="h-3.5 w-3.5" /> Competitive Edge
+                        </TabsTrigger>
+                        <TabsTrigger value="ai-agent" className="gap-2">
+                            <Brain className="h-3.5 w-3.5" /> AI Agent History
                         </TabsTrigger>
                     </TabsList>
                     
@@ -480,6 +484,10 @@ export function LeadDetailsDialog({ open, onOpenChange, lead, owners, maskLeads 
                             leadId={lead.id} 
                             initialCompetitor={(lead as any).competitors || (lead as any).current_solution} 
                         />
+                    </TabsContent>
+
+                    <TabsContent value="ai-agent" className="py-2">
+                        <AIAgentHistoryTab leadId={lead.id} />
                     </TabsContent>
                 </Tabs>
             </DialogContent>
