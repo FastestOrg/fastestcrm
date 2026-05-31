@@ -9,7 +9,7 @@ serve(async (req) => {
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const googleClientId = Deno.env.get("GOOGLE_CLIENT_ID");
+  const googleClientId = Deno.env.get("GOOGLE_CLIENT_ID") || "1033874890501-p253hb5at1qb077rcoitv6pjc9elf75n.apps.googleusercontent.com";
   const googleClientSecret = Deno.env.get("GOOGLE_CLIENT_SECRET");
 
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
@@ -26,14 +26,14 @@ serve(async (req) => {
     // Get booking page
     const { data: bookingPage, error: bpError } = await supabase
       .from("booking_pages")
-      .select("*, calendar_connections:user_id(calendar_connections(*))")
+      .select("*")
       .eq("id", bookingPageId)
       .eq("is_active", true)
       .single();
 
     if (bpError || !bookingPage) {
       return new Response(JSON.stringify({ error: "Booking page not found" }), {
-        status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -51,7 +51,7 @@ serve(async (req) => {
 
     if (conflicts && conflicts.length > 0) {
       return new Response(JSON.stringify({ error: "This time slot is no longer available" }), {
-        status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -84,7 +84,14 @@ serve(async (req) => {
       .eq("user_id", bookingPage.user_id)
       .eq("provider", "google")
       .eq("is_active", true)
-      .single();
+      .maybeSingle();
+
+    // Fetch host profile to get the host's email address
+    const { data: hostProfile } = await supabase
+      .from("profiles")
+      .select("email, full_name")
+      .eq("id", bookingPage.user_id)
+      .maybeSingle();
 
     if (calConn?.access_token && googleClientId && googleClientSecret) {
       let accessToken = calConn.access_token;
@@ -115,12 +122,20 @@ serve(async (req) => {
 
       // Create Google Calendar event
       try {
+        const attendeesList = [
+          { email: attendeeEmail, displayName: attendeeName }
+        ];
+
+        if (hostProfile?.email) {
+          attendeesList.push({ email: hostProfile.email, displayName: hostProfile.full_name || 'Host' });
+        }
+
         const gcalEvent = {
           summary: eventTitle,
           description: notes || `Booked via Fastest CRM by ${attendeeName}`,
           start: { dateTime: startTime, timeZone: bookingPage.timezone || "Asia/Kolkata" },
           end: { dateTime: computedEndTime, timeZone: bookingPage.timezone || "Asia/Kolkata" },
-          attendees: [{ email: attendeeEmail, displayName: attendeeName }],
+          attendees: attendeesList,
           reminders: { useDefault: true },
           conferenceData: {
             createRequest: {

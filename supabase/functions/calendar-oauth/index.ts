@@ -9,7 +9,7 @@ serve(async (req) => {
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const googleClientId = Deno.env.get("GOOGLE_CLIENT_ID");
+  const googleClientId = Deno.env.get("GOOGLE_CLIENT_ID") || "1033874890501-p253hb5at1qb077rcoitv6pjc9elf75n.apps.googleusercontent.com";
   const googleClientSecret = Deno.env.get("GOOGLE_CLIENT_SECRET");
 
   if (!googleClientId || !googleClientSecret) {

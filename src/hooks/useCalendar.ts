@@ -114,6 +114,7 @@ export function useConnectGoogleCalendar() {
         body: { action: 'get_auth_url', userId: user.id, companyId: company.id, redirectUri },
       });
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
       if (data?.authUrl) window.location.href = data.authUrl;
       return data;
     },
@@ -133,6 +134,7 @@ export function useExchangeCalendarCode() {
         body: { action: 'exchange_code', code, userId: user.id, companyId: company.id, redirectUri },
       });
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
       return data;
     },
     onSuccess: () => {

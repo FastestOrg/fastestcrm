@@ -43,7 +43,6 @@ export default function PublicBooking() {
         .from('booking_pages' as any)
         .select(`
           *, 
-          profiles:user_id(full_name, avatar_url), 
           companies!inner(name, logo_url, slug)
         `)
         .eq('slug', slug)
@@ -55,6 +54,18 @@ export default function PublicBooking() {
         setError('Booking page not found'); 
         setLoading(false); 
         return; 
+      }
+      
+      // Fetch profile info securely using public RPC function
+      try {
+        const { data: profileData } = await supabase.rpc('get_public_profile_info', {
+          profile_id: data.user_id
+        });
+        if (profileData && profileData.length > 0) {
+          data.profiles = profileData[0];
+        }
+      } catch (profileErr) {
+        console.error('Error fetching public profile details:', profileErr);
       }
       
       setBookingPage(data);

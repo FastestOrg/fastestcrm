@@ -51,6 +51,26 @@
     "mtime": 1773219996.8526733,
     "hash": "d766c413c557c490830dfd8821618d5d"
   },
+  "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\scratch\\check-conflicts.js": {
+    "mtime": 1780224719.7812939,
+    "hash": "3dd2829c2f2d9c643c7fe510d5511e6f"
+  },
+  "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\scratch\\list-all-conns.js": {
+    "mtime": 1780223213.2218783,
+    "hash": "dd06b90a716db136643da95da893fefe"
+  },
+  "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\scratch\\list-email-accounts.js": {
+    "mtime": 1780223237.0593753,
+    "hash": "966ad896e62efc3537953fc53c10ebdd"
+  },
+  "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\scratch\\test-booking-query.js": {
+    "mtime": 1780219276.516087,
+    "hash": "250cb0079f7b3708008f371914153f70"
+  },
+  "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\scratch\\test-cal-conn.js": {
+    "mtime": 1780222897.7593434,
+    "hash": "282a93919b50f03efd177a6c6e938576"
+  },
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\scripts\\benchmark_bulk_insert.ts": {
     "mtime": 1779312467.067163,
     "hash": "31d3953695bfe23c19b5f7741d69900a"
@@ -596,8 +616,8 @@
     "hash": "5aaf4a8b0dfbb13d94fa42ca7303eea4"
   },
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\src\\hooks\\useCalendar.ts": {
-    "mtime": 1775520387.2599676,
-    "hash": "3619ec43782ae163cb3abb4d6a608e3b"
+    "mtime": 1780223296.8595123,
+    "hash": "fea394bc1c426c3aa18664b9ef160747"
   },
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\src\\hooks\\useCompany.ts": {
     "mtime": 1780143639.0043836,
@@ -1068,8 +1088,8 @@
     "hash": "37543084b02e324f6e5700963acfb6e8"
   },
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\src\\pages\\CalendarPage.tsx": {
-    "mtime": 1775537929.5802407,
-    "hash": "65f218ede568a73dfd3c8a799599013d"
+    "mtime": 1780223964.950115,
+    "hash": "d8ede569057a375c7750d74947f185e5"
   },
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\src\\pages\\ComparisonTemplate.tsx": {
     "mtime": 1776196438.6272132,
@@ -1232,8 +1252,8 @@
     "hash": "cc9ca7cb9da4e16abe588db9e6da5df0"
   },
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\src\\pages\\PublicBooking.tsx": {
-    "mtime": 1775537915.8932812,
-    "hash": "c50388f4afc5ef22877b5212cefe614b"
+    "mtime": 1780219500.4166074,
+    "hash": "bec24b8739349faa95c69e9103960066"
   },
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\src\\pages\\PublicDocument.tsx": {
     "mtime": 1778569481.917176,
@@ -1372,20 +1392,20 @@
     "hash": "014bb978c27c74287d207670f93459f1"
   },
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\supabase\\functions\\calendar-freebusy\\index.ts": {
-    "mtime": 1775515714.04253,
-    "hash": "61bd8c047d5b723c6aae9210da1c4e6f"
+    "mtime": 1780225410.3298287,
+    "hash": "ef5c1f8f922569fdf1d382e4125b3632"
   },
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\supabase\\functions\\calendar-oauth\\index.ts": {
-    "mtime": 1774304393.8436215,
-    "hash": "a1e2c148eb21e1b6d829ab0a3a0cb2e7"
+    "mtime": 1780216919.2679975,
+    "hash": "42999fa7e7d4eb7de038ce0c8f01929f"
   },
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\supabase\\functions\\change-industry\\index.ts": {
     "mtime": 1774304581.8764718,
     "hash": "f4babefffdb19053877dfbfe0fdea52e"
   },
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\supabase\\functions\\create-booking\\index.ts": {
-    "mtime": 1775515682.572052,
-    "hash": "edc4c186fe771053a076274febd79d5c"
+    "mtime": 1780225416.4372158,
+    "hash": "7084c87b0fda487f1cbc4db0a0f11b13"
   },
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\supabase\\functions\\create-payment-link\\index.ts": {
     "mtime": 1774304581.8879733,
@@ -2046,6 +2066,10 @@
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\supabase\\migrations\\20260531000004_add_incentive_percent_to_profiles.sql": {
     "mtime": 1780183756.720868,
     "hash": "06d4d39c9e063fec29a372540bd5bc96"
+  },
+  "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\supabase\\migrations\\20260531000005_public_booking_profile_rpc.sql": {
+    "mtime": 1780219484.20922,
+    "hash": "95159f5158bd05a2690b759a1c94cab1"
   },
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\whatsapp-server\\scripts\\benchmark_cache.ts": {
     "mtime": 1779312467.3503547,

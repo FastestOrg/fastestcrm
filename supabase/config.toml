@@ -85,6 +85,9 @@ verify_jwt = false
 [functions.calendar-oauth]
 verify_jwt = false
 
+[functions.calendar-freebusy]
+verify_jwt = false
+
 [functions.create-booking]
 verify_jwt = false
 

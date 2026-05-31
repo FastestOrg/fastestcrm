@@ -8,6 +8,16 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { 
   Calendar as CalendarIcon, 
   ChevronLeft, 
@@ -64,6 +74,7 @@ export default function CalendarPage() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
   const [bookingSettingsOpen, setBookingSettingsOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [reconnectConfirmOpen, setReconnectConfirmOpen] = useState(false);
 
   const { user } = useAuth();
   const { company } = useCompany();
@@ -89,16 +100,27 @@ export default function CalendarPage() {
   // Handle OAuth callback
   useEffect(() => {
     const code = searchParams.get('code');
+    const error = searchParams.get('error');
+
+    if (error) {
+      toast(`Google OAuth Error: ${error}`);
+      searchParams.delete('error');
+      searchParams.delete('state');
+      setSearchParams(searchParams, { replace: true });
+      return;
+    }
+
     if (code) {
       exchangeCode.mutate(code, {
         onSettled: () => {
           searchParams.delete('code');
           searchParams.delete('scope');
+          searchParams.delete('state');
           setSearchParams(searchParams, { replace: true });
         }
       });
     }
-  }, []);
+  }, [searchParams]);
 
   // Booking page form state
   const [bpTitle, setBpTitle] = useState('Book a Meeting');
@@ -202,12 +224,22 @@ export default function CalendarPage() {
               Connect Google
             </Button>
           ) : (
-            <div className="flex items-center gap-2 group cursor-pointer" onClick={() => connectGoogle.mutate()}>
-               <div className="h-9 px-3 flex items-center gap-2 rounded-full glass border-success/30 text-success text-[11px] font-semibold transition-all hover:bg-success/5">
-                 <div className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
-                 Sync Active
-               </div>
-            </div>
+            <Button 
+              size="sm"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-600/20 border-none glow button-premium flex items-center gap-2"
+              onClick={() => setReconnectConfirmOpen(true)}
+              disabled={connectGoogle.isPending}
+            >
+              {connectGoogle.isPending ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <div className="relative flex h-2 w-2 mr-1">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-white" />
+                </div>
+              )}
+              Calendar Connected
+            </Button>
           )}
 
           <Dialog open={bookingSettingsOpen} onOpenChange={setBookingSettingsOpen}>
@@ -544,6 +576,29 @@ export default function CalendarPage() {
         .button-premium::after { content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: radial-gradient(circle, #fff3 0%, transparent 70%); transform: scale(0); transition: transform 0.6s ease-out; }
         .button-premium:hover::after { transform: scale(1); }
       `}} />
+
+      <AlertDialog open={reconnectConfirmOpen} onOpenChange={setReconnectConfirmOpen}>
+        <AlertDialogContent className="glass-strong border-primary/20">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-syne text-xl">Google Calendar Connected</AlertDialogTitle>
+            <AlertDialogDescription>
+              Your Google Calendar is already connected. Reconnecting will refresh your connection and sync preferences. Do you want to proceed?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="glass border-border/50">Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => {
+                setReconnectConfirmOpen(false);
+                connectGoogle.mutate();
+              }}
+              className="gradient-primary border-none shadow-lg glow"
+            >
+              Reconnect
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
