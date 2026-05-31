@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useCompany } from '@/hooks/useCompany';
+import { CallAudioPlayer } from '@/components/ai-caller/CallAudioPlayer';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -189,22 +190,14 @@ export default function AICallerPage() {
         queryFn: async () => {
             if (!company?.id) return [];
             const { data, error } = await supabase
-                .from('integration_api_keys')
-                .select('id, api_key, created_at')
+                .from('ai_caller_logs')
+                .select('id, lead_name, lead_phone, created_at, status, duration_seconds, agent_id, call_recording, error')
                 .eq('company_id', company.id)
-                .eq('service_name', 'ai_call_queue')
                 .order('created_at', { ascending: false })
-                .limit(50) as any;
+                .limit(50);
 
             if (error) throw error;
-            return (data || []).map((row: any) => {
-                const item = typeof row.api_key === 'string' ? JSON.parse(row.api_key) : row.api_key;
-                return {
-                    id: row.id,
-                    created_at: row.created_at,
-                    ...item,
-                };
-            });
+            return data || [];
         },
         enabled: !!company?.id,
         refetchInterval: 5000, // Poll every 5s for live updates
@@ -424,6 +417,7 @@ export default function AICallerPage() {
                                                 <th className="px-4 py-3">Triggered</th>
                                                 <th className="px-4 py-3">Status</th>
                                                 <th className="px-4 py-3">Duration</th>
+                                                <th className="px-4 py-3">Recording</th>
                                                 <th className="px-4 py-3">Agent</th>
                                                 <th className="px-4 py-3">Notes / Error</th>
                                             </tr>
@@ -466,13 +460,20 @@ export default function AICallerPage() {
                                                             {call.lead_phone}
                                                         </td>
                                                         <td className="px-4 py-3 whitespace-nowrap text-muted-foreground text-xs">
-                                                            {new Date(call.created_at || call.enqueued_at).toLocaleString()}
+                                                            {new Date(call.created_at).toLocaleString()}
                                                         </td>
                                                         <td className="px-4 py-3 whitespace-nowrap">
                                                             {statusBadge}
                                                         </td>
                                                         <td className="px-4 py-3 whitespace-nowrap font-mono text-xs">
                                                             {call.duration_seconds ? `${call.duration_seconds}s` : '—'}
+                                                        </td>
+                                                        <td className="px-4 py-3 whitespace-nowrap">
+                                                            {call.call_recording ? (
+                                                                <CallAudioPlayer url={call.call_recording} logId={call.id} />
+                                                            ) : (
+                                                                <span className="text-muted-foreground text-xs">—</span>
+                                                            )}
                                                         </td>
                                                         <td className="px-4 py-3 whitespace-nowrap text-xs">
                                                             {agentName}

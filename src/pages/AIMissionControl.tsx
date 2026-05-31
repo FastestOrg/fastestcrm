@@ -12,6 +12,7 @@ import { PremiumCard, PremiumCardContent, PremiumCardDescription, PremiumCardHea
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useCompany } from '@/hooks/useCompany';
+import { useLeadsTable } from '@/hooks/useLeadsTable';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
@@ -19,6 +20,7 @@ import { Switch } from '@/components/ui/switch';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 export default function AIMissionControl() {
+    const { tableName, companyId, loading: tableLoading } = useLeadsTable();
     const { company } = useCompany();
     const navigate = useNavigate();
     const { toast } = useToast();
@@ -121,9 +123,13 @@ export default function AIMissionControl() {
 
     // 3. Fetch Key Metrics
     const { data: metrics } = useQuery({
-        queryKey: ['ai-mission-metrics', company?.id],
+        queryKey: ['ai-mission-metrics', companyId, tableName],
         queryFn: async () => {
-            const { data: leads } = await supabase.from('leads').select('id, status, enrichment_status');
+            if (!companyId || !tableName || tableLoading) return null;
+            const { data: leads } = await supabase
+                .from(tableName as any)
+                .select('id, status, enrichment_status')
+                .eq('company_id', companyId);
             const { count: triggers } = await supabase.from('autonomous_market_triggers').select('*', { count: 'exact', head: true });
             
             const total = leads?.length || 0;
@@ -138,7 +144,7 @@ export default function AIMissionControl() {
                 growthVelocity: enriched > 0 ? `+${Math.round((enriched/total)*100)}%` : '0%'
             };
         },
-        enabled: !!company?.id
+        enabled: !!companyId && !tableLoading
     });
 
     // 4. Fetch Autopilot Settings

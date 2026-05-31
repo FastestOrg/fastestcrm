@@ -20,6 +20,7 @@ export interface TaskLead {
     product_purchased: string | null;
     created_at: string;
     updated_at: string;
+    lead_history?: any[] | null;
 }
 
 export type TaskBucket = 'urgent' | 'today' | 'upcoming';

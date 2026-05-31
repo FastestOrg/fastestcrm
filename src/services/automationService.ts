@@ -1,6 +1,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { generateAgenticReply } from './emailAIService';
+import { getLeadsTableName } from '@/lib/leadsTableUtils';
 
 export type TriggerType = 'lead_created' | 'status_changed' | 'tag_added' | 'form_submitted';
 export type ActionType = 'send_email' | 'webhook' | 'create_task' | 'assign_lead' | 'ai_personalized_followup' | 'ai_call';
@@ -145,16 +146,52 @@ export const automationService = {
     },
 
     async executeAction(auto: Automation, data: any) {
+        const companyId = data.company_id || auto.company_id;
+        if (!companyId) {
+            console.error('No company_id found for lead automation');
+            return;
+        }
+
+        const tableName = await getLeadsTableName(companyId);
+
+        // Build select query with dynamic foreign key reference if standard table, else fallback
+        let selectStr = '*';
+        if (tableName === 'leads') {
+            selectStr = '*, sales_owner:profiles!leads_sales_owner_id_fkey(full_name)';
+        } else if (tableName === 'leads_real_estate') {
+            selectStr = '*, sales_owner:profiles!leads_real_estate_sales_owner_id_fkey(full_name)';
+        } else if (tableName === 'leads_travel') {
+            selectStr = '*, sales_owner:profiles!leads_travel_sales_owner_id_fkey(full_name)';
+        } else if (tableName === 'leads_saas') {
+            selectStr = '*, sales_owner:profiles!leads_saas_sales_owner_id_fkey(full_name)';
+        } else if (tableName === 'leads_insurance') {
+            selectStr = '*, sales_owner:profiles!leads_insurance_sales_owner_id_fkey(full_name)';
+        } else if (tableName === 'leads_healthcare') {
+            selectStr = '*, sales_owner:profiles!leads_healthcare_sales_owner_id_fkey(full_name)';
+        }
+
         // Fetch full lead data to get history and other details
         const { data: lead, error: leadError } = await supabase
-            .from('leads')
-            .select('*, sales_owner:profiles!leads_sales_owner_id_fkey(full_name)')
+            .from(tableName as any)
+            .select(selectStr)
             .eq('id', data.id)
-            .single();
+            .single() as any;
 
         if (leadError) {
             console.error('Failed to fetch lead for automation', leadError);
             return;
+        }
+
+        // Robust fallback for sales_owner name resolving (especially on custom tables)
+        if (lead && lead.sales_owner_id && !lead.sales_owner) {
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('full_name')
+                .eq('id', lead.sales_owner_id)
+                .single();
+            if (profile) {
+                lead.sales_owner = { full_name: profile.full_name };
+            }
         }
 
         const logEntry = {
@@ -181,7 +218,7 @@ export const automationService = {
                 
                 // Get lead history as context
                 const context = lead.lead_history && Array.isArray(lead.lead_history)
-                    ? lead.lead_history.slice(-5).map((h: any) => `[${h.timestamp}] ${h.type}: ${h.details}`).join('\n')
+                    ? lead.lead_history.slice(-5).map((h: any) => `[${h.timestamp || h.date_time || ''}] ${h.type || h.action || 'Event'}: ${h.details || h.text || ''}`).join('\n')
                     : 'New lead, no history.';
 
                 // Generate Reply

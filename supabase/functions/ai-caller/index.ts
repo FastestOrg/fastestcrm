@@ -84,6 +84,91 @@ serve(async (req) => {
         }
     };
 
+    // ── CASE 0: GET RECORDING (Proxy to Vobiz with credentials) ───────────────
+    if (action === "get_recording") {
+        const logId = url.searchParams.get("log_id");
+        const token = url.searchParams.get("token");
+
+        if (!logId || !token) {
+            return new Response(JSON.stringify({ error: "Missing log_id or token" }), {
+                status: 400,
+                headers: { "Content-Type": "application/json", ...corsHeaders }
+            });
+        }
+
+        // Authenticate using the provided token (checks RLS)
+        const clientSupabase = createClient(supabaseUrl, supabaseServiceKey, {
+            global: {
+                headers: {
+                    Authorization: `Bearer ${token}`
+                }
+            }
+        });
+
+        // Fetch the log row
+        const { data: logRow, error: logErr } = await clientSupabase
+            .from("ai_caller_logs")
+            .select("company_id, call_recording")
+            .eq("id", logId)
+            .maybeSingle();
+
+        if (logErr || !logRow || !logRow.call_recording) {
+            return new Response(JSON.stringify({ error: "Unauthorized or recording not found" }), {
+                status: 403,
+                headers: { "Content-Type": "application/json", ...corsHeaders }
+            });
+        }
+
+        const companyId = logRow.company_id;
+        const recordingUrl = logRow.call_recording;
+
+        // Fetch Vobiz credentials
+        const { data: vobizRow } = await supabase
+            .from("integration_api_keys")
+            .select("api_key")
+            .eq("company_id", companyId)
+            .eq("service_name", "vobiz")
+            .eq("is_active", true)
+            .maybeSingle();
+
+        if (!vobizRow) {
+            return new Response(JSON.stringify({ error: "Vobiz credentials not found" }), {
+                status: 404,
+                headers: { "Content-Type": "application/json", ...corsHeaders }
+            });
+        }
+
+        const vobizConfig = typeof vobizRow.api_key === "string" ? JSON.parse(vobizRow.api_key) : vobizRow.api_key;
+
+        // Fetch recording with credentials from Vobiz
+        const vobizResponse = await fetch(recordingUrl, {
+            headers: {
+                "X-Auth-ID": vobizConfig.auth_id,
+                "X-Auth-Token": vobizConfig.auth_token,
+            }
+        });
+
+        if (!vobizResponse.ok) {
+            const errText = await vobizResponse.text();
+            return new Response(JSON.stringify({ error: `Failed to fetch from Vobiz: ${vobizResponse.status}`, details: errText }), {
+                status: vobizResponse.status,
+                headers: { "Content-Type": "application/json", ...corsHeaders }
+            });
+        }
+
+        const responseHeaders = new Headers(corsHeaders);
+        responseHeaders.set("Content-Type", vobizResponse.headers.get("Content-Type") || "audio/mpeg");
+        const contentLength = vobizResponse.headers.get("Content-Length");
+        if (contentLength) {
+            responseHeaders.set("Content-Length", contentLength);
+        }
+
+        return new Response(vobizResponse.body, {
+            headers: responseHeaders,
+            status: 200
+        });
+    }
+
     // ── CASE 1: WebSocket Request (Bidirectional Audio Stream) ──────────────────
     if (req.headers.get("upgrade") === "websocket") {
         const { socket: vobizSocket, response } = Deno.upgradeWebSocket(req);
@@ -103,41 +188,31 @@ serve(async (req) => {
             let geminiSetupComplete = false;
             let keepaliveInterval: number | null = null;
             const pendingAudioChunks: string[] = [];
+            let companyId = "";
+            let agentId = "";
+            let callId = "";
 
             await logToDb("WebSocket connection received", { queueItemId, url: req.url });
 
             // Helper to update DB queue item status
             const updateQueueStatus = async (status: string, error?: string) => {
                 try {
-                    const { data: queueRow } = await supabase
-                        .from("integration_api_keys")
-                        .select("api_key")
-                        .eq("id", queueItemId)
-                        .maybeSingle();
-
-                    if (queueRow) {
-                        const item = typeof queueRow.api_key === "string" ? JSON.parse(queueRow.api_key) : queueRow.api_key;
-                        const updatedItem = {
-                            ...item,
-                            status,
-                            ended_at: new Date().toISOString(),
-                        };
-                        if (error) {
-                            updatedItem.error = error;
-                        }
-                        await supabase
-                            .from("integration_api_keys")
-                            .update({ 
-                                api_key: JSON.stringify(updatedItem),
-                                is_active: status === "calling" || status === "pending"
-                            })
-                            .eq("id", queueItemId);
-                        console.log(`[AI-Caller] Updated queue item ${queueItemId} to status: ${status}, error: ${error || 'none'}`);
-                        await logToDb(`Queue item status updated: ${status}`, { error });
+                    const updates: any = {
+                        status,
+                        ended_at: new Date().toISOString(),
+                    };
+                    if (error) {
+                        updates.error = error;
                     }
+                    await supabase
+                        .from("ai_caller_logs")
+                        .update(updates)
+                        .eq("id", queueItemId);
+                    console.log(`[AI-Caller] Updated call log item ${queueItemId} to status: ${status}, error: ${error || 'none'}`);
+                    await logToDb(`Call log status updated: ${status}`, { error });
                 } catch (dbErr: any) {
-                    console.error("[AI-Caller] Failed to update queue status in DB:", dbErr);
-                    await logToDb("Failed to update queue status in DB", dbErr.message);
+                    console.error("[AI-Caller] Failed to update call log status in DB:", dbErr);
+                    await logToDb("Failed to update call log status in DB", dbErr.message);
                 }
             };
 
@@ -203,20 +278,20 @@ serve(async (req) => {
             };
 
             try {
-                // 1. Fetch queue item details
-                const { data: queueRow, error: queueErr } = await supabase
-                    .from("integration_api_keys")
-                    .select("api_key, company_id")
+                // 1. Fetch call log details
+                const { data: logRow, error: logErr } = await supabase
+                    .from("ai_caller_logs")
+                    .select("company_id, agent_id, call_id")
                     .eq("id", queueItemId)
                     .maybeSingle();
 
-                if (queueErr || !queueRow) {
-                    throw new Error(`Queue item not found or error: ${queueErr?.message || "Not found"}`);
+                if (logErr || !logRow) {
+                    throw new Error(`Call log item not found or error: ${logErr?.message || "Not found"}`);
                 }
 
-                const queueItem = typeof queueRow.api_key === "string" ? JSON.parse(queueRow.api_key) : queueRow.api_key;
-                const companyId = queueRow.company_id || queueItem.company_id;
-                const agentId = queueItem.agent_id;
+                companyId = logRow.company_id;
+                agentId = logRow.agent_id;
+                callId = logRow.call_id || "";
 
                 // 2. Fetch agent config
                 let agentConfig: any = {};
@@ -421,6 +496,11 @@ serve(async (req) => {
                         streamId = data.streamId || data.callSid || "";
                         console.log(`[AI-Caller] Call started. Stream ID: ${streamId}`);
                         await logToDb("Vobiz start event", data);
+                        
+                        const targetCallUuid = callId || streamId;
+                        if (targetCallUuid) {
+                            startVobizRecording(supabase, companyId, targetCallUuid, queueItemId, supabaseUrl);
+                        }
                         return;
                     }
 
@@ -473,37 +553,78 @@ serve(async (req) => {
         // ── HANGUP EVENT ───────────────────────────────────────────────────────
         if (action === "hangup") {
             const body = await req.text();
-            const params = new URLSearchParams(body);
-            const duration = params.get("Duration") || params.get("duration") || "0";
+            
+            // Log raw hangup payload to debug_logs table
+            await logToDb(`Call hangup payload received. Body: ${body}`);
+
+            let recordingUrl = "";
+            let duration = "0";
+
+            try {
+                // Try JSON first
+                const json = JSON.parse(body);
+                recordingUrl = json.recording_url || json.record_url || json.RecordingUrl || json.recording || json.Recording || json.recordingUrl || json.RecordingUrlText || "";
+                duration = String(json.duration || json.Duration || json.recording_duration || json.recording_duration_seconds || "0");
+            } catch (_) {
+                // Fallback to URLSearchParams
+                const params = new URLSearchParams(body);
+                recordingUrl = params.get("recording_url") || params.get("record_url") || params.get("RecordingUrl") || params.get("recording") || params.get("Recording") || params.get("recordingUrl") || params.get("RecordingUrlText") || "";
+                duration = params.get("duration") || params.get("Duration") || params.get("recording_duration") || "";
+
+                // Check for nested JSON response from Vobiz recording webhook
+                const responseParam = params.get("response");
+                if (responseParam) {
+                    try {
+                        const responseJson = JSON.parse(responseParam);
+                        if (!recordingUrl) {
+                            recordingUrl = responseJson.recording_url || responseJson.record_url || responseJson.RecordingUrl || responseJson.recording || responseJson.Recording || "";
+                        }
+                        if (!duration || duration === "0") {
+                            duration = String(responseJson.duration || responseJson.Duration || responseJson.recording_duration || responseJson.recording_duration_seconds || "0");
+                        }
+                    } catch (_) {
+                        // ignore nested parse failure
+                    }
+                }
+            }
+
+            if (!recordingUrl) {
+                recordingUrl = url.searchParams.get("recording_url") || url.searchParams.get("record_url") || url.searchParams.get("RecordingUrl") || "";
+            }
 
             if (queueItemId) {
-                const { data: queueRow } = await supabase
-                    .from("integration_api_keys")
-                    .select("api_key")
+                const { data: logRow } = await supabase
+                    .from("ai_caller_logs")
+                    .select("status, company_id, duration_seconds")
                     .eq("id", queueItemId)
-                    .single();
+                    .maybeSingle();
 
-                if (queueRow) {
-                    const item = typeof queueRow.api_key === "string" ? JSON.parse(queueRow.api_key) : queueRow.api_key;
-                    const finalStatus = item.status === "failed" ? "failed" : "completed";
+                if (logRow) {
+                    const finalStatus = logRow.status === "failed" ? "failed" : "completed";
+                    
+                    const updates: any = {
+                        status: finalStatus,
+                        ended_at: new Date().toISOString(),
+                    };
+
+                    const parsedDuration = parseInt(duration);
+                    if (parsedDuration > 0) {
+                        updates.duration_seconds = parsedDuration;
+                    }
+
+                    if (recordingUrl) {
+                        updates.call_recording = recordingUrl;
+                    }
 
                     await supabase
-                        .from("integration_api_keys")
-                        .update({
-                            api_key: JSON.stringify({
-                                ...item,
-                                status: finalStatus,
-                                duration_seconds: parseInt(duration),
-                                ended_at: new Date().toISOString(),
-                            }),
-                            is_active: false, // Mark as processed
-                        })
+                        .from("ai_caller_logs")
+                        .update(updates)
                         .eq("id", queueItemId);
 
-                    await logToDb(`Call hangup processed. Queue item: ${queueItemId}, Duration: ${duration}s, Status: ${finalStatus}`);
+                    await logToDb(`Call hangup processed. Call ID: ${queueItemId}, Duration: ${duration}s, Status: ${finalStatus}, Recording: ${recordingUrl || 'none'}`);
 
                     // Process next item in queue for this company
-                    await processNextQueueItem(supabase, item.company_id, supabaseUrl);
+                    await processNextQueueItem(supabase, logRow.company_id, supabaseUrl);
                 }
             }
 
@@ -517,22 +638,26 @@ serve(async (req) => {
             });
         }
 
-        // Fetch queue item
-        const { data: queueRow } = await supabase
-            .from("integration_api_keys")
-            .select("api_key, company_id")
+        // Fetch call log details
+        const { data: logRow } = await supabase
+            .from("ai_caller_logs")
+            .select("company_id, agent_id, call_id")
             .eq("id", queueItemId)
-            .single();
+            .maybeSingle();
 
-        if (!queueRow) {
-            return new Response(xmlError("Queue item not found"), {
+        if (!logRow) {
+            return new Response(xmlError("Call log item not found"), {
                 headers: { "Content-Type": "text/xml" },
             });
         }
 
-        const queueItem = typeof queueRow.api_key === "string" ? JSON.parse(queueRow.api_key) : queueRow.api_key;
-        const companyId = queueRow.company_id || queueItem.company_id;
-        const agentId = queueItem.agent_id;
+        const companyId = logRow.company_id;
+        const agentId = logRow.agent_id;
+        const callUuid = logRow.call_id;
+
+        if (callUuid) {
+            startVobizRecording(supabase, companyId, callUuid, queueItemId, supabaseUrl);
+        }
 
         // Fetch agent configuration for timeouts
         let agentConfig: any = {};
@@ -590,20 +715,16 @@ async function processNextQueueItem(supabase: any, companyId: string, supabaseUr
     if (!companyId) return;
 
     const { data: pending } = await supabase
-        .from("integration_api_keys")
-        .select("id, api_key")
+        .from("ai_caller_logs")
+        .select("id, lead_phone, agent_id, status")
         .eq("company_id", companyId)
-        .eq("service_name", "ai_call_queue")
-        .eq("is_active", true)
+        .eq("status", "pending")
         .order("created_at", { ascending: true })
         .limit(1);
 
     if (!pending || pending.length === 0) return;
 
     const nextRow = pending[0];
-    const item = typeof nextRow.api_key === "string" ? JSON.parse(nextRow.api_key) : nextRow.api_key;
-
-    if (item.status !== "pending") return;
 
     // Fetch Vobiz config
     const { data: vobizRow } = await supabase
@@ -621,7 +742,7 @@ async function processNextQueueItem(supabase: any, companyId: string, supabaseUr
     const { data: agentRow } = await supabase
         .from("integration_api_keys")
         .select("api_key")
-        .eq("id", item.agent_id)
+        .eq("id", nextRow.agent_id)
         .maybeSingle();
 
     if (!agentRow) return;
@@ -642,7 +763,7 @@ async function processNextQueueItem(supabase: any, companyId: string, supabaseUr
                 },
                 body: JSON.stringify({
                     from: agentConfig.phone_number || vobizConfig.phone_number,
-                    to: item.lead_phone,
+                    to: nextRow.lead_phone,
                     answer_url: answerUrl,
                     hangup_url: hangupUrl,
                 }),
@@ -652,24 +773,76 @@ async function processNextQueueItem(supabase: any, companyId: string, supabaseUr
         const result = await response.json();
 
         await supabase
-            .from("integration_api_keys")
+            .from("ai_caller_logs")
             .update({
-                api_key: JSON.stringify({
-                    ...item,
-                    status: response.ok ? "calling" : "failed",
-                    call_id: result?.request_uuid || result?.call_uuid,
-                    error: response.ok ? undefined : (result?.error || `HTTP ${response.status}`),
-                }),
+                status: response.ok ? "calling" : "failed",
+                call_id: result?.request_uuid || result?.call_uuid,
+                error: response.ok ? null : (result?.error || `HTTP ${response.status}`),
             })
             .eq("id", nextRow.id);
 
     } catch (err: any) {
         await supabase
-            .from("integration_api_keys")
+            .from("ai_caller_logs")
             .update({
-                api_key: JSON.stringify({ ...item, status: "failed", error: err.message }),
-                is_active: false,
+                status: "failed",
+                error: err.message,
             })
             .eq("id", nextRow.id);
     }
 }
+
+// ── Start Vobiz outbound call recording ───────────────────────────────────────
+async function startVobizRecording(
+    supabase: any,
+    companyId: string,
+    callUuid: string,
+    queueItemId: string,
+    supabaseUrl: string
+) {
+    if (!companyId || !callUuid) return;
+
+    try {
+        const { data: vobizRow } = await supabase
+            .from("integration_api_keys")
+            .select("api_key")
+            .eq("company_id", companyId)
+            .eq("service_name", "vobiz")
+            .eq("is_active", true)
+            .maybeSingle();
+
+        if (!vobizRow) {
+            console.error("[AI-Caller] Vobiz integration credentials not found for recording");
+            return;
+        }
+
+        const vobizConfig = typeof vobizRow.api_key === "string" ? JSON.parse(vobizRow.api_key) : vobizRow.api_key;
+        
+        console.log(`[AI-Caller] Requesting Vobiz call recording for call ${callUuid}...`);
+        
+        const callbackUrl = `${supabaseUrl}/functions/v1/ai-caller?action=hangup&queue_item_id=${encodeURIComponent(queueItemId)}`;
+        
+        const response = await fetch(
+            `https://api.vobiz.ai/api/v1/Account/${vobizConfig.auth_id}/Call/${callUuid}/Record/`,
+            {
+                method: "POST",
+                headers: {
+                    "X-Auth-ID": vobizConfig.auth_id,
+                    "X-Auth-Token": vobizConfig.auth_token,
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    time_limit: 3600,
+                    file_format: "mp3",
+                    callback_url: callbackUrl,
+                })
+            }
+        );
+
+        const result = await response.json();
+        console.log(`[AI-Caller] Vobiz recording response:`, result);
+    } catch (err: any) {
+        console.error("[AI-Caller] Failed to trigger Vobiz call recording:", err);
+    }
+}
+

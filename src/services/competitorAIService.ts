@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { getLeadsTableName } from '@/lib/leadsTableUtils';
 
 export interface BattleCard {
     competitor: string;
@@ -19,9 +20,11 @@ export async function generateBattleCard(params: {
 }): Promise<BattleCard> {
     const apiKey = await getGeminiKey(params.companyId);
 
+    const tableName = await getLeadsTableName(params.companyId);
+
     // Fetch Lead Context
     const { data: lead } = await supabase
-        .from('leads')
+        .from(tableName as any)
         .select('name, industry, company_name, product_purchased, notes')
         .eq('id', params.leadId)
         .single();

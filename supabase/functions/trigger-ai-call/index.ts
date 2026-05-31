@@ -122,25 +122,17 @@ serve(async (req) => {
         const pendingCount = 0; // Set to 0 to bypass queue logic and initiate call immediately
 
         // 5. Enqueue the call item
-        const queueItem: QueueItem = {
-            lead_id: lead_id || "",
-            lead_phone,
-            lead_name: lead_name || "Unknown",
-            agent_id,
-            automation_id,
-            company_id,
-            enqueued_at: new Date().toISOString(),
-            status: pendingCount > 0 ? "pending" : "calling",
-        };
-
         const { data: queueRow, error: insertError } = await supabase
-            .from("integration_api_keys")
+            .from("ai_caller_logs")
             .insert({
                 user_id: user.id,
                 company_id,
-                service_name: "ai_call_queue",
-                api_key: JSON.stringify(queueItem),
-                is_active: true,
+                lead_id: lead_id || null,
+                lead_phone,
+                lead_name: lead_name || "Unknown",
+                agent_id,
+                automation_id: automation_id || null,
+                status: pendingCount > 0 ? "pending" : "calling",
             })
             .select()
             .single();
@@ -159,16 +151,13 @@ serve(async (req) => {
                 supabaseUrl,
             });
 
-            const updatedItem: QueueItem = {
-                ...queueItem,
-                status: callResult.success ? "calling" : "failed",
-                call_id: callResult.callId,
-                error: callResult.error,
-            };
-
             await supabase
-                .from("integration_api_keys")
-                .update({ api_key: JSON.stringify(updatedItem) })
+                .from("ai_caller_logs")
+                .update({ 
+                    status: callResult.success ? "calling" : "failed",
+                    call_id: callResult.callId,
+                    error: callResult.error || null,
+                })
                 .eq("id", queueRow.id);
 
             return new Response(JSON.stringify({

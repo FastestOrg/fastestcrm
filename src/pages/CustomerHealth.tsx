@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useCompany } from '@/hooks/useCompany';
+import { useLeadsTable } from '@/hooks/useLeadsTable';
 import { useToast } from '@/hooks/use-toast';
 
 interface CustomerHealth {
@@ -24,6 +25,7 @@ interface CustomerHealth {
 }
 
 export default function CustomerHealth() {
+  const { tableName, companyId, loading: tableLoading } = useLeadsTable();
   const { company } = useCompany();
   const { toast } = useToast();
   const [accounts, setAccounts] = useState<CustomerHealth[]>([]);
@@ -31,25 +33,25 @@ export default function CustomerHealth() {
   const [running, setRunning] = useState<string | null>(null);
   const [stats, setStats] = useState({ total: 0, critical: 0, atRisk: 0, healthy: 0 });
 
-  useEffect(() => { if (company?.id) fetchAccounts(); }, [company?.id]);
+  useEffect(() => { if (companyId && tableName) fetchAccounts(); }, [companyId, tableName]);
 
   const fetchAccounts = async () => {
-    if (!company?.id) return;
+    if (!companyId || !tableName) return;
     setLoading(true);
     try {
       const { data: leads } = await supabase
-        .from('leads')
+        .from(tableName as any)
         .select('id, name, status, updated_at, created_at, phone, email')
-        .eq('company_id', company.id)
+        .eq('company_id', companyId)
         .in('status', ['paid', 'closed', 'won', 'converted', 'active', 'customer'])
         .order('updated_at', { ascending: true })
         .limit(25);
 
       // Also get leads that look like "customers" (recently paid/interested)
       const { data: prospects } = await supabase
-        .from('leads')
+        .from(tableName as any)
         .select('id, name, status, updated_at, created_at, phone, email')
-        .eq('company_id', company.id)
+        .eq('company_id', companyId)
         .in('status', ['interested', 'follow_up', 'warm'])
         .order('updated_at', { ascending: true })
         .limit(10);

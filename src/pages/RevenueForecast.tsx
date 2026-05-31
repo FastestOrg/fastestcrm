@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useCompany } from '@/hooks/useCompany';
+import { useLeadsTable } from '@/hooks/useLeadsTable';
 import { useToast } from '@/hooks/use-toast';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
@@ -24,6 +25,7 @@ const MOCK_FORECAST = [
 ];
 
 export default function RevenueForecast() {
+  const { tableName, companyId, loading: tableLoading } = useLeadsTable();
   const { company } = useCompany();
   const { toast } = useToast();
   const [scenario, setScenario] = useState('');
@@ -33,16 +35,16 @@ export default function RevenueForecast() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (company?.id) fetchPipelineData();
-  }, [company?.id]);
+    if (companyId && tableName) fetchPipelineData();
+  }, [companyId, tableName]);
 
   const fetchPipelineData = async () => {
-    if (!company?.id) return;
+    if (!companyId || !tableName) return;
     try {
       const { data: leads } = await supabase
-        .from('leads')
+        .from(tableName as any)
         .select('id, status')
-        .eq('company_id', company.id);
+        .eq('company_id', companyId);
 
       const active = leads?.filter(l => !['closed','won','lost','converted','archived'].includes(l.status?.toLowerCase() || '')) || [];
       setPipelineStats({ total: leads?.length || 0, active: active.length, value: active.length * 15000 });

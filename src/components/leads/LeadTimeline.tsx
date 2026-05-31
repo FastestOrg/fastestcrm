@@ -5,6 +5,8 @@ import { Mail, MessageSquare, History, AlertCircle, CheckCircle2, Clock } from '
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import { useTeam } from '@/hooks/useTeam';
+import { formatLeadHistoryEntry } from '@/lib/leadHistory';
 
 interface LeadTimelineProps {
     leadId: string;
@@ -14,8 +16,10 @@ interface LeadTimelineProps {
 }
 
 export function LeadTimeline({ leadId, email, phone, leadHistory }: LeadTimelineProps) {
+    const { members } = useTeam();
+
     const { data: interactions, isLoading } = useQuery({
-        queryKey: ['lead-interactions', leadId],
+        queryKey: ['lead-interactions', leadId, leadHistory, members],
         queryFn: async () => {
             const results: any[] = [];
 
@@ -70,11 +74,24 @@ export function LeadTimeline({ leadId, email, phone, leadHistory }: LeadTimeline
             // 3. Add Lead History
             if (leadHistory && Array.isArray(leadHistory)) {
                 leadHistory.forEach((h: any, index: number) => {
+                    const timestampStr = h.date_time || h.timestamp || h.at;
+                    let dateVal = new Date();
+                    try {
+                        if (timestampStr) {
+                            const parsedDate = new Date(timestampStr);
+                            if (!isNaN(parsedDate.getTime())) {
+                                dateVal = parsedDate;
+                            }
+                        }
+                    } catch (e) {
+                        console.error(e);
+                    }
+
                     results.push({
                         id: `history-${index}`,
-                        timestamp: new Date(h.timestamp),
+                        timestamp: dateVal,
                         type: 'history',
-                        content: h.details,
+                        content: formatLeadHistoryEntry(h, members),
                         status: 'completed',
                         icon: <History className="h-4 w-4" />,
                         color: "text-slate-500",
@@ -88,6 +105,7 @@ export function LeadTimeline({ leadId, email, phone, leadHistory }: LeadTimeline
         },
         enabled: !!leadId,
     });
+
 
     if (isLoading) {
         return <div className="flex items-center justify-center p-8 text-muted-foreground">Loading timeline...</div>;

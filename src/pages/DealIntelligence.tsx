@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useCompany } from '@/hooks/useCompany';
+import { useLeadsTable } from '@/hooks/useLeadsTable';
 import { useToast } from '@/hooks/use-toast';
 
 interface DealScore {
@@ -25,6 +26,7 @@ interface DealScore {
 }
 
 export default function DealIntelligence() {
+  const { tableName, companyId, loading: tableLoading } = useLeadsTable();
   const { company } = useCompany();
   const { toast } = useToast();
   const [deals, setDeals] = useState<DealScore[]>([]);
@@ -33,20 +35,20 @@ export default function DealIntelligence() {
   const [stats, setStats] = useState({ total: 0, atRisk: 0, healthy: 0, avgScore: 0 });
 
   useEffect(() => {
-    if (company?.id) fetchDeals();
-  }, [company?.id]);
+    if (companyId && tableName) fetchDeals();
+  }, [companyId, tableName]);
 
   const fetchDeals = async () => {
-    if (!company?.id) return;
+    if (!companyId || !tableName) return;
     setLoading(true);
     try {
       const threshold = new Date();
       threshold.setDate(threshold.getDate() - 2);
 
       const { data: leads } = await supabase
-        .from('leads')
+        .from(tableName as any)
         .select('id, name, status, updated_at, phone, email')
-        .eq('company_id', company.id)
+        .eq('company_id', companyId)
         .not('status', 'in', '("closed","won","lost","converted","archived")')
         .order('updated_at', { ascending: true })
         .limit(20);

@@ -26,7 +26,21 @@ async function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+async function processConcurrent(tasks: (() => Promise<void>)[], limit: number): Promise<void> {
+  const executing = new Set<Promise<void>>();
+  for (const task of tasks) {
+    const p = task();
+    executing.add(p);
+    p.finally(() => executing.delete(p));
+    if (executing.size >= limit) {
+      await Promise.race(executing);
+    }
+  }
+  await Promise.all(executing);
+}
+
 Deno.serve(async (req) => {
+
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -134,155 +148,198 @@ Deno.serve(async (req) => {
       let processed = 0;
       let accountIndex = 0;
       const maxBatch = 50; // Increased batch size
+      const concurrencyLimit = 10;
 
-      for (const recipient of recipients) {
-        if (processed >= maxBatch) break;
+      const recipientUpdates: any[] = [];
+      const campaignLogs: any[] = [];
+      const tasks: (() => Promise<void>)[] = [];
 
-        // Re-check campaign status (in case paused)
-        const { data: freshCampaign } = await adminClient
-          .from("email_campaigns")
-          .select("status")
-          .eq("id", campaignId)
-          .single();
+      // Re-check campaign status (in case paused)
+      const { data: freshCampaign } = await adminClient
+        .from("email_campaigns")
+        .select("status")
+        .eq("id", campaignId)
+        .single();
 
-        if (freshCampaign?.status !== "active") break;
+      if (freshCampaign?.status === "active") {
+        for (const recipient of recipients) {
+          if (processed >= maxBatch) break;
 
-        // Determine which step to send
-        const nextStep = recipient.current_step + 1;
-        const sequence = sequences.find((s: any) => s.step_number === nextStep);
+          // Determine which step to send
+          const nextStep = recipient.current_step + 1;
+          const sequence = sequences.find((s: any) => s.step_number === nextStep);
 
-        if (!sequence) {
-          // Recipient has completed all steps
-          await adminClient
-            .from("email_campaign_recipients")
-            .update({ status: "completed" })
-            .eq("id", recipient.id);
-          continue;
-        }
-
-        // Check send condition
-        if (sequence.send_condition === "if_no_reply" && recipient.replied_at) {
-          await adminClient
-            .from("email_campaign_recipients")
-            .update({ status: "replied" })
-            .eq("id", recipient.id);
-          continue;
-        }
-
-        if (sequence.send_condition === "if_no_open" && recipient.opened_at) {
-          // Skip to next step
-          await adminClient
-            .from("email_campaign_recipients")
-            .update({ current_step: nextStep })
-            .eq("id", recipient.id);
-          continue;
-        }
-
-        // Check if enough time has elapsed for delay
-        if (recipient.last_sent_at && sequence.delay_after_ms > 0) {
-          const lastSent = new Date(recipient.last_sent_at).getTime();
-          const elapsed = Date.now() - lastSent;
-          if (elapsed < sequence.delay_after_ms) continue; // Not yet time
-        }
-
-        // Pick sender account (round-robin)
-        const accountId = accountIds[accountIndex % accountIds.length];
-        accountIndex++;
-
-        // Resolve variables in subject and body
-        const leadData = recipient.lead_data || {};
-        const resolvedSubject = resolveVariables(sequence.subject, leadData);
-        const resolvedBody = resolveVariables(sequence.body_html, leadData);
-
-        // Send via fastsend-send function
-        try {
-          const projectId = SUPABASE_URL.replace("https://", "").replace(".supabase.co", "");
-          const sendRes = await fetch(`https://${projectId}.supabase.co/functions/v1/fastsend-send`, {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`, // Use service key for internal calls
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              accountId,
-              to: recipient.lead_email,
-              subject: resolvedSubject,
-              bodyHtml: resolvedBody,
-              campaignId,
-              recipientId: recipient.id,
-              sequenceStepId: sequence.id,
-              companyId: campaign.company_id,
-              leadId: recipient.lead_id,
-              leadTable: recipient.lead_table
-            }),
-          });
-
-          const sendResult = await sendRes.json();
-
-          if (sendResult.success) {
-            await adminClient
-              .from("email_campaign_recipients")
-              .update({
-                current_step: nextStep,
-                status: nextStep >= sequences.length ? "completed" : "in_progress",
-                last_sent_at: new Date().toISOString(),
-              })
-              .eq("id", recipient.id);
-          } else if (sendResult.limitReached) {
-            // Account limit reached — skip to next account
-            continue;
-          } else {
-            const now = new Date().toISOString();
-            await adminClient
-              .from("email_campaign_recipients")
-              .update({ status: "failed", error_message: sendResult.error || "Unknown error" })
-              .eq("id", recipient.id);
-
-            // Log failed status in email_campaign_logs
-            await adminClient.from("email_campaign_logs").insert({
-              company_id: campaign.company_id,
-              campaign_id: campaignId,
-              recipient_id: recipient.id,
-              sequence_step_id: sequence.id,
-              sent_by_account_id: accountId,
-              recipient_email: recipient.lead_email,
-              subject: resolvedSubject,
-              status: "failed",
-              error_message: sendResult.error || "Unknown error",
-              sent_at: now,
+          if (!sequence) {
+            // Recipient has completed all steps
+            recipientUpdates.push({
+              id: recipient.id,
+              status: "completed",
+              updated_at: new Date().toISOString()
             });
+            continue;
           }
-        } catch (sendErr: any) {
-          console.error("Send error:", sendErr);
-          const now = new Date().toISOString();
-          await adminClient
-            .from("email_campaign_recipients")
-            .update({ status: "failed", error_message: sendErr.message || "Unknown execution error" })
-            .eq("id", recipient.id);
 
-          // Log caught failed status in email_campaign_logs
-          await adminClient.from("email_campaign_logs").insert({
-            company_id: campaign.company_id,
-            campaign_id: campaignId,
-            recipient_id: recipient.id,
-            sequence_step_id: sequence.id,
-            sent_by_account_id: accountId,
-            recipient_email: recipient.lead_email,
-            subject: resolvedSubject,
-            status: "failed",
-            error_message: sendErr.message || "Unknown execution error",
-            sent_at: now,
+          // Check send condition
+          if (sequence.send_condition === "if_no_reply" && recipient.replied_at) {
+            recipientUpdates.push({
+              id: recipient.id,
+              status: "replied",
+              updated_at: new Date().toISOString()
+            });
+            continue;
+          }
+
+          if (sequence.send_condition === "if_no_open" && recipient.opened_at) {
+            // Skip to next step
+            recipientUpdates.push({
+              id: recipient.id,
+              current_step: nextStep,
+              updated_at: new Date().toISOString()
+            });
+            continue;
+          }
+
+          // Check if enough time has elapsed for delay
+          if (recipient.last_sent_at && sequence.delay_after_ms > 0) {
+            const lastSent = new Date(recipient.last_sent_at).getTime();
+            const elapsed = Date.now() - lastSent;
+            if (elapsed < sequence.delay_after_ms) continue; // Not yet time
+          }
+
+          // Pick sender account (round-robin)
+          const accountId = accountIds[accountIndex % accountIds.length];
+          accountIndex++;
+
+          // Resolve variables in subject and body
+          const leadData = recipient.lead_data || {};
+          const resolvedSubject = resolveVariables(sequence.subject, leadData);
+          const resolvedBody = resolveVariables(sequence.body_html, leadData);
+
+          processed++;
+
+          const currentRecipient = recipient;
+          const currentAccountId = accountId;
+          const currentResolvedSubject = resolvedSubject;
+          const currentResolvedBody = resolvedBody;
+          const currentSequence = sequence;
+
+          tasks.push(async () => {
+            try {
+              const projectId = SUPABASE_URL.replace("https://", "").replace(".supabase.co", "");
+              const sendRes = await fetch(`https://${projectId}.supabase.co/functions/v1/fastsend-send`, {
+                method: "POST",
+                headers: {
+                  Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`, // Use service key for internal calls
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  accountId: currentAccountId,
+                  to: currentRecipient.lead_email,
+                  subject: currentResolvedSubject,
+                  bodyHtml: currentResolvedBody,
+                  campaignId,
+                  recipientId: currentRecipient.id,
+                  sequenceStepId: currentSequence.id,
+                  companyId: campaign.company_id,
+                  leadId: currentRecipient.lead_id,
+                  leadTable: currentRecipient.lead_table
+                }),
+              });
+
+              const sendResult = await sendRes.json();
+
+              if (sendResult.success) {
+                recipientUpdates.push({
+                  id: currentRecipient.id,
+                  current_step: nextStep,
+                  status: nextStep >= sequences.length ? "completed" : "in_progress",
+                  last_sent_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString()
+                });
+              } else if (sendResult.limitReached) {
+                // Account limit reached — this count shouldn't block, but for now mark as pending to retry
+              } else {
+                const now = new Date().toISOString();
+                recipientUpdates.push({
+                  id: currentRecipient.id,
+                  status: "failed",
+                  error_message: sendResult.error || "Unknown error",
+                  updated_at: now
+                });
+
+                // Log failed status in email_campaign_logs
+                campaignLogs.push({
+                  company_id: campaign.company_id,
+                  campaign_id: campaignId,
+                  recipient_id: currentRecipient.id,
+                  sequence_step_id: currentSequence.id,
+                  sent_by_account_id: currentAccountId,
+                  recipient_email: currentRecipient.lead_email,
+                  subject: currentResolvedSubject,
+                  status: "failed",
+                  error_message: sendResult.error || "Unknown error",
+                  sent_at: now,
+                });
+              }
+            } catch (sendErr: any) {
+              console.error("Send error:", sendErr);
+              const now = new Date().toISOString();
+              recipientUpdates.push({
+                id: currentRecipient.id,
+                status: "failed",
+                error_message: sendErr.message || "Unknown execution error",
+                updated_at: now
+              });
+
+              // Log caught failed status in email_campaign_logs
+              campaignLogs.push({
+                company_id: campaign.company_id,
+                campaign_id: campaignId,
+                recipient_id: currentRecipient.id,
+                sequence_step_id: currentSequence.id,
+                sent_by_account_id: currentAccountId,
+                recipient_email: currentRecipient.lead_email,
+                subject: currentResolvedSubject,
+                status: "failed",
+                error_message: sendErr.message || "Unknown execution error",
+                sent_at: now,
+              });
+            }
+
+            // Optional delay between emails in the concurrent pool
+            if (campaign.delay_between_emails_ms > 0) {
+              const delayMs = Math.min(campaign.delay_between_emails_ms, 5000); // cap at 5s in edge function
+              await sleep(delayMs);
+            }
           });
         }
 
-        processed++;
+        // Execute fetches concurrently
+        if (tasks.length > 0) {
+          await processConcurrent(tasks, concurrencyLimit);
+        }
 
-        // Delay between emails
-        if (campaign.delay_between_emails_ms > 0 && processed < maxBatch) {
-          const delayMs = Math.min(campaign.delay_between_emails_ms, 5000); // cap at 5s in edge function
-          await sleep(delayMs);
+        // Bulk upsert updates to email_campaign_recipients
+        if (recipientUpdates.length > 0) {
+          const { error: bulkUpError } = await adminClient
+            .from("email_campaign_recipients")
+            .upsert(recipientUpdates);
+          if (bulkUpError) {
+            console.error("Bulk update email_campaign_recipients error:", bulkUpError.message);
+          }
+        }
+
+        // Bulk insert logs into email_campaign_logs
+        if (campaignLogs.length > 0) {
+          const { error: bulkLogError } = await adminClient
+            .from("email_campaign_logs")
+            .insert(campaignLogs);
+          if (bulkLogError) {
+            console.error("Bulk insert email_campaign_logs error:", bulkLogError.message);
+          }
         }
       }
+
 
       // Check if there's more work to do
       const { data: remaining } = await adminClient

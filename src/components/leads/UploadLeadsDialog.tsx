@@ -91,16 +91,48 @@ export function UploadLeadsDialog() {
         leads: any[],
         currentProgress: UploadProgress
     ): Promise<UploadProgress> => {
-        const results = await Promise.all(leads.map(lead => insertLeadWithRetry(lead)));
+        try {
+            const { error } = await supabase
+                .from(tableName as any)
+                .insert(leads);
 
-        return {
-            ...currentProgress,
-            processed: currentProgress.processed + leads.length,
-            success: currentProgress.success + results.filter(r => r === 'success').length,
-            duplicates: currentProgress.duplicates + results.filter(r => r === 'duplicate').length,
-            errors: currentProgress.errors + results.filter(r => r === 'error').length,
-        };
+            if (error) {
+                // Check if it's a unique constraint violation, if so fallback to individual inserts
+                if (error.code === '23505' || error.message?.toLowerCase().includes('duplicate') || error.message?.toLowerCase().includes('unique')) {
+                    console.log('Duplicate key found in bulk insert. Falling back to individual inserts for this batch.');
+                    const results = await Promise.all(leads.map(lead => insertLeadWithRetry(lead)));
+                    return {
+                        ...currentProgress,
+                        processed: currentProgress.processed + leads.length,
+                        success: currentProgress.success + results.filter(r => r === 'success').length,
+                        duplicates: currentProgress.duplicates + results.filter(r => r === 'duplicate').length,
+                        errors: currentProgress.errors + results.filter(r => r === 'error').length,
+                    };
+                }
+                
+                console.error('Bulk insert database error:', error);
+                return {
+                    ...currentProgress,
+                    processed: currentProgress.processed + leads.length,
+                    errors: currentProgress.errors + leads.length,
+                };
+            }
+
+            return {
+                ...currentProgress,
+                processed: currentProgress.processed + leads.length,
+                success: currentProgress.success + leads.length,
+            };
+        } catch (err) {
+            console.error('Bulk insert exception:', err);
+            return {
+                ...currentProgress,
+                processed: currentProgress.processed + leads.length,
+                errors: currentProgress.errors + leads.length,
+            };
+        }
     };
+
 
     const handleUpload = async () => {
         if (!file || !user || !company) {

@@ -61,6 +61,7 @@ import {
 } from '@/hooks/useCalendar';
 import { useCompany } from '@/hooks/useCompany';
 import { useAuth } from '@/hooks/useAuth';
+import { useLeadsTable } from '@/hooks/useLeadsTable';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/sonner';
 import { useQueryClient } from '@tanstack/react-query';
@@ -606,13 +607,14 @@ export default function CalendarPage() {
 // Hook to fetch lead reminders for calendar
 function useLeadReminders(startDate: Date, endDate: Date) {
   const { user } = useAuth();
+  const { tableName, loading: tableLoading } = useLeadsTable();
 
   return useQuery({
-    queryKey: ['lead-reminders-calendar', user?.id, startDate.toISOString(), endDate.toISOString()],
+    queryKey: ['lead-reminders-calendar', user?.id, startDate.toISOString(), endDate.toISOString(), tableName],
     queryFn: async () => {
-      if (!user?.id) return [];
+      if (!user?.id || tableLoading) return [];
       const { data, error } = await supabase
-        .from('leads')
+        .from(tableName as any)
         .select('id, name, reminder_at, status')
         .not('reminder_at', 'is', null)
         .gte('reminder_at', startDate.toISOString())
@@ -621,6 +623,6 @@ function useLeadReminders(startDate: Date, endDate: Date) {
       if (error) return [];
       return data || [];
     },
-    enabled: !!user?.id,
+    enabled: !!user?.id && !tableLoading,
   });
 }

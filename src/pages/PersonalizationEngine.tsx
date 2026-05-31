@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useCompany } from '@/hooks/useCompany';
+import { useLeadsTable } from '@/hooks/useLeadsTable';
 import { useToast } from '@/hooks/use-toast';
 
 type Channel = 'whatsapp' | 'email';
@@ -26,6 +27,7 @@ interface GeneratedMessage {
 }
 
 export default function PersonalizationEngine() {
+  const { tableName, companyId, loading: tableLoading } = useLeadsTable();
   const { company } = useCompany();
   const { toast } = useToast();
   const [leads, setLeads] = useState<any[]>([]);
@@ -39,13 +41,14 @@ export default function PersonalizationEngine() {
   const [copied, setCopied] = useState(false);
   const [sending, setSending] = useState(false);
 
-  useEffect(() => { if (company?.id) fetchLeads(); }, [company?.id]);
+  useEffect(() => { if (companyId && tableName) fetchLeads(); }, [companyId, tableName]);
 
   const fetchLeads = async () => {
+    if (!companyId || !tableName) return;
     const { data } = await supabase
-      .from('leads')
+      .from(tableName as any)
       .select('id, name, status, phone, email, updated_at')
-      .eq('company_id', company?.id)
+      .eq('company_id', companyId)
       .limit(50)
       .order('updated_at', { ascending: false });
     setLeads(data || []);
