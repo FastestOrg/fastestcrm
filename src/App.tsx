@@ -95,6 +95,9 @@ const FastestScout = lazy(() => import("./pages/FastestScout"));
 const AIMissionControl = lazy(() => import("./pages/AIMissionControl"));
 const PublicDocument = lazy(() => import("./pages/PublicDocument"));
 const AICallerPage = lazy(() => import("./pages/AICallerPage"));
+const LandingPages = lazy(() => import("./pages/LandingPages"));
+const LandingPageBuilder = lazy(() => import("./pages/LandingPageBuilder"));
+const PublicLandingPage = lazy(() => import("./pages/PublicLandingPage"));
 
 import { useCompany } from "@/hooks/useCompany";
 import { solutionsData } from "./data/solutions";
@@ -300,6 +303,9 @@ function AppRoutes() {
           <Route path="/dashboard/fastsend" element={<FastSend />} />
           <Route path="/dashboard/whatsapp" element={<WhatsAppCampaign />} />
           <Route path="/dashboard/ai-caller" element={<AICallerPage />} />
+          <Route path="/dashboard/landing-pages" element={<LandingPages />} />
+          <Route path="/dashboard/landing-pages/new" element={<LandingPageBuilder />} />
+          <Route path="/dashboard/landing-pages/:id" element={<LandingPageBuilder />} />
           <Route path="/dashboard/quotations" element={<Quotations />} />
           <Route path="/dashboard/quotations/new" element={<QuotationBuilder />} />
           <Route path="/dashboard/quotations/:id" element={<QuotationBuilder />} />
@@ -309,6 +315,7 @@ function AppRoutes() {
           <Route path="/dashboard/invoice-settings" element={<InvoiceSettings />} />
         </Route>
 
+        <Route path="/lp/:companySlug/:pageSlug" element={<PublicLandingPage />} />
         <Route path="/:companySlug/:slug" element={<PublicBooking />} />
         <Route path="*" element={<NotFound />} />
       </Routes>

@@ -120,6 +120,11 @@ const navItems: NavItem[] = [{
     path: '/dashboard/ai-caller',
     section: 'FastEngage'
 }, {
+    icon: Globe,
+    label: 'Landing Pages',
+    path: '/dashboard/landing-pages',
+    section: 'FastEngage'
+}, {
     icon: ShieldCheck,
     label: 'Mission Control',
     path: '/dashboard/ai-mission-control',

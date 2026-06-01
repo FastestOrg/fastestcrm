@@ -100,8 +100,8 @@
     "hash": "3e71888489362f90d48a28dfeca65be3"
   },
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\src\\App.tsx": {
-    "mtime": 1779827323.2746155,
-    "hash": "5a282d1052fa503f20e03f1067add39f"
+    "mtime": 1780323011.2227578,
+    "hash": "59e8a75bdd96c0180351c7a08e502ded"
   },
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\src\\main.tsx": {
     "mtime": 1780181731.466691,
@@ -260,8 +260,8 @@
     "hash": "4ca1cb7ab7ad4443d4fd2925875f2e73"
   },
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\src\\components\\layout\\AppLayout.tsx": {
-    "mtime": 1780183013.59681,
-    "hash": "b3575fc59b2921d5295a81ff8942a9ba"
+    "mtime": 1780323111.585982,
+    "hash": "c77f4eac4790bc34ef45fe98329ab00b"
   },
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\src\\components\\layout\\AuthorityFooter.tsx": {
     "mtime": 1776200430.8621888,
@@ -670,6 +670,10 @@
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\src\\hooks\\useInvoiceSettings.ts": {
     "mtime": 1775510452.2092738,
     "hash": "27c50ba568bd370bb1c94aeace5314b0"
+  },
+  "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\src\\hooks\\useLandingPages.ts": {
+    "mtime": 1780344013.1199088,
+    "hash": "10b5b6a4b0e6de1c130ffd0792bea7be"
   },
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\src\\hooks\\useLeads.ts": {
     "mtime": 1780182158.1287239,
@@ -1199,6 +1203,14 @@
     "mtime": 1776200406.9945362,
     "hash": "bea9c81b901fde45edd8e9352e7e99df"
   },
+  "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\src\\pages\\LandingPageBuilder.tsx": {
+    "mtime": 1780324978.7361608,
+    "hash": "32bf71b39ffb36d50b46cfd7e4dac7a4"
+  },
+  "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\src\\pages\\LandingPages.tsx": {
+    "mtime": 1780324962.627899,
+    "hash": "c905e092845e3e434c29e971cb6b6089"
+  },
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\src\\pages\\LGDashboard.tsx": {
     "mtime": 1776324382.1847832,
     "hash": "b33ed584693e271857dff1b98a9b76fa"
@@ -1274,6 +1286,10 @@
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\src\\pages\\PublicForm.tsx": {
     "mtime": 1772696394.4225347,
     "hash": "1f443bf4c6d857cd1df8b350df5cf56f"
+  },
+  "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\src\\pages\\PublicLandingPage.tsx": {
+    "mtime": 1780343194.9635503,
+    "hash": "ad053e81f2915b57a50ee1a72a026d5f"
   },
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\src\\pages\\QuotationBuilder.tsx": {
     "mtime": 1778570215.4698448,
@@ -2102,6 +2118,14 @@
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\supabase\\migrations\\20260601030000_backfill_ai_caller_logs.sql": {
     "mtime": 1780262660.2496786,
     "hash": "019088a9ed9adc5c27eb1352e55cc4cf"
+  },
+  "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\supabase\\migrations\\20260601180000_create_landing_pages.sql": {
+    "mtime": 1780322788.631768,
+    "hash": "6905c6a9e0e9032622bf3f1436aa8163"
+  },
+  "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\supabase\\migrations\\20260602020000_fix_landing_pages_fk.sql": {
+    "mtime": 1780343911.1597714,
+    "hash": "0ef021bca3870a3afe9c6e774474240f"
   },
   "C:\\Users\\ppdub\\Documents\\Work\\Weskill\\Software\\FastestCRM\\whatsapp-server\\scripts\\benchmark_cache.ts": {
     "mtime": 1779312467.3503547,
