@@ -21,6 +21,11 @@ export interface TaskLead {
     created_at: string;
     updated_at: string;
     lead_history?: any[] | null;
+    // Meeting fields
+    isMeeting?: boolean;
+    location?: string | null;
+    lead_id?: string | null;
+    event_type?: string | null;
 }
 
 export type TaskBucket = 'urgent' | 'today' | 'upcoming';
@@ -70,15 +75,59 @@ export function useTaskLeads(): TaskLeadsResult {
                     ? '*, sales_owner:profiles!leads_sales_owner_id_fkey(full_name)'
                     : '*';
 
-            const { data, error } = await supabase
+            const { data: leadsData, error: leadsError } = await supabase
                 .from(tableName as any)
                 .select(selectQuery)
                 .eq('company_id', companyId)
                 .not('reminder_at', 'is', null) // Server-side filter — key for performance
                 .order('reminder_at', { ascending: true });
 
-            if (error) throw error;
-            return (data as unknown as TaskLead[]) || [];
+            if (leadsError) throw leadsError;
+
+            // Fetch calendar events starting from today start to prevent past meetings cluttering tasks
+            const { todayStart } = getDateBoundaries();
+            const { data: eventsData, error: eventsError } = await supabase
+                .from('calendar_events' as any)
+                .select('*')
+                .eq('company_id', companyId)
+                .gte('start_time', todayStart.toISOString())
+                .neq('status', 'cancelled')
+                .order('start_time', { ascending: true });
+
+            if (eventsError) throw eventsError;
+
+            const mappedLeads: TaskLead[] = (leadsData || []).map((lead: any) => ({
+                ...lead,
+                isMeeting: false,
+            }));
+
+            const mappedEvents: TaskLead[] = (eventsData || []).map((event: any) => ({
+                id: event.id,
+                name: event.title,
+                email: event.attendee_email,
+                phone: event.attendee_phone,
+                whatsapp: null,
+                status: 'meeting',
+                reminder_at: event.start_time,
+                sales_owner_id: event.user_id,
+                sales_owner: null,
+                company_id: event.company_id,
+                college: event.attendee_name ? `Attendee: ${event.attendee_name}` : null,
+                lead_source: null,
+                product_purchased: null,
+                created_at: event.created_at,
+                updated_at: event.updated_at,
+                lead_history: null,
+                isMeeting: true,
+                location: event.location,
+                lead_id: event.lead_id,
+                event_type: event.event_type,
+            } as unknown as TaskLead));
+
+            const combined = [...mappedLeads, ...mappedEvents];
+            combined.sort((a, b) => new Date(a.reminder_at).getTime() - new Date(b.reminder_at).getTime());
+
+            return combined;
         },
         enabled: !tableLoading && !!companyId,
         staleTime: 30_000, // 30 seconds fresh

@@ -10,7 +10,9 @@ import {
     Mail,
     User,
     CheckSquare,
+    Video,
 } from 'lucide-react';
+import { toast } from '@/components/ui/sonner';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -86,8 +88,9 @@ function LeadTaskCard({
     onEdit: (lead: TaskLead) => void;
 }) {
     const { getStatusColor, getStatusLabel } = useLeadStatuses();
-    const color = getStatusColor(lead.status);
-    const label = getStatusLabel(lead.status);
+    const isMeeting = lead.isMeeting;
+    const color = isMeeting ? 'var(--primary)' : getStatusColor(lead.status);
+    const label = isMeeting ? 'Meeting' : getStatusLabel(lead.status);
 
     const timeIndicatorClass =
         bucket === 'urgent'
@@ -145,6 +148,20 @@ function LeadTaskCard({
                         </a>
                     )}
                 </div>
+
+                {isMeeting && lead.location && lead.location.includes('google.com') && (
+                    <div className="mt-1 mb-3" onClick={(e) => e.stopPropagation()}>
+                        <a
+                            href={lead.location}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center justify-center gap-1.5 w-full py-1.5 px-3 rounded-md bg-primary hover:bg-primary/90 text-white text-xs font-semibold shadow transition-all duration-200"
+                        >
+                            <Video className="h-3.5 w-3.5" />
+                            Launch Selection Meet
+                        </a>
+                    </div>
+                )}
 
                 {/* Footer row: time + owner + arrow */}
                 <div className="flex items-center justify-between gap-2">
@@ -249,6 +266,32 @@ export default function Tasks() {
 
     const { urgent, today, upcoming, isLoading, error, refetch } = useTaskLeads();
 
+    const handleViewLead = async (lead: TaskLead) => {
+        if (lead.isMeeting) {
+            const leadId = lead.lead_id;
+            if (leadId) {
+                try {
+                    const { data, error } = await supabase
+                        .from('leads')
+                        .select('*, sales_owner:profiles!leads_sales_owner_id_fkey(full_name)')
+                        .eq('id', leadId)
+                        .single();
+                    if (error) throw error;
+                    if (data) {
+                        setViewingLead(data as unknown as TaskLead);
+                    }
+                } catch (err) {
+                    console.error("Error fetching lead for meeting:", err);
+                    toast.error("Could not load associated lead details");
+                }
+            } else {
+                toast("Meeting not linked to a specific lead");
+            }
+        } else {
+            setViewingLead(lead);
+        }
+    };
+
     const counts: Record<TaskBucket, number> = {
         urgent: urgent.length,
         today: today.length,
@@ -342,7 +385,7 @@ export default function Tasks() {
                             lead={lead}
                             bucket={activeTabId}
                             owners={owners || []}
-                            onView={setViewingLead}
+                            onView={handleViewLead}
                             onEdit={setEditingLead}
                         />
                     ))}
