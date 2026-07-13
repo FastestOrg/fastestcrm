@@ -55,7 +55,7 @@ export async function getGeminiKey(companyId: string): Promise<string> {
     }
 
     if (!integrationApiKey) {
-        throw new Error('No active Gemini API key found for your company. Please set it up in Settings.');
+        throw new Error('No active FastAI API key found for your company. Please set it up in Settings.');
     }
 
     return integrationApiKey;
@@ -111,12 +111,12 @@ export async function callGemini(params: {
     const data = await res.json();
     
     if (data.error) {
-        throw new Error(`Gemini API Error: ${data.error.message}`);
+        throw new Error(`FastAI API Error: ${data.error.message}`);
     }
 
     const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!content) {
-        throw new Error('Gemini returned an empty response.');
+        throw new Error('FastAI returned an empty response.');
     }
 
     return cleanAIResponse(content);

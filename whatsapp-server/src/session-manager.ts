@@ -283,7 +283,7 @@ class SessionManager extends EventEmitter {
                         }
 
                         if (!apiKey) {
-                            console.log(`[AI Responder] Skipping: No Gemini key for company ${account.company_id}`);
+                            console.log(`[AI Responder] Skipping: No FastAI key for company ${account.company_id}`);
                             return;
                         }
 

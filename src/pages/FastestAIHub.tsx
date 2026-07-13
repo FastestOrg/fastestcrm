@@ -98,7 +98,7 @@ const AI_FEATURES = [
     icon: BrainCircuit,
     label: 'AI Insights',
     path: '/dashboard/ai',
-    description: 'Strategic CRM analysis powered by Gemini. Bottlenecks, team insights & actions.',
+    description: 'Strategic CRM analysis powered by FastAI. Bottlenecks, team insights & actions.',
     color: 'from-primary to-violet-600',
     badge: 'Live',
     badgeColor: 'bg-primary/20 text-primary border-primary/30',

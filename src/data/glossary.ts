@@ -18,7 +18,7 @@ export const glossaryTerms: GlossaryTerm[] = [
     term: 'AI CRM',
     slug: 'what-is-ai-crm',
     definition: 'A Customer Relationship Management system that leverages Artificial Intelligence to automate tasks, predict behavior, and provide insights.',
-    fullDescription: 'AI CRM systems like Fastest CRM use large language models (like Google Gemini) to analyze lead sentiment, prioritize high-value calls, and automate follow-ups without manual intervention.',
+    fullDescription: 'AI CRM systems like Fastest CRM use large language models (like FastAI) to analyze lead sentiment, prioritize high-value calls, and automate follow-ups without manual intervention.',
     category: 'AI'
   },
   {
@@ -57,10 +57,10 @@ export const glossaryTerms: GlossaryTerm[] = [
     category: 'AI'
   },
   {
-    term: 'Gemini AI',
-    slug: 'google-gemini-crm-integration',
-    definition: 'Googles multimodal AI model integrated into Fastest CRM for advanced text and data analysis.',
-    fullDescription: 'By integrating Gemini AI, Fastest CRM can provide deep insights into client conversations, summary reports, and even draft personalized email/WhatsApp responses automatically.',
+    term: 'FastAI',
+    slug: 'fastai-crm-integration',
+    definition: 'FastAI multimodal AI model integrated into Fastest CRM for advanced text and data analysis.',
+    fullDescription: 'By integrating FastAI, Fastest CRM can provide deep insights into client conversations, summary reports, and even draft personalized email/WhatsApp responses automatically.',
     category: 'AI'
   },
   {

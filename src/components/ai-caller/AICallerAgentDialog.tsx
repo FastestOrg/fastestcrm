@@ -9,7 +9,7 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Bot, Mic, Globe, Phone, Clock, Sparkles } from 'lucide-react';
+import { Loader2, Bot, Mic, Globe, Phone, Clock, Sparkles, CheckCircle2 } from 'lucide-react';
 import { useAICallerAgents, AICallerAgent, CreateAgentParams } from '@/hooks/useAICallerAgents';
 
 const GEMINI_VOICES = [
@@ -44,6 +44,9 @@ interface AICallerAgentDialogProps {
     onOpenChange: (open: boolean) => void;
     editAgent?: AICallerAgent | null;
     vobizPhoneNumber?: string;
+    tataSmartfloPhoneNumber?: string;
+    vobizConnected?: boolean;
+    smartfloConnected?: boolean;
 }
 
 const DEFAULT_PROMPT = `You are a friendly and professional sales representative. Your goal is to:
@@ -55,7 +58,7 @@ const DEFAULT_PROMPT = `You are a friendly and professional sales representative
 
 Keep responses concise and conversational. Always be respectful of their time.`;
 
-export function AICallerAgentDialog({ isOpen, onOpenChange, editAgent, vobizPhoneNumber }: AICallerAgentDialogProps) {
+export function AICallerAgentDialog({ isOpen, onOpenChange, editAgent, vobizPhoneNumber, tataSmartfloPhoneNumber, vobizConnected, smartfloConnected }: AICallerAgentDialogProps) {
     const { createAgent, updateAgent, isCreating, isUpdating } = useAICallerAgents();
     const { toast } = useToast();
 
@@ -64,9 +67,10 @@ export function AICallerAgentDialog({ isOpen, onOpenChange, editAgent, vobizPhon
         system_prompt: DEFAULT_PROMPT,
         voice: 'Aoede',
         language: 'en-IN',
-        phone_number: vobizPhoneNumber ?? '',
+        phone_number: vobizPhoneNumber ?? tataSmartfloPhoneNumber ?? '',
         max_duration_minutes: 10,
         is_active: true,
+        telephony_provider: vobizConnected ? 'vobiz' : smartfloConnected ? 'tata_smartflo' : 'vobiz',
     });
 
     useEffect(() => {
@@ -79,19 +83,23 @@ export function AICallerAgentDialog({ isOpen, onOpenChange, editAgent, vobizPhon
                 phone_number: editAgent.phone_number,
                 max_duration_minutes: editAgent.max_duration_minutes,
                 is_active: editAgent.is_active,
+                telephony_provider: editAgent.telephony_provider ?? 'vobiz',
             });
         } else {
+            const defaultProvider = vobizConnected ? 'vobiz' : smartfloConnected ? 'tata_smartflo' : 'vobiz';
+            const defaultPhone = defaultProvider === 'vobiz' ? (vobizPhoneNumber ?? '') : (tataSmartfloPhoneNumber ?? '');
             setForm({
                 name: '',
                 system_prompt: DEFAULT_PROMPT,
                 voice: 'Aoede',
                 language: 'en-IN',
-                phone_number: vobizPhoneNumber ?? '',
+                phone_number: defaultPhone,
                 max_duration_minutes: 10,
                 is_active: true,
+                telephony_provider: defaultProvider,
             });
         }
-    }, [editAgent, vobizPhoneNumber, isOpen]);
+    }, [editAgent, vobizPhoneNumber, tataSmartfloPhoneNumber, vobizConnected, smartfloConnected, isOpen]);
 
     const handleSubmit = async () => {
         if (!form.name.trim()) {
@@ -207,11 +215,76 @@ export function AICallerAgentDialog({ isOpen, onOpenChange, editAgent, vobizPhon
                         </div>
                     </div>
 
+                    {/* Telephony Provider */}
+                    <div className="space-y-3">
+                        <Label className="flex items-center gap-1.5">
+                            <Phone className="h-3.5 w-3.5 text-primary" />
+                            Telephony Provider
+                        </Label>
+                        <div className="grid grid-cols-2 gap-3">
+                            {/* Vobiz option */}
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setForm(f => ({
+                                        ...f,
+                                        telephony_provider: 'vobiz',
+                                        phone_number: vobizPhoneNumber ?? f.phone_number,
+                                    }));
+                                }}
+                                className={`p-3 rounded-lg border-2 text-left transition-all ${
+                                    form.telephony_provider === 'vobiz'
+                                        ? 'border-orange-500 bg-orange-500/5'
+                                        : 'border-border hover:border-border/80'
+                                }`}
+                            >
+                                <div className="flex items-center justify-between mb-1">
+                                    <span className="font-medium text-sm">Vobiz AI Telephony</span>
+                                    {vobizConnected && (
+                                        <CheckCircle2 className="h-4 w-4 text-green-500" />
+                                    )}
+                                </div>
+                                <p className="text-xs text-muted-foreground">AI voice calling via Vobiz SIP</p>
+                                {!vobizConnected && (
+                                    <p className="text-xs text-orange-500 mt-1">Not connected</p>
+                                )}
+                            </button>
+
+                            {/* Tata Smartflo option */}
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setForm(f => ({
+                                        ...f,
+                                        telephony_provider: 'tata_smartflo',
+                                        phone_number: tataSmartfloPhoneNumber ?? f.phone_number,
+                                    }));
+                                }}
+                                className={`p-3 rounded-lg border-2 text-left transition-all ${
+                                    form.telephony_provider === 'tata_smartflo'
+                                        ? 'border-blue-600 bg-blue-600/5'
+                                        : 'border-border hover:border-border/80'
+                                }`}
+                            >
+                                <div className="flex items-center justify-between mb-1">
+                                    <span className="font-medium text-sm">Tata Tele Smartflo</span>
+                                    {smartfloConnected && (
+                                        <CheckCircle2 className="h-4 w-4 text-green-500" />
+                                    )}
+                                </div>
+                                <p className="text-xs text-muted-foreground">AI voice calling via Smartflo</p>
+                                {!smartfloConnected && (
+                                    <p className="text-xs text-blue-600 mt-1">Not connected</p>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+
                     {/* Phone Number */}
                     <div className="space-y-2">
                         <Label htmlFor="agent-phone" className="flex items-center gap-1.5">
                             <Phone className="h-3.5 w-3.5 text-primary" />
-                            Caller ID (Vobiz Phone Number)
+                            Caller ID ({form.telephony_provider === 'vobiz' ? 'Vobiz' : 'Smartflo'} Phone Number)
                         </Label>
                         <Input
                             id="agent-phone"
@@ -219,7 +292,9 @@ export function AICallerAgentDialog({ isOpen, onOpenChange, editAgent, vobizPhon
                             value={form.phone_number}
                             onChange={(e) => setForm(f => ({ ...f, phone_number: e.target.value }))}
                         />
-                        <p className="text-xs text-muted-foreground">The DID number from your Vobiz account that this agent will call from.</p>
+                        <p className="text-xs text-muted-foreground">
+                            The DID number from your {form.telephony_provider === 'vobiz' ? 'Vobiz' : 'Tata Smartflo'} account that this agent will call from.
+                        </p>
                     </div>
 
                     {/* Max Duration */}
@@ -258,8 +333,10 @@ export function AICallerAgentDialog({ isOpen, onOpenChange, editAgent, vobizPhon
                     <div className="p-3 rounded-lg bg-primary/5 border border-primary/20 flex items-start gap-2 text-sm">
                         <Sparkles className="h-4 w-4 text-primary mt-0.5 shrink-0" />
                         <div>
-                            <p className="font-medium">Powered by Gemini 3.1 Flash Live</p>
-                            <p className="text-xs text-muted-foreground mt-0.5">Ultra-low latency speech-to-speech AI with ~20ms round-trip via Vobiz SIP.</p>
+                            <p className="font-medium">Powered by FastAI STS Latest</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                                Ultra-low latency speech-to-speech AI with ~20ms round-trip via {form.telephony_provider === 'vobiz' ? 'Vobiz SIP' : 'Tata Smartflo'}.
+                            </p>
                         </div>
                     </div>
                 </div>

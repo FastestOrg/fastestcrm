@@ -206,7 +206,7 @@ export function CampaignDetailView({ campaign, onBack, onEdit }: { campaign: Ema
                                                 <span className="text-xs font-semibold text-purple-400">AI STATUS</span>
                                             </div>
                                             <p className="text-xs text-muted-foreground">
-                                                AI is autonomously engaging with leads who reply. Gemini analyzes conversation context and responds to move toward your campaign goal.
+                                                AI is autonomously engaging with leads who reply. FastAI analyzes conversation context and responds to move toward your campaign goal.
                                             </p>
                                         </div>
                                     )}

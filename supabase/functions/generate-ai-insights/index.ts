@@ -50,7 +50,7 @@ serve(async (req) => {
     }
 
     if (!integration?.api_key) {
-      throw new Error("No active Gemini API key found for this company. Please connect Google Gemini in the Integrations page first.");
+      throw new Error("No active FastAI API key found for this company. Please connect Google Gemini in the Integrations page first.");
     }
     const geminiKey = integration.api_key;
 
@@ -207,14 +207,14 @@ serve(async (req) => {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`Gemini API Error: ${errorText}`);
+      throw new Error(`FastAI API Error: ${errorText}`);
     }
 
     const result = await response.json();
     let aiContent = result.candidates?.[0]?.content?.parts?.[0]?.text;
     
     if (!aiContent) {
-      throw new Error("Gemini returned an empty response.");
+      throw new Error("FastAI returned an empty response.");
     }
 
     // Clean up potential markdown formatting from Gemini
@@ -233,7 +233,7 @@ serve(async (req) => {
         parsedContent = JSON.parse(aiContent.trim());
     } catch (e) {
         console.error("Failed to parse Gemini output as JSON:", aiContent);
-        throw new Error("Gemini returned malformed JSON");
+        throw new Error("FastAI returned malformed JSON");
     }
 
     return new Response(JSON.stringify(parsedContent), {

@@ -103,7 +103,7 @@ Deno.serve(async (req) => {
     }
 
     if (!integration?.api_key) {
-      throw new Error("No active Gemini API key found for this company.");
+      throw new Error("No active FastAI API key found for this company.");
     }
 
     // 5. Construct Prompt
@@ -152,7 +152,7 @@ Write a short, professional, and convincing email reply to ${leadName}. Do NOT i
     if (!geminiRes.ok) {
        const errBody = await geminiRes.text();
        console.error(`[AI Autopilot] Gemini API error:`, errBody);
-       throw new Error(`Gemini API error: ${geminiRes.status}`);
+       throw new Error(`FastAI API error: ${geminiRes.status}`);
     }
 
     const geminiData = await geminiRes.json();
@@ -160,7 +160,7 @@ Write a short, professional, and convincing email reply to ${leadName}. Do NOT i
 
     if (!generatedReply) {
        console.error(`[AI Autopilot] No content generated. Response:`, JSON.stringify(geminiData));
-       throw new Error("Failed to generate content from Gemini.");
+       throw new Error("Failed to generate content from FastAI.");
     }
     
     console.log(`[AI Autopilot] Successfully generated reply. Length: ${generatedReply.length}`);

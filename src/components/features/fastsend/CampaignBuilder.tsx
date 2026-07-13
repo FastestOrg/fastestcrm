@@ -260,7 +260,7 @@ export function CampaignBuilder({ onCancel, initialData, initialSequences }: { o
                                     <Wand2 className="mx-auto h-8 w-8 text-primary mb-3" />
                                     <p className="font-medium">Use the AI panel to generate your sequence</p>
                                     <p className="text-sm text-muted-foreground mt-1 mb-4 text-balance">
-                                        Describe your goals on the right, and Gemini will instantly write a full multi-step drip campaign.
+                                        Describe your goals on the right, and FastAI will instantly write a full multi-step drip campaign.
                                     </p>
                                     <div className="flex justify-center gap-3">
                                         <Button variant="outline" onClick={() => {
@@ -438,7 +438,7 @@ export function CampaignBuilder({ onCancel, initialData, initialSequences }: { o
                                         <Bot className="h-4 w-4" /> AI Autopilot
                                     </Label>
                                     <p className="text-xs text-muted-foreground">
-                                        Let Gemini fully negotiate and reply to incoming leads automatically to reach your goal.
+                                        Let FastAI fully negotiate and reply to incoming leads automatically to reach your goal.
                                     </p>
                                 </div>
                                 <Switch

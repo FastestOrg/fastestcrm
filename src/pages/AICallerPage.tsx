@@ -26,6 +26,16 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 
 const VOICE_COLORS: Record<string, string> = {
@@ -42,13 +52,15 @@ function AgentCard({
     onEdit,
     onDelete,
     onToggle,
-    vobizConnected,
+    onTest,
+    telephonyConnected,
 }: {
     agent: AICallerAgent;
     onEdit: (a: AICallerAgent) => void;
     onDelete: (a: AICallerAgent) => void;
     onToggle: (id: string, active: boolean) => void;
-    vobizConnected: boolean;
+    onTest: (a: AICallerAgent) => void;
+    telephonyConnected: boolean;
 }) {
     return (
         <Card className={cn(
@@ -103,53 +115,64 @@ function AgentCard({
                     </div>
                     <div className="flex items-center gap-1.5 col-span-2">
                         <Sparkles className="h-3.5 w-3.5 text-primary" />
-                        <span>Gemini 3.1 Flash Live · Vobiz SIP</span>
+                        <span>FastAI STS Latest · {agent.telephony_provider === 'tata_smartflo' ? 'Tata Smartflo' : 'Vobiz SIP'}</span>
                     </div>
                 </div>
 
                 {/* Actions */}
-                <div className="flex items-center gap-2 pt-1 border-t">
+                <div className="flex flex-col gap-2 pt-1 border-t">
                     <Button
                         size="sm"
-                        variant="outline"
-                        className="flex-1"
-                        onClick={() => onEdit(agent)}
+                        className="w-full bg-primary text-primary-foreground hover:bg-primary/95"
+                        onClick={() => onTest(agent)}
+                        disabled={!telephonyConnected || !agent.is_active}
                     >
-                        <Pencil className="h-3.5 w-3.5 mr-1.5" />
-                        Edit
+                        <PhoneCall className="h-3.5 w-3.5 mr-1.5" />
+                        Test Agent Call
                     </Button>
-                    <Button
-                        size="sm"
-                        variant="outline"
-                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                        onClick={() => onDelete(agent)}
-                    >
-                        <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
+                    <div className="flex items-center gap-2">
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            className="flex-1"
+                            onClick={() => onEdit(agent)}
+                        >
+                            <Pencil className="h-3.5 w-3.5 mr-1.5" />
+                            Edit
+                        </Button>
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10 shrink-0"
+                            onClick={() => onDelete(agent)}
+                        >
+                            <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                    </div>
                 </div>
             </CardContent>
         </Card>
     );
 }
 
-function VobizNotConnectedBanner() {
+function TelephonyNotConnectedBanner() {
     return (
         <div className="flex items-center gap-4 p-5 rounded-xl bg-orange-500/5 border border-orange-500/20">
             <div className="w-12 h-12 rounded-full bg-orange-500/10 flex items-center justify-center shrink-0">
                 <AlertTriangle className="h-6 w-6 text-orange-500" />
             </div>
             <div>
-                <p className="font-semibold text-foreground">Vobiz Not Connected</p>
+                <p className="font-semibold text-foreground">No Telephony Provider Connected</p>
                 <p className="text-sm text-muted-foreground mt-0.5">
-                    Connect Vobiz first to enable AI calling. Go to{' '}
+                    Connect <strong>Vobiz AI Telephony</strong> or <strong>Tata Tele Smartflo</strong> to enable AI calling. Go to{' '}
                     <a href="/dashboard/integrations" className="text-primary underline underline-offset-2">
                         Settings → Integrations
                     </a>{' '}
-                    and add your Vobiz credentials.
+                    and add your credentials.
                 </p>
             </div>
             <Button variant="outline" size="sm" className="ml-auto shrink-0" asChild>
-                <a href="/dashboard/integrations">Connect Vobiz →</a>
+                <a href="/dashboard/integrations">Connect Provider →</a>
             </Button>
         </div>
     );
@@ -162,6 +185,46 @@ export default function AICallerPage() {
     const [isAgentDialogOpen, setIsAgentDialogOpen] = useState(false);
     const [editAgent, setEditAgent] = useState<AICallerAgent | null>(null);
     const [deleteTarget, setDeleteTarget] = useState<AICallerAgent | null>(null);
+    const [testAgent, setTestAgent] = useState<AICallerAgent | null>(null);
+    const [testPhoneNumber, setTestPhoneNumber] = useState('');
+    const [triggeringTestCall, setTriggeringTestCall] = useState(false);
+
+    const handleTriggerTestCall = async () => {
+        if (!testAgent || !testPhoneNumber.trim() || !company?.id) return;
+        setTriggeringTestCall(true);
+        try {
+            const { data, error } = await supabase.functions.invoke('trigger-ai-call', {
+                body: {
+                    lead_phone: testPhoneNumber.trim(),
+                    lead_name: "Test Call Recipient",
+                    agent_id: testAgent.id,
+                    company_id: company.id,
+                    lead_id: null,
+                }
+            });
+
+            if (error) throw error;
+            if (data?.success === false || (data && !data.success && data.error)) {
+                throw new Error(data.error || "Failed to trigger call");
+            }
+
+            toast({
+                title: "✓ Call Triggered!",
+                description: "The AI caller has initiated the call. You should receive it shortly.",
+            });
+            setTestAgent(null);
+            refetchHistory();
+        } catch (err: any) {
+            console.error("Test call error:", err);
+            toast({
+                title: "Call initiation failed",
+                description: err.message || "An unexpected error occurred",
+                variant: "destructive",
+            });
+        } finally {
+            setTriggeringTestCall(false);
+        }
+    };
 
     // Check if Vobiz is connected
     const { data: vobizConfig } = useQuery({
@@ -181,7 +244,27 @@ export default function AICallerPage() {
         enabled: !!company?.id,
     });
 
+    // Check if Tata Smartflo is connected
+    const { data: smartfloConfig } = useQuery({
+        queryKey: ['smartflo-config', company?.id],
+        queryFn: async () => {
+            if (!company?.id) return null;
+            const { data } = await supabase
+                .from('integration_api_keys')
+                .select('api_key, is_active')
+                .eq('company_id', company.id)
+                .eq('service_name', 'tata_smartflo')
+                .eq('is_active', true)
+                .maybeSingle() as any;
+            if (!data) return null;
+            return typeof data.api_key === 'string' ? JSON.parse(data.api_key) : data.api_key;
+        },
+        enabled: !!company?.id,
+    });
+
     const vobizConnected = !!vobizConfig;
+    const smartfloConnected = !!smartfloConfig;
+    const anyTelephonyConnected = vobizConnected || smartfloConnected;
     const activeAgents = agents.filter(a => a.is_active);
 
     // Query for call queue / history
@@ -238,12 +321,12 @@ export default function AICallerPage() {
                         AI Caller
                     </h1>
                     <p className="text-muted-foreground mt-1">
-                        Configure AI agents powered by Gemini 3.1 Flash Live to make intelligent outbound calls via Vobiz.
+                        Configure AI agents powered by FastAI STS Latest to make intelligent outbound calls.
                     </p>
                 </div>
                 <Button
                     onClick={() => { setEditAgent(null); setIsAgentDialogOpen(true); }}
-                    disabled={!vobizConnected}
+                    disabled={!anyTelephonyConnected}
                     className="gradient-primary"
                 >
                     <Plus className="h-4 w-4 mr-2" />
@@ -256,8 +339,8 @@ export default function AICallerPage() {
                 {[
                     { label: 'Total Agents', value: agents.length, icon: Bot, color: 'text-primary' },
                     { label: 'Active Agents', value: activeAgents.length, icon: CheckCircle2, color: 'text-green-500' },
-                    { label: 'Vobiz Status', value: vobizConnected ? 'Connected' : 'Not Set', icon: vobizConnected ? PhoneCall : PhoneOff, color: vobizConnected ? 'text-green-500' : 'text-orange-500' },
-                    { label: 'AI Model', value: 'Gemini 3.1', icon: Sparkles, color: 'text-purple-500' },
+                    { label: 'Telephony', value: anyTelephonyConnected ? (vobizConnected && smartfloConnected ? 'Both' : vobizConnected ? 'Vobiz' : 'Smartflo') : 'Not Set', icon: anyTelephonyConnected ? PhoneCall : PhoneOff, color: anyTelephonyConnected ? 'text-green-500' : 'text-orange-500' },
+                    { label: 'AI Model', value: 'FastAI STS Latest', icon: Sparkles, color: 'text-purple-500' },
                 ].map((s) => (
                     <Card key={s.label} className="p-4">
                         <div className="flex items-center gap-3">
@@ -290,8 +373,8 @@ export default function AICallerPage() {
                 </TabsList>
 
                 <TabsContent value="agents" className="mt-4 space-y-4">
-                    {/* Vobiz Banner if not connected */}
-                    {!vobizConnected && <VobizNotConnectedBanner />}
+                    {/* Telephony Banner if not connected */}
+                    {!anyTelephonyConnected && <TelephonyNotConnectedBanner />}
 
                     {isLoading ? (
                         <div className="flex items-center justify-center h-40">
@@ -305,12 +388,12 @@ export default function AICallerPage() {
                                 </div>
                                 <h3 className="font-semibold text-lg">No AI Agents yet</h3>
                                 <p className="text-muted-foreground text-sm mt-2 max-w-sm">
-                                    Create your first AI caller agent. It will use Gemini 3.1 Flash Live for ultra-low latency voice conversations.
+                                    Create your first AI caller agent. It will use FastAI STS Latest for ultra-low latency voice conversations.
                                 </p>
                                 <Button
                                     className="mt-6 gradient-primary"
                                     onClick={() => { setEditAgent(null); setIsAgentDialogOpen(true); }}
-                                    disabled={!vobizConnected}
+                                    disabled={!anyTelephonyConnected}
                                 >
                                     <Plus className="h-4 w-4 mr-2" />
                                     Create First Agent
@@ -326,7 +409,8 @@ export default function AICallerPage() {
                                     onEdit={handleEdit}
                                     onDelete={setDeleteTarget}
                                     onToggle={handleToggle}
-                                    vobizConnected={vobizConnected}
+                                    telephonyConnected={anyTelephonyConnected}
+                                    onTest={(a) => { setTestAgent(a); setTestPhoneNumber(''); }}
                                 />
                             ))}
                         </div>
@@ -342,21 +426,21 @@ export default function AICallerPage() {
                                         step: '01',
                                         icon: PhoneCall,
                                         title: 'Call Initiated',
-                                        desc: 'FastEngage sends a REST API call to Vobiz to dial the lead\'s phone number from your DID.',
+                                        desc: 'FastEngage sends a REST API call to your telephony provider (Vobiz or Tata Smartflo) to dial the lead\'s phone number from your DID.',
                                         color: 'bg-blue-500/10 text-blue-500',
                                     },
                                     {
                                         step: '02',
                                         icon: Activity,
                                         title: 'AI Takes Over',
-                                        desc: 'When the call connects, Vobiz streams audio via WebSocket to our bridge. Gemini 3.1 Flash Live processes speech in real-time (~20ms latency).',
+                                        desc: 'When the call connects, the telephony provider streams audio via WebSocket to our bridge. FastAI STS Latest processes speech in real-time (~20ms latency).',
                                         color: 'bg-primary/10 text-primary',
                                     },
                                     {
                                         step: '03',
                                         icon: BarChart2,
                                         title: 'Post-Call Actions',
-                                        desc: 'After the call ends, Vobiz sends a CDR webhook. FastEngage logs the call and triggers configured automations (update lead status, send follow-up, etc.)',
+                                        desc: 'After the call ends, the provider sends a CDR webhook. FastEngage logs the call and triggers configured automations (update lead status, send follow-up, etc.)',
                                         color: 'bg-green-500/10 text-green-500',
                                     },
                                 ].map(s => (
@@ -379,7 +463,7 @@ export default function AICallerPage() {
                                     Queue-Based Architecture
                                 </p>
                                 <p className="text-sm text-muted-foreground">
-                                    When automations trigger AI calls, they're added to a company-scoped FIFO queue. Calls are processed sequentially to respect Vobiz rate limits and ensure quality. You can monitor the queue status in real-time.
+                                    When automations trigger AI calls, they're added to a company-scoped FIFO queue. Calls are processed sequentially to respect provider rate limits and ensure quality. You can monitor the queue status in real-time.
                                 </p>
                             </div>
                         </CardContent>
@@ -514,6 +598,9 @@ export default function AICallerPage() {
                 }}
                 editAgent={editAgent}
                 vobizPhoneNumber={vobizConfig?.phone_number}
+                tataSmartfloPhoneNumber={smartfloConfig?.phone_number}
+                vobizConnected={vobizConnected}
+                smartfloConnected={smartfloConnected}
             />
 
             {/* Delete Confirm */}
@@ -536,6 +623,58 @@ export default function AICallerPage() {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+            {/* Test Call Dialog */}
+            <Dialog open={!!testAgent} onOpenChange={(open) => { if (!open) setTestAgent(null); }}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <PhoneCall className="h-5 w-5 text-primary" />
+                            Test Agent: {testAgent?.name}
+                        </DialogTitle>
+                        <DialogDescription>
+                            Enter a phone number to receive a live test call from this AI Agent.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-4 py-2">
+                        <div className="space-y-2">
+                            <Label htmlFor="test-phone">Your Phone Number</Label>
+                            <Input
+                                id="test-phone"
+                                placeholder="e.g. +919876543210 or 8447129797"
+                                value={testPhoneNumber}
+                                onChange={(e) => setTestPhoneNumber(e.target.value)}
+                            />
+                            <p className="text-[11px] text-muted-foreground">
+                                Make sure the number has the country code (e.g. 91 for India) if required by your telephony provider.
+                            </p>
+                        </div>
+                    </div>
+
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setTestAgent(null)}>
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={handleTriggerTestCall}
+                            disabled={triggeringTestCall || !testPhoneNumber.trim()}
+                            className="bg-primary text-primary-foreground hover:bg-primary/90"
+                        >
+                            {triggeringTestCall ? (
+                                <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Calling...
+                                </>
+                            ) : (
+                                <>
+                                    <Phone className="mr-2 h-4 w-4" />
+                                    Start Test Call
+                                </>
+                            )}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

@@ -66,7 +66,7 @@ export default function AIInsights() {
             await refetch();
             toast({
                 title: "Insights Updated",
-                description: "Gemini has analyzed your latest CRM data.",
+                description: "FastAI has analyzed your latest CRM data.",
             });
         } catch (error: any) {
             toast({
@@ -87,7 +87,7 @@ export default function AIInsights() {
                     <Brain className="h-8 w-8 text-primary absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-pulse" />
                 </div>
                 <div className="text-center space-y-2">
-                    <h2 className="text-xl font-semibold">Gemini is Thinking...</h2>
+                    <h2 className="text-xl font-semibold">FastAI is Thinking...</h2>
                     <p className="text-muted-foreground animate-pulse">Analyzing all leads and task performance data</p>
                 </div>
             </div>
@@ -106,7 +106,7 @@ export default function AIInsights() {
                         <h1 className="text-3xl font-extrabold tracking-tight">AI Insights</h1>
                     </div>
                     <p className="text-muted-foreground ml-11">
-                        Advanced lead analysis powered by <span className="text-primary font-semibold">Gemini 2.0 Flash Lite</span>
+                        Advanced lead analysis powered by <span className="text-primary font-semibold">FastAI 2.0 Flash Lite</span>
                     </p>
                 </div>
                 <Button 
@@ -267,7 +267,7 @@ export default function AIInsights() {
                     </div>
                     <h3 className="text-xl font-bold mb-2">Ready for Insights?</h3>
                     <p className="text-muted-foreground max-w-sm mb-6">
-                        Click the button below to have Gemini analyze your entire CRM database and provide strategic recommendations.
+                        Click the button below to have FastAI analyze your entire CRM database and provide strategic recommendations.
                     </p>
                     <Button onClick={handleRefresh} className="gap-2 gradient-primary">
                         <Zap className="h-4 w-4 fill-current" />

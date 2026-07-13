@@ -66,22 +66,40 @@ serve(async (req) => {
 
         const agentConfig = typeof agentRow.api_key === "string" ? JSON.parse(agentRow.api_key) : agentRow.api_key;
 
-        // 2. Fetch Vobiz credentials for this company
-        const { data: vobizRow, error: vobizError } = await supabase
-            .from("integration_api_keys")
-            .select("api_key")
-            .eq("company_id", company_id)
-            .eq("service_name", "vobiz")
-            .eq("is_active", true)
-            .maybeSingle();
+        // 2. Determine telephony provider from agent config (default: vobiz for backward compat)
+        const telephonyProvider = agentConfig.telephony_provider || "vobiz";
 
-        if (vobizError || !vobizRow) {
-            return new Response(JSON.stringify({ error: "Vobiz integration not connected. Please connect it in Integrations page." }), { status: 400, headers: corsHeaders });
+        // 3. Fetch telephony credentials based on provider
+        let telephonyConfig: any = null;
+        if (telephonyProvider === "tata_smartflo") {
+            const { data: smartfloRow, error: smartfloError } = await supabase
+                .from("integration_api_keys")
+                .select("api_key")
+                .eq("company_id", company_id)
+                .eq("service_name", "tata_smartflo")
+                .eq("is_active", true)
+                .maybeSingle();
+
+            if (smartfloError || !smartfloRow) {
+                return new Response(JSON.stringify({ error: "Tata Smartflo integration not connected. Please connect it in Integrations page." }), { status: 400, headers: corsHeaders });
+            }
+            telephonyConfig = typeof smartfloRow.api_key === "string" ? JSON.parse(smartfloRow.api_key) : smartfloRow.api_key;
+        } else {
+            const { data: vobizRow, error: vobizError } = await supabase
+                .from("integration_api_keys")
+                .select("api_key")
+                .eq("company_id", company_id)
+                .eq("service_name", "vobiz")
+                .eq("is_active", true)
+                .maybeSingle();
+
+            if (vobizError || !vobizRow) {
+                return new Response(JSON.stringify({ error: "Vobiz integration not connected. Please connect it in Integrations page." }), { status: 400, headers: corsHeaders });
+            }
+            telephonyConfig = typeof vobizRow.api_key === "string" ? JSON.parse(vobizRow.api_key) : vobizRow.api_key;
         }
 
-        const vobizConfig = typeof vobizRow.api_key === "string" ? JSON.parse(vobizRow.api_key) : vobizRow.api_key;
-
-        // 3. Fetch company's Gemini API key (same pattern as generate-ai-insights)
+        // 4. Fetch company's Gemini API key (same pattern as generate-ai-insights)
         let { data: geminiRow } = await supabase
             .from("integration_api_keys")
             .select("api_key")
@@ -115,13 +133,13 @@ serve(async (req) => {
 
         if (!geminiRow?.api_key) {
             return new Response(JSON.stringify({
-                error: "No Gemini API key found. Please connect Google Gemini in the Integrations page first."
+                error: "No FastAI API key found. Please connect Google Gemini in the Integrations page first."
             }), { status: 400, headers: corsHeaders });
         }
 
         const pendingCount = 0; // Set to 0 to bypass queue logic and initiate call immediately
 
-        // 5. Enqueue the call item
+        // 6. Enqueue the call item
         const { data: queueRow, error: insertError } = await supabase
             .from("ai_caller_logs")
             .insert({
@@ -139,17 +157,31 @@ serve(async (req) => {
 
         if (insertError) throw insertError;
 
-        // 6. If no active call, fire immediately via Vobiz
+        // 7. If no active call, fire immediately via the selected telephony provider
         if (pendingCount === 0) {
-            const callResult = await initiateVobizCall({
-                authId: vobizConfig.auth_id,
-                authToken: vobizConfig.auth_token,
-                fromNumber: agentConfig.phone_number || vobizConfig.phone_number,
-                toNumber: lead_phone,
-                queueItemId: queueRow.id,
-                agentConfig,
-                supabaseUrl,
-            });
+            let callResult: { success: boolean; callId?: string; error?: string };
+
+            if (telephonyProvider === "tata_smartflo") {
+                callResult = await initiateTataSmartfloCall({
+                    accountSid: telephonyConfig.account_sid,
+                    authToken: telephonyConfig.auth_token,
+                    fromNumber: agentConfig.phone_number || telephonyConfig.phone_number,
+                    toNumber: lead_phone,
+                    queueItemId: queueRow.id,
+                    agentConfig: { ...agentConfig, _c2c_api_key: telephonyConfig.c2c_api_key },
+                    supabaseUrl,
+                });
+            } else {
+                callResult = await initiateVobizCall({
+                    authId: telephonyConfig.auth_id,
+                    authToken: telephonyConfig.auth_token,
+                    fromNumber: agentConfig.phone_number || telephonyConfig.phone_number,
+                    toNumber: lead_phone,
+                    queueItemId: queueRow.id,
+                    agentConfig,
+                    supabaseUrl,
+                });
+            }
 
             await supabase
                 .from("ai_caller_logs")
@@ -202,6 +234,10 @@ async function initiateVobizCall(params: {
 }) {
     const { authId, authToken, fromNumber, toNumber, queueItemId, agentConfig, supabaseUrl } = params;
 
+    // Clean phone numbers
+    const cleanFrom = (fromNumber || "").trim().replace(/[^0-9]/g, "");
+    const cleanTo = (toNumber || "").trim().replace(/[^0-9]/g, "");
+
     // answer_url — Vobiz POSTs here when the callee picks up
     const answerUrl = `${supabaseUrl}/functions/v1/ai-caller?` +
         `queue_item_id=${encodeURIComponent(queueItemId)}`;
@@ -221,8 +257,8 @@ async function initiateVobizCall(params: {
                     "Content-Type": "application/json",
                 },
                 body: JSON.stringify({
-                    from: fromNumber,
-                    to: toNumber,
+                    from: cleanFrom,
+                    to: cleanTo,
                     answer_url: answerUrl,
                     hangup_url: hangupUrl,
                 }),
@@ -238,6 +274,103 @@ async function initiateVobizCall(params: {
 
         return { success: true, callId: result?.request_uuid || result?.call_uuid || result?.id };
     } catch (err: any) {
+        return { success: false, error: err.message };
+    }
+}
+
+// ─── Initiate Tata Smartflo outbound call ──────────────────────────────────────
+// Uses the click_to_call_support API which calls the CUSTOMER first.
+// Requires two separate keys:
+//   - auth_token: Bearer token for the Authorization header (from API Connect → API Tokens)
+//   - c2c_api_key: Click-to-Call Support API Key in the body (from API Connect → Click to Call Support API)
+// When the customer picks up, Smartflo Voice Streaming routes audio to our WebSocket
+// endpoint (ai-caller), which bridges it with Gemini Live AI.
+// ──────────────────────────────────────────────────────────────────────────────
+async function initiateTataSmartfloCall(params: {
+    accountSid: string;
+    authToken: string;
+    fromNumber: string;
+    toNumber: string;
+    queueItemId: string;
+    agentConfig: any;
+    supabaseUrl: string;
+}) {
+    const { accountSid, authToken, fromNumber, toNumber, queueItemId, agentConfig, supabaseUrl } = params;
+
+    // Clean inputs to avoid whitespace, tabs, plus signs, or non-digits causing invalid parameters
+    const cleanFrom = (fromNumber || "").trim().replace(/[^0-9]/g, "");
+    const cleanTo = (toNumber || "").trim().replace(/[^0-9]/g, "");
+    const bearerToken = (authToken || accountSid || "").trim();
+
+    // The c2c_api_key is stored separately in the telephony config — it's the
+    // Click-to-Call Support API Key from Smartflo portal (different from the bearer token).
+    // We pass it through agentConfig.c2c_api_key which is populated from the integration config.
+    // Fallback: check the telephony config directly (passed via accountSid field for backward compat)
+    const c2cApiKey = (agentConfig._c2c_api_key || bearerToken).trim();
+
+    // DB logging helper
+    const logToDebug = async (message: string, details?: any) => {
+        try {
+            const supabaseUrlEnv = Deno.env.get("SUPABASE_URL")!;
+            const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+            const supabaseClient = createClient(supabaseUrlEnv, supabaseServiceKey);
+            await supabaseClient.from("debug_logs").insert({
+                message: `[AI-Caller] ${message}`,
+                details: typeof details === "string" ? details : JSON.stringify(details)
+            });
+        } catch (_) {}
+    };
+
+    await logToDebug(
+        `Initiating Smartflo Call via click_to_call_support. To: "${cleanTo}", CallerID: "${cleanFrom}", HasC2CKey: ${c2cApiKey !== bearerToken}`,
+        { queueItemId, agentId: agentConfig?.id }
+    );
+
+    // ── click_to_call_support — calls the CUSTOMER first ────────────────────
+    try {
+        const requestBody: any = {
+            api_key: c2cApiKey,
+            customer_number: cleanTo,
+            async: 1,
+            get_call_id: 1,
+        };
+
+        // Only include caller_id if we have a DID number
+        if (cleanFrom) {
+            requestBody.caller_id = cleanFrom;
+        }
+
+        console.log("[Smartflo] Calling click_to_call_support:", JSON.stringify(requestBody));
+
+        const response = await fetch(
+            `https://api-smartflo.tatateleservices.com/v1/click_to_call_support`,
+            {
+                method: "POST",
+                headers: {
+                    "Authorization": `Bearer ${bearerToken}`,
+                    "Content-Type": "application/json",
+                    "Accept": "application/json",
+                },
+                body: JSON.stringify(requestBody),
+            }
+        );
+
+        const result = await response.json();
+
+        await logToDebug(`Smartflo click_to_call_support Response: HTTP ${response.status}`, result);
+
+        if (response.ok && result?.success !== false) {
+            console.log("[Smartflo] click_to_call_support succeeded:", result);
+            const callId = result?.call_id || result?.id || result?.request_uuid || result?.call_sid;
+            return { success: true, callId };
+        }
+
+        const errorMsg = result?.message || result?.error || `HTTP ${response.status}`;
+        console.error("[Smartflo] click_to_call_support failed:", errorMsg);
+        return { success: false, error: `Smartflo API error: ${errorMsg}` };
+
+    } catch (err: any) {
+        await logToDebug(`Smartflo click_to_call_support exception`, err.message);
         return { success: false, error: err.message };
     }
 }

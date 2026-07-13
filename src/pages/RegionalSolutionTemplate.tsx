@@ -117,7 +117,7 @@ const RegionalSolutionTemplate: React.FC<RegionalSolutionProps> = ({
                 <div className="text-center">
                     <Brain className="h-12 w-12 text-primary mx-auto mb-4" />
                     <h3 className="text-xl font-bold mb-2">Native AI Integration</h3>
-                    <p className="text-muted-foreground text-sm">Powered by Google Gemini for intelligent lead insights.</p>
+                    <p className="text-muted-foreground text-sm">Powered by FastAI for intelligent lead insights.</p>
                 </div>
                 <div className="text-center">
                     <Zap className="h-12 w-12 text-primary mx-auto mb-4" />

@@ -28,7 +28,7 @@ const features = [
   {
     icon: Brain,
     title: 'Predictive Lead Scoring',
-    description: 'Gemini AI analyzes firmographic and behavioral data to predict the lifetime value (LTV) of B2B leads.'
+    description: 'FastAI analyzes firmographic and behavioral data to predict the lifetime value (LTV) of B2B leads.'
   },
   {
     icon: CreditCard,

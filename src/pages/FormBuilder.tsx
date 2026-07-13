@@ -471,7 +471,7 @@ export default function FormBuilder() {
             toast.success(`AI successfully extracted ${extracted.length} fields!`);
         } catch (error) {
             console.error('Extraction failed', error);
-            toast.error('Failed to extract fields. Is your Gemini key active?');
+            toast.error('Failed to extract fields. Is your FastAI key active?');
         } finally {
             setIsExtracting(false);
             if (e.target) e.target.value = '';

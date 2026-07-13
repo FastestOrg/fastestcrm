@@ -64,7 +64,6 @@ serve(async (req) => {
 
     const url = new URL(req.url);
     const action = url.searchParams.get("action");
-    const queueItemId = url.searchParams.get("queue_item_id");
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -83,6 +82,117 @@ serve(async (req) => {
             console.error("Failed to write to debug_logs table:", dbErr);
         }
     };
+
+    // Helper to resolve queue_item_id dynamically
+    const resolveQueueItemId = async (): Promise<string | null> => {
+        let qid = url.searchParams.get("queue_item_id");
+        if (qid) return qid;
+
+        let incomingCallId = url.searchParams.get("call_id") || 
+                             url.searchParams.get("call_sid") || 
+                             url.searchParams.get("request_uuid") ||
+                             url.searchParams.get("call_uuid");
+
+        let leadPhone = url.searchParams.get("to") || 
+                        url.searchParams.get("toNumber") || 
+                        url.searchParams.get("customer_number") || 
+                        url.searchParams.get("destination_number");
+
+        if (req.method === "POST") {
+            try {
+                const bodyText = await req.clone().text();
+                if (bodyText) {
+                    try {
+                        const parsedBody = JSON.parse(bodyText);
+                        incomingCallId = incomingCallId || 
+                                         parsedBody.call_id || 
+                                         parsedBody.call_sid || 
+                                         parsedBody.request_uuid ||
+                                         parsedBody.call_uuid;
+                        leadPhone = leadPhone || 
+                                    parsedBody.to || 
+                                    parsedBody.toNumber || 
+                                    parsedBody.customer_number || 
+                                    parsedBody.destination_number;
+                        qid = qid || parsedBody.queue_item_id;
+                    } catch (_) {
+                        const params = new URLSearchParams(bodyText);
+                        incomingCallId = incomingCallId || 
+                                         params.get("call_id") || 
+                                         params.get("call_sid") || 
+                                         params.get("request_uuid") ||
+                                         params.get("call_uuid");
+                        leadPhone = leadPhone || 
+                                    params.get("to") || 
+                                    params.get("toNumber") || 
+                                    params.get("customer_number") || 
+                                    params.get("destination_number");
+                        qid = qid || params.get("queue_item_id");
+                    }
+                }
+            } catch (err) {
+                console.error("resolveQueueItemId body parse error:", err);
+            }
+        }
+
+        if (qid) return qid;
+
+        if (incomingCallId) {
+            const { data: logByCallId } = await supabase
+                .from("ai_caller_logs")
+                .select("id")
+                .eq("call_id", incomingCallId)
+                .maybeSingle();
+            if (logByCallId) {
+                await logToDb(`Resolved queue_item_id ${logByCallId.id} via incomingCallId: ${incomingCallId}`);
+                return logByCallId.id;
+            }
+        }
+
+        if (leadPhone) {
+            const cleanPhone = leadPhone.replace(/\D/g, "");
+            if (cleanPhone) {
+                const { data: activeLogs } = await supabase
+                    .from("ai_caller_logs")
+                    .select("id, lead_phone")
+                    .or("status.eq.calling,status.eq.pending")
+                    .order("created_at", { ascending: false });
+
+                if (activeLogs && activeLogs.length > 0) {
+                    const matchedLog = activeLogs.find((log: any) => {
+                        const logPhoneClean = (log.lead_phone || "").replace(/\D/g, "");
+                        return logPhoneClean === cleanPhone || 
+                               logPhoneClean.endsWith(cleanPhone) || 
+                               cleanPhone.endsWith(logPhoneClean);
+                    });
+                    if (matchedLog) {
+                        await logToDb(`Resolved queue_item_id ${matchedLog.id} via phone match: ${leadPhone}`);
+                        return matchedLog.id;
+                    }
+                    await logToDb(`No exact phone match. Using latest active call log: ${activeLogs[0].id}`);
+                    return activeLogs[0].id;
+                }
+            }
+        }
+
+        // Ultimate fallback
+        const { data: lastCallingLog } = await supabase
+            .from("ai_caller_logs")
+            .select("id")
+            .eq("status", "calling")
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+        if (lastCallingLog) {
+            await logToDb(`Resolved queue_item_id ${lastCallingLog.id} via latest 'calling' status fallback`);
+            return lastCallingLog.id;
+        }
+
+        return null;
+    };
+
+    const queueItemId = await resolveQueueItemId();
 
     // ── CASE 0: GET RECORDING (Proxy to Vobiz with credentials) ───────────────
     if (action === "get_recording") {
@@ -122,7 +232,8 @@ serve(async (req) => {
         const companyId = logRow.company_id;
         const recordingUrl = logRow.call_recording;
 
-        // Fetch Vobiz credentials
+        // Fetch telephony credentials (try Vobiz first, then Smartflo)
+        let authHeaders: Record<string, string> = {};
         const { data: vobizRow } = await supabase
             .from("integration_api_keys")
             .select("api_key")
@@ -131,39 +242,58 @@ serve(async (req) => {
             .eq("is_active", true)
             .maybeSingle();
 
-        if (!vobizRow) {
-            return new Response(JSON.stringify({ error: "Vobiz credentials not found" }), {
+        if (vobizRow) {
+            const vobizConfig = typeof vobizRow.api_key === "string" ? JSON.parse(vobizRow.api_key) : vobizRow.api_key;
+            authHeaders = {
+                "X-Auth-ID": vobizConfig.auth_id,
+                "X-Auth-Token": vobizConfig.auth_token,
+            };
+        } else {
+            // Try Smartflo credentials
+            const { data: smartfloRow } = await supabase
+                .from("integration_api_keys")
+                .select("api_key")
+                .eq("company_id", companyId)
+                .eq("service_name", "tata_smartflo")
+                .eq("is_active", true)
+                .maybeSingle();
+
+            if (smartfloRow) {
+                const smartfloConfig = typeof smartfloRow.api_key === "string" ? JSON.parse(smartfloRow.api_key) : smartfloRow.api_key;
+                authHeaders = {
+                    "Authorization": `Bearer ${smartfloConfig.auth_token}`,
+                };
+            }
+        }
+
+        if (Object.keys(authHeaders).length === 0) {
+            return new Response(JSON.stringify({ error: "Telephony credentials not found" }), {
                 status: 404,
                 headers: { "Content-Type": "application/json", ...corsHeaders }
             });
         }
 
-        const vobizConfig = typeof vobizRow.api_key === "string" ? JSON.parse(vobizRow.api_key) : vobizRow.api_key;
-
-        // Fetch recording with credentials from Vobiz
-        const vobizResponse = await fetch(recordingUrl, {
-            headers: {
-                "X-Auth-ID": vobizConfig.auth_id,
-                "X-Auth-Token": vobizConfig.auth_token,
-            }
+        // Fetch recording with credentials
+        const providerResponse = await fetch(recordingUrl, {
+            headers: authHeaders
         });
 
-        if (!vobizResponse.ok) {
-            const errText = await vobizResponse.text();
-            return new Response(JSON.stringify({ error: `Failed to fetch from Vobiz: ${vobizResponse.status}`, details: errText }), {
-                status: vobizResponse.status,
+        if (!providerResponse.ok) {
+            const errText = await providerResponse.text();
+            return new Response(JSON.stringify({ error: `Failed to fetch recording: ${providerResponse.status}`, details: errText }), {
+                status: providerResponse.status,
                 headers: { "Content-Type": "application/json", ...corsHeaders }
             });
         }
 
         const responseHeaders = new Headers(corsHeaders);
-        responseHeaders.set("Content-Type", vobizResponse.headers.get("Content-Type") || "audio/mpeg");
-        const contentLength = vobizResponse.headers.get("Content-Length");
+        responseHeaders.set("Content-Type", providerResponse.headers.get("Content-Type") || "audio/mpeg");
+        const contentLength = providerResponse.headers.get("Content-Length");
         if (contentLength) {
             responseHeaders.set("Content-Length", contentLength);
         }
 
-        return new Response(vobizResponse.body, {
+        return new Response(providerResponse.body, {
             headers: responseHeaders,
             status: 200
         });
@@ -680,16 +810,28 @@ serve(async (req) => {
         // This avoids any ampersands in the XML which prevents XML parsing issues
         const bridgeWsUrl = `${supabaseUrl.replace("https://", "wss://")}/functions/v1/ai-caller?queue_item_id=${encodeURIComponent(queueItemId)}`;
 
-        await logToDb("Returning Stream XML to Vobiz", { bridgeWsUrl });
+        const isTata = agentConfig.telephony_provider === "tata_smartflo";
 
-        const vobizXml = `<?xml version="1.0" encoding="UTF-8"?>
+        if (isTata) {
+            await logToDb("Returning Stream JSON to Tata Smartflo", { bridgeWsUrl });
+            return new Response(JSON.stringify({
+                success: true,
+                wss_url: bridgeWsUrl
+            }), {
+                headers: { "Content-Type": "application/json", ...corsHeaders }
+            });
+        }
+
+        await logToDb("Returning Stream XML to telephony provider", { bridgeWsUrl });
+
+        const streamXml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
     <Stream bidirectional="true" streamTimeout="${maxDurationSecs}" contentType="audio/x-mulaw;rate=8000" maxDuration="${maxDurationSecs}" keepCallAlive="true">
         ${bridgeWsUrl}
     </Stream>
 </Response>`;
 
-        return new Response(vobizXml, {
+        return new Response(streamXml, {
             headers: { "Content-Type": "text/xml", ...corsHeaders },
         });
 
@@ -710,7 +852,7 @@ function xmlError(message: string): string {
 </Response>`;
 }
 
-// ── Process next queued call when current call ends ───────────────────────────
+// ── Process next queued call when current call ends ─────────────────────────
 async function processNextQueueItem(supabase: any, companyId: string, supabaseUrl: string) {
     if (!companyId) return;
 
@@ -726,19 +868,7 @@ async function processNextQueueItem(supabase: any, companyId: string, supabaseUr
 
     const nextRow = pending[0];
 
-    // Fetch Vobiz config
-    const { data: vobizRow } = await supabase
-        .from("integration_api_keys")
-        .select("api_key")
-        .eq("company_id", companyId)
-        .eq("service_name", "vobiz")
-        .eq("is_active", true)
-        .maybeSingle();
-
-    if (!vobizRow) return;
-    const vobizConfig = typeof vobizRow.api_key === "string" ? JSON.parse(vobizRow.api_key) : vobizRow.api_key;
-
-    // Fetch agent config
+    // Fetch agent config to determine telephony provider
     const { data: agentRow } = await supabase
         .from("integration_api_keys")
         .select("api_key")
@@ -747,28 +877,72 @@ async function processNextQueueItem(supabase: any, companyId: string, supabaseUr
 
     if (!agentRow) return;
     const agentConfig = typeof agentRow.api_key === "string" ? JSON.parse(agentRow.api_key) : agentRow.api_key;
+    const telephonyProvider = agentConfig.telephony_provider || "vobiz";
+
+    // Fetch telephony config based on provider
+    let telephonyConfig: any = null;
+    const serviceName = telephonyProvider === "tata_smartflo" ? "tata_smartflo" : "vobiz";
+    const { data: telephonyRow } = await supabase
+        .from("integration_api_keys")
+        .select("api_key")
+        .eq("company_id", companyId)
+        .eq("service_name", serviceName)
+        .eq("is_active", true)
+        .maybeSingle();
+
+    if (!telephonyRow) return;
+    telephonyConfig = typeof telephonyRow.api_key === "string" ? JSON.parse(telephonyRow.api_key) : telephonyRow.api_key;
 
     const answerUrl = `${supabaseUrl}/functions/v1/ai-caller?queue_item_id=${encodeURIComponent(nextRow.id)}`;
     const hangupUrl = `${supabaseUrl}/functions/v1/ai-caller?action=hangup&queue_item_id=${encodeURIComponent(nextRow.id)}`;
 
     try {
-        const response = await fetch(
-            `https://api.vobiz.ai/api/v1/Account/${vobizConfig.auth_id}/Call/`,
-            {
-                method: "POST",
-                headers: {
-                    "X-Auth-ID": vobizConfig.auth_id,
-                    "X-Auth-Token": vobizConfig.auth_token,
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    from: agentConfig.phone_number || vobizConfig.phone_number,
-                    to: nextRow.lead_phone,
-                    answer_url: answerUrl,
-                    hangup_url: hangupUrl,
-                }),
-            }
-        );
+        let response: Response;
+
+        if (telephonyProvider === "tata_smartflo") {
+            // Use click_to_call_support — calls the customer first
+            const cleanTo = (nextRow.lead_phone || "").replace(/[^0-9]/g, "");
+            const cleanFrom = (agentConfig.phone_number || telephonyConfig.phone_number || "").replace(/[^0-9]/g, "");
+            const c2cApiKey = telephonyConfig.c2c_api_key || telephonyConfig.auth_token;
+            const requestBody: any = {
+                api_key: c2cApiKey,
+                customer_number: cleanTo,
+                async: 1,
+                get_call_id: 1,
+            };
+            if (cleanFrom) requestBody.caller_id = cleanFrom;
+
+            response = await fetch(
+                `https://api-smartflo.tatateleservices.com/v1/click_to_call_support`,
+                {
+                    method: "POST",
+                    headers: {
+                        "Authorization": `Bearer ${telephonyConfig.auth_token}`,
+                        "Content-Type": "application/json",
+                        "Accept": "application/json",
+                    },
+                    body: JSON.stringify(requestBody),
+                }
+            );
+        } else {
+            response = await fetch(
+                `https://api.vobiz.ai/api/v1/Account/${telephonyConfig.auth_id}/Call/`,
+                {
+                    method: "POST",
+                    headers: {
+                        "X-Auth-ID": telephonyConfig.auth_id,
+                        "X-Auth-Token": telephonyConfig.auth_token,
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        from: agentConfig.phone_number || telephonyConfig.phone_number,
+                        to: nextRow.lead_phone,
+                        answer_url: answerUrl,
+                        hangup_url: hangupUrl,
+                    }),
+                }
+            );
+        }
 
         const result = await response.json();
 
@@ -776,7 +950,7 @@ async function processNextQueueItem(supabase: any, companyId: string, supabaseUr
             .from("ai_caller_logs")
             .update({
                 status: response.ok ? "calling" : "failed",
-                call_id: result?.request_uuid || result?.call_uuid,
+                call_id: result?.request_uuid || result?.call_uuid || result?.call_sid,
                 error: response.ok ? null : (result?.error || `HTTP ${response.status}`),
             })
             .eq("id", nextRow.id);
@@ -792,7 +966,7 @@ async function processNextQueueItem(supabase: any, companyId: string, supabaseUr
     }
 }
 
-// ── Start Vobiz outbound call recording ───────────────────────────────────────
+// ── Start call recording (provider-aware) ───────────────────────────────────
 async function startVobizRecording(
     supabase: any,
     companyId: string,
@@ -802,47 +976,108 @@ async function startVobizRecording(
 ) {
     if (!companyId || !callUuid) return;
 
-    try {
-        const { data: vobizRow } = await supabase
+    // Determine which provider is being used by checking the agent config for this call
+    const { data: logRow } = await supabase
+        .from("ai_caller_logs")
+        .select("agent_id")
+        .eq("id", queueItemId)
+        .maybeSingle();
+
+    let telephonyProvider = "vobiz";
+    if (logRow?.agent_id) {
+        const { data: agentRow } = await supabase
             .from("integration_api_keys")
             .select("api_key")
-            .eq("company_id", companyId)
-            .eq("service_name", "vobiz")
-            .eq("is_active", true)
+            .eq("id", logRow.agent_id)
             .maybeSingle();
-
-        if (!vobizRow) {
-            console.error("[AI-Caller] Vobiz integration credentials not found for recording");
-            return;
+        if (agentRow) {
+            const agentConfig = typeof agentRow.api_key === "string" ? JSON.parse(agentRow.api_key) : agentRow.api_key;
+            telephonyProvider = agentConfig.telephony_provider || "vobiz";
         }
+    }
 
-        const vobizConfig = typeof vobizRow.api_key === "string" ? JSON.parse(vobizRow.api_key) : vobizRow.api_key;
-        
-        console.log(`[AI-Caller] Requesting Vobiz call recording for call ${callUuid}...`);
-        
+    try {
         const callbackUrl = `${supabaseUrl}/functions/v1/ai-caller?action=hangup&queue_item_id=${encodeURIComponent(queueItemId)}`;
-        
-        const response = await fetch(
-            `https://api.vobiz.ai/api/v1/Account/${vobizConfig.auth_id}/Call/${callUuid}/Record/`,
-            {
-                method: "POST",
-                headers: {
-                    "X-Auth-ID": vobizConfig.auth_id,
-                    "X-Auth-Token": vobizConfig.auth_token,
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    time_limit: 3600,
-                    file_format: "mp3",
-                    callback_url: callbackUrl,
-                })
-            }
-        );
 
-        const result = await response.json();
-        console.log(`[AI-Caller] Vobiz recording response:`, result);
+        if (telephonyProvider === "tata_smartflo") {
+            // Tata Smartflo recording
+            const { data: smartfloRow } = await supabase
+                .from("integration_api_keys")
+                .select("api_key")
+                .eq("company_id", companyId)
+                .eq("service_name", "tata_smartflo")
+                .eq("is_active", true)
+                .maybeSingle();
+
+            if (!smartfloRow) {
+                console.error("[AI-Caller] Smartflo integration credentials not found for recording");
+                return;
+            }
+
+            const smartfloConfig = typeof smartfloRow.api_key === "string" ? JSON.parse(smartfloRow.api_key) : smartfloRow.api_key;
+            const smartfloToken = smartfloConfig.auth_token || smartfloConfig.api_key;
+
+            console.log(`[AI-Caller] Requesting Smartflo call recording for call ${callUuid}...`);
+
+            const response = await fetch(
+                `https://api-smartflo.tatateleservices.com/v1/call/${callUuid}/recording`,
+                {
+                    method: "POST",
+                    headers: {
+                        "Authorization": `Bearer ${smartfloToken}`,
+                        "Content-Type": "application/json",
+                        "Accept": "application/json",
+                    },
+                    body: JSON.stringify({
+                        time_limit: 3600,
+                        file_format: "mp3",
+                        callback_url: callbackUrl,
+                    })
+                }
+            );
+
+            const result = await response.json();
+            console.log(`[AI-Caller] Smartflo recording response:`, result);
+        } else {
+            // Vobiz recording (original logic)
+            const { data: vobizRow } = await supabase
+                .from("integration_api_keys")
+                .select("api_key")
+                .eq("company_id", companyId)
+                .eq("service_name", "vobiz")
+                .eq("is_active", true)
+                .maybeSingle();
+
+            if (!vobizRow) {
+                console.error("[AI-Caller] Vobiz integration credentials not found for recording");
+                return;
+            }
+
+            const vobizConfig = typeof vobizRow.api_key === "string" ? JSON.parse(vobizRow.api_key) : vobizRow.api_key;
+
+            console.log(`[AI-Caller] Requesting Vobiz call recording for call ${callUuid}...`);
+
+            const response = await fetch(
+                `https://api.vobiz.ai/api/v1/Account/${vobizConfig.auth_id}/Call/${callUuid}/Record/`,
+                {
+                    method: "POST",
+                    headers: {
+                        "X-Auth-ID": vobizConfig.auth_id,
+                        "X-Auth-Token": vobizConfig.auth_token,
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        time_limit: 3600,
+                        file_format: "mp3",
+                        callback_url: callbackUrl,
+                    })
+                }
+            );
+
+            const result = await response.json();
+            console.log(`[AI-Caller] Vobiz recording response:`, result);
+        }
     } catch (err: any) {
-        console.error("[AI-Caller] Failed to trigger Vobiz call recording:", err);
+        console.error("[AI-Caller] Failed to trigger call recording:", err);
     }
 }
-

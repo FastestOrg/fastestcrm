@@ -154,7 +154,7 @@ function AIConfigDialogContent({ account, onClose, updateAccountAI }: { account:
                 .maybeSingle();
                 
             if (iErr) throw iErr;
-            if (!integration?.api_key) throw new Error('Gemini integration not found or inactive. Please add it in the Integrations tab.');
+            if (!integration?.api_key) throw new Error('FastAI integration not found or inactive. Please add it in the Integrations tab.');
 
             // Call Gemini API directly (REST)
             const systemPrompt = `You are an expert AI sales director. Your job is to improve the following basic instructions into a detailed, professional AI agent prompt.
@@ -173,7 +173,7 @@ Rewrite the instructions to be extremely clear, conversion-focused, and suitable
 
             if (!res.ok) {
                 const errData = await res.json().catch(() => ({}));
-                throw new Error('Gemini API Error: ' + (errData.error?.message || res.statusText));
+                throw new Error('FastAI API Error: ' + (errData.error?.message || res.statusText));
             }
 
             const data = await res.json();
@@ -181,7 +181,7 @@ Rewrite the instructions to be extremely clear, conversion-focused, and suitable
             if (improvedText) {
                 setAiPrompt(improvedText.trim());
             } else {
-                throw new Error('No improvement generated from Gemini API.');
+                throw new Error('No improvement generated from FastAI API.');
             }
         } catch (e: any) {
             alert(e.message);

@@ -123,7 +123,7 @@ export default function LGDashboard() {
                                         <Zap className="h-4 w-4 text-amber-500" />
                                         Autonomous Enrichment
                                     </h4>
-                                    <p className="text-xs text-muted-foreground">Automatically research every new lead using Gemini AI.</p>
+                                    <p className="text-xs text-muted-foreground">Automatically research every new lead using FastAI.</p>
                                 </div>
                                 <Switch 
                                     checked={settings?.is_enabled || false} 
@@ -204,7 +204,7 @@ export default function LGDashboard() {
                                     onChange={(e) => updateSettings({ daily_budget_limit: parseInt(e.target.value) || 0 })}
                                     disabled={settingsLoading}
                                 />
-                                <p className="text-[10px] text-muted-foreground">Limits Gemini API and outreach volume to control costs.</p>
+                                <p className="text-[10px] text-muted-foreground">Limits FastAI API and outreach volume to control costs.</p>
                             </div>
                         </div>
                     </CardContent>

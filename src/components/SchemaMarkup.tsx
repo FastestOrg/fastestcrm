@@ -149,7 +149,7 @@ export const SoftwareAppSchema = () => {
     "applicationCategory": "BusinessApplication",
     "operatingSystem": "Web, Android, iOS",
     "url": "https://www.fastestcrm.com",
-    "description": "India's first AI-powered CRM built for sales teams, training companies, and enrollment teams. Manage leads, calls, payments, and analytics with intelligent automation powered by Google Gemini.",
+    "description": "India's first AI-powered CRM built for sales teams, training companies, and enrollment teams. Manage leads, calls, payments, and analytics with intelligent automation powered by FastAI.",
     "offers": {
       "@type": "Offer",
       "price": "0",

@@ -317,7 +317,7 @@ export function CreateAutomationDialog({ isOpen, onOpenChange, onSuccess, automa
                                         <div>
                                             <p className="text-[11px] text-primary font-medium">AI CALLER MODE</p>
                                             <p className="text-[10px] text-muted-foreground mt-0.5">
-                                                An AI agent will call the lead using Gemini 3.1 Flash Live via Vobiz telephony.
+                                                An AI agent will call the lead using FastAI STS Latest via Vobiz telephony.
                                                 Calls are queued and processed sequentially.
                                             </p>
                                         </div>

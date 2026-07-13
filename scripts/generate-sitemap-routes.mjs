@@ -43,7 +43,7 @@ const routes = [
   '/glossary/sales-workflow-automation',
   '/glossary/sales-pipeline-stages',
   '/glossary/ai-lead-scoring',
-  '/glossary/google-gemini-crm-integration',
+  '/glossary/fastai-crm-integration',
   '/glossary/gst-invoicing-software-for-crm',
   '/glossary/razorpay-crm-integration',
   ...slugs

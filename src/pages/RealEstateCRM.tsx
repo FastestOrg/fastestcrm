@@ -29,7 +29,7 @@ const features = [
   {
     icon: Brain,
     title: 'AI Lead Profiling',
-    description: 'Gemini AI analyzes lead conversations to predict closure probability and intent for specific projects.'
+    description: 'FastAI analyzes lead conversations to predict closure probability and intent for specific projects.'
   },
   {
     icon: CreditCard,

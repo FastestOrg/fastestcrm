@@ -308,7 +308,7 @@ const docSections: DocSection[] = [
       {
         title: 'AI Dashboard',
         content:
-          'The AI Insights page powered by Gemini analyzes your lead data to provide conversion predictions, pipeline health scores, and actionable recommendations. Get AI-generated summaries of your team\'s performance.',
+          'The AI Insights page powered by FastAI analyzes your lead data to provide conversion predictions, pipeline health scores, and actionable recommendations. Get AI-generated summaries of your team\'s performance.',
       },
       {
         title: 'BigData SQL',

@@ -12,6 +12,7 @@ export interface AICallerAgent {
     phone_number: string;
     max_duration_minutes: number;
     is_active: boolean;
+    telephony_provider: 'vobiz' | 'tata_smartflo';
     created_at: string;
 }
 
@@ -23,6 +24,7 @@ export interface CreateAgentParams {
     phone_number: string;
     max_duration_minutes: number;
     is_active: boolean;
+    telephony_provider: 'vobiz' | 'tata_smartflo';
 }
 
 const SERVICE_PREFIX = 'ai_caller_agent';
@@ -38,6 +40,7 @@ function parseAgentRow(row: any): AICallerAgent {
         phone_number: config.phone_number ?? '',
         max_duration_minutes: config.max_duration_minutes ?? 10,
         is_active: row.is_active ?? true,
+        telephony_provider: config.telephony_provider ?? 'vobiz',
         created_at: row.created_at,
     };
 }
@@ -137,6 +140,19 @@ export function useAICallerAgents() {
         return typeof data.api_key === 'string' ? JSON.parse(data.api_key) : data.api_key;
     };
 
+    // Helper to get Tata Smartflo config for this company
+    const getTataSmartfloConfig = async () => {
+        const { data } = await supabase
+            .from('integration_api_keys')
+            .select('api_key, is_active')
+            .eq('company_id', company?.id)
+            .eq('service_name', 'tata_smartflo')
+            .eq('is_active', true)
+            .maybeSingle() as any;
+        if (!data) return null;
+        return typeof data.api_key === 'string' ? JSON.parse(data.api_key) : data.api_key;
+    };
+
     return {
         agents,
         isLoading,
@@ -147,5 +163,6 @@ export function useAICallerAgents() {
         isCreating: createMutation.isPending,
         isUpdating: updateMutation.isPending,
         getVobizConfig,
+        getTataSmartfloConfig,
     };
 }

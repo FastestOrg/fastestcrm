@@ -12,6 +12,7 @@ import { AddIntegrationDialog } from '@/components/integrations/AddIntegrationDi
 import { PerformanceMarketingDialog } from '@/components/integrations/PerformanceMarketingDialog';
 import { EmailIntegrationDialog } from '@/components/integrations/EmailIntegrationDialog';
 import { VobizIntegrationDialog } from '@/components/integrations/VobizIntegrationDialog';
+import { TataSmartfloIntegrationDialog } from '@/components/integrations/TataSmartfloIntegrationDialog';
 import { useCompany } from '@/hooks/useCompany';
 import { useEmailAccounts } from '@/hooks/useEmailAccounts';
 import { useToast } from '@/hooks/use-toast';
@@ -21,6 +22,7 @@ const integrationTypes = [
     { id: 'gmail', name: 'Gmail / Outlook', icon: Mail, description: 'Sync emails and calendar', category: 'Communication' },
     { id: 'whatsapp', name: 'WhatsApp Business', icon: MessageSquare, description: 'Send automated messages', category: 'Communication' },
     { id: 'vobiz', name: 'Vobiz AI Telephony', icon: PhoneCall, description: 'AI voice calling with Gemini Live', category: 'AI Caller', isSpecial: true },
+    { id: 'tata_smartflo', name: 'Tata Tele Smartflo', icon: PhoneCall, description: 'AI voice calling via Smartflo', category: 'AI Caller', isSpecial: true },
     { id: 'telephony', name: 'Exotel / Twilio', icon: Phone, description: 'Click-to-call and recording', category: 'Telephony' },
     { id: 'razorpay', name: 'Razorpay', icon: CreditCard, description: 'Payment links and reconciliation', category: 'Payments' },
     { id: 'google_calendar', name: 'Google Calendar', icon: Calendar, description: 'Schedule meetings', category: 'Scheduling' },
@@ -38,6 +40,7 @@ export default function Integrations() {
     const [isPerformanceMarketingOpen, setIsPerformanceMarketingOpen] = useState(false);
     const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
     const [isVobizOpen, setIsVobizOpen] = useState(false);
+    const [isTataSmartfloOpen, setIsTataSmartfloOpen] = useState(false);
     
     // Unified email account check
     const { accounts: emailAccounts } = useEmailAccounts();
@@ -112,6 +115,10 @@ export default function Integrations() {
         }
         if (integration.id === 'vobiz') {
             setIsVobizOpen(true);
+            return;
+        }
+        if (integration.id === 'tata_smartflo') {
+            setIsTataSmartfloOpen(true);
             return;
         }
         if (integration.id === 'google_calendar') {
@@ -192,7 +199,7 @@ export default function Integrations() {
                                             <span className="text-xs text-muted-foreground uppercase tracking-wider font-medium">{integration.category}</span>
                                             {connected ? (
                                                 <div className="flex gap-2">
-                                                    {(integration.id === 'performance_marketing' || integration.id === 'gmail' || integration.id === 'vobiz') ? (
+                                                    {(integration.id === 'performance_marketing' || integration.id === 'gmail' || integration.id === 'vobiz' || integration.id === 'tata_smartflo') ? (
                                                         <Button
                                                             size="sm"
                                                             variant="secondary"
@@ -247,6 +254,11 @@ export default function Integrations() {
                 <VobizIntegrationDialog
                     isOpen={isVobizOpen}
                     onOpenChange={setIsVobizOpen}
+                />
+
+                <TataSmartfloIntegrationDialog
+                    isOpen={isTataSmartfloOpen}
+                    onOpenChange={setIsTataSmartfloOpen}
                 />
             </div>
         </>

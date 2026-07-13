@@ -20,7 +20,7 @@ const features = [
   },
   {
     icon: Brain,
-    title: 'AI Analytics (Gemini)',
+    title: 'AI Analytics (FastAI)',
     description: 'Get intelligent insights, conversion predictions, and AI-powered recommendations for every lead.'
   },
   {
