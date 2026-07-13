@@ -122,54 +122,89 @@ export function useInvoices() {
   });
 
   const generateNumber = async (): Promise<string> => {
-    const { data: settings } = await supabase
+    const { data: settings, error: settingsReadErr } = await supabase
       .from('invoice_settings' as any)
       .select('invoice_prefix, next_invoice_number')
       .eq('company_id', companyId!)
       .maybeSingle();
 
+    console.log('[Invoice Debug] Settings read:', { settings, settingsReadErr, companyId });
+
     const prefix = (settings as any)?.invoice_prefix || 'INV-';
     const nextNum = (settings as any)?.next_invoice_number || 1;
     const number = `${prefix}${String(nextNum).padStart(4, '0')}`;
 
-    await supabase
+    const upsertPayload = {
+      company_id: companyId!,
+      next_invoice_number: nextNum + 1,
+      updated_at: new Date().toISOString(),
+    };
+    console.log('[Invoice Debug] Upsert payload:', upsertPayload);
+
+    const { error: upsertErr } = await supabase
       .from('invoice_settings' as any)
-      .upsert({
-        company_id: companyId!,
-        next_invoice_number: nextNum + 1,
-        updated_at: new Date().toISOString(),
-      } as any, { onConflict: 'company_id' });
+      .upsert(upsertPayload as any, { onConflict: 'company_id' });
+
+    if (upsertErr) {
+      console.error('[Invoice Debug] Upsert ERROR:', upsertErr);
+    } else {
+      console.log('[Invoice Debug] Upsert OK');
+    }
 
     return number;
   };
 
   const createInvoice = useMutation({
     mutationFn: async (input: InvoiceInput) => {
+      // Debug: check auth state
+      const { data: { session } } = await supabase.auth.getSession();
+      console.log('[Invoice Debug] Auth session:', { 
+        userId: session?.user?.id, 
+        role: session?.user?.role,
+        companyId,
+        userFromHook: user?.id 
+      });
+
+      // Debug: test RPC
+      const { data: rpcCompanyId, error: rpcErr } = await supabase.rpc('get_user_company_id' as any);
+      console.log('[Invoice Debug] get_user_company_id() RPC:', { rpcCompanyId, rpcErr });
+      console.log('[Invoice Debug] companyId from useCompany:', companyId);
+      console.log('[Invoice Debug] Match:', rpcCompanyId === companyId);
+
       const invoiceNumber = await generateNumber();
       const { items, ...invoiceData } = input;
 
+      const insertPayload = {
+        ...invoiceData,
+        company_id: companyId!,
+        created_by: user!.id,
+        invoice_number: invoiceNumber,
+        currency: input.currency || company?.default_currency || 'INR',
+        amount_due: (input.total || 0) - (input.amount_paid || 0),
+      };
+      console.log('[Invoice Debug] Insert payload:', JSON.stringify(insertPayload, null, 2));
+
       const { data: inv, error: invErr } = await supabase
         .from('invoices' as any)
-        .insert({
-          ...invoiceData,
-          company_id: companyId!,
-          created_by: user!.id,
-          invoice_number: invoiceNumber,
-          currency: input.currency || company?.default_currency || 'INR',
-          amount_due: (input.total || 0) - (input.amount_paid || 0),
-        } as any)
+        .insert(insertPayload as any)
         .select()
         .single();
 
-      if (invErr) throw invErr;
+      if (invErr) {
+        console.error('[Invoice Debug] Insert ERROR:', invErr);
+        throw invErr;
+      }
+      console.log('[Invoice Debug] Insert OK:', inv);
 
       if (items.length > 0) {
-        const itemRows = items.map((item, i) => ({
-          ...item,
-          invoice_id: (inv as any).id,
-          sort_order: i,
-          id: undefined,
-        }));
+        const itemRows = items.map((item, i) => {
+          const { id: _, ...itemWithoutId } = item;
+          return {
+            ...itemWithoutId,
+            invoice_id: (inv as any).id,
+            sort_order: i,
+          };
+        });
         const { error: itemErr } = await supabase
           .from('invoice_items' as any)
           .insert(itemRows as any);
@@ -214,12 +249,14 @@ export function useInvoices() {
       // Replace items
       await supabase.from('invoice_items' as any).delete().eq('invoice_id', id);
       if (items.length > 0) {
-        const itemRows = items.map((item, i) => ({
-          ...item,
-          invoice_id: id,
-          sort_order: i,
-          id: undefined,
-        }));
+        const itemRows = items.map((item, i) => {
+          const { id: _, ...itemWithoutId } = item;
+          return {
+            ...itemWithoutId,
+            invoice_id: id,
+            sort_order: i,
+          };
+        });
         const { error: itemErr } = await supabase
           .from('invoice_items' as any)
           .insert(itemRows as any);

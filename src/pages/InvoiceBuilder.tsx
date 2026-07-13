@@ -15,7 +15,7 @@ import { SendDocumentDialog } from '@/components/financial/SendDocumentDialog';
 import { DocumentView } from '@/components/financial/DocumentView';
 
 import { useQuotations } from '@/hooks/useQuotations';
-import { useInvoiceTaxes } from '@/hooks/useInvoiceSettings';
+import { useInvoiceTaxes, useInvoiceSettings, useInvoiceTemplates } from '@/hooks/useInvoiceSettings';
 import { useProducts } from '@/hooks/useProducts';
 import { useToast } from '@/hooks/use-toast';
 import { useCompany } from '@/hooks/useCompany';
@@ -41,12 +41,16 @@ export default function InvoiceBuilder() {
   const { fetchQuotationWithItems } = useQuotations();
   const { taxes } = useInvoiceTaxes();
   const { products } = useProducts();
+  const { settings: invoiceSettings } = useInvoiceSettings();
+  const { templates } = useInvoiceTemplates();
+  const defaultTemplate = templates?.find((t) => t.is_default);
 
   const isEditing = !!id;
   const [loading, setLoading] = useState(isEditing || !!fromQuotationId);
   const [saving, setSaving] = useState(false);
 
   // Form state
+  const [invoiceNumber, setInvoiceNumber] = useState('');
   const [clientName, setClientName] = useState('');
   const [clientEmail, setClientEmail] = useState('');
   const [clientPhone, setClientPhone] = useState('');
@@ -87,6 +91,7 @@ export default function InvoiceBuilder() {
   useEffect(() => {
     if (isEditing) {
       fetchInvoiceWithItems(id!).then((data) => {
+        setInvoiceNumber(data.invoice_number);
         setClientName(data.client_name);
         setClientEmail(data.client_email || '');
         setClientPhone(data.client_phone || '');
@@ -647,7 +652,7 @@ export default function InvoiceBuilder() {
                     type="invoice" 
                     document={{
                         status,
-                        invoice_number: isEditing ? (id ? "Loading..." : "INV-NEW") : "INV-NEW",
+                        invoice_number: isEditing ? (invoiceNumber || "Loading...") : (invoiceSettings ? `${invoiceSettings.invoice_prefix || 'INV-'}${String(invoiceSettings.next_invoice_number || 1).padStart(4, '0')}` : 'INV-NEW'),
                         currency,
                         subtotal,
                         discount_amount: docDiscountAmount,
@@ -665,13 +670,20 @@ export default function InvoiceBuilder() {
                     }}
                     items={computedItems}
                     company={{
-                        name: company?.name || 'FastestCRM',
-                        logo_url: company?.logo_url || null,
-                        primary_color: company?.primary_color || '#3b82f6',
-                        address: company?.address || null,
-                        email: company?.email || null,
-                        phone: company?.phone || null,
-                        gstin: null
+                        name: invoiceSettings?.business_name || company?.name || 'FastestCRM',
+                        logo_url: invoiceSettings?.business_logo_url || company?.logo_url || null,
+                        primary_color: defaultTemplate?.color_scheme?.primary || company?.primary_color || '#3b82f6',
+                        address: invoiceSettings?.business_address || company?.address || null,
+                        email: invoiceSettings?.business_email || company?.email || null,
+                        phone: invoiceSettings?.business_phone || company?.phone || null,
+                        gstin: invoiceSettings?.business_gstin || null,
+                        pan: invoiceSettings?.business_pan || null,
+                        bank_name: invoiceSettings?.bank_details?.bank || '',
+                        account_number: invoiceSettings?.bank_details?.account || '',
+                        ifsc_code: invoiceSettings?.bank_details?.ifsc || '',
+                        upi_id: invoiceSettings?.bank_details?.upi || '',
+                        show_bank_details: defaultTemplate?.show_bank_details ?? true,
+                        show_logo: defaultTemplate?.show_logo ?? true
                     }}
                   />
               </div>

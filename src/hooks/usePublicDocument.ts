@@ -48,42 +48,46 @@ export function usePublicDocument(type: 'quotation' | 'invoice', id: string | un
       if (itemError) throw itemError;
 
       // 2. Fetch company settings for branding
-      const { data: settings, error: settingsError } = await supabase
+      const { data: settings } = await supabase
         .from('invoice_settings' as any)
         .select('*')
         .eq('company_id', (document as any).company_id)
-        .single();
+        .maybeSingle();
 
-      // If settings not found, we fetch the company name from companies table
-      let companyData: any = settings || {};
-      
-      if (settingsError || !settings) {
-        const { data: company } = await supabase
-          .from('companies' as any)
-          .select('name, logo_url, primary_color')
-          .eq('id', (document as any).company_id)
-          .single();
-        
-        companyData = {
-            ...companyData,
-            business_name: company?.name,
-            business_logo_url: company?.logo_url,
-            primary_color: company?.primary_color
-        };
-      }
+      // 3. Fetch default template if exists
+      const { data: defaultTemplate } = await supabase
+        .from('invoice_templates' as any)
+        .select('*')
+        .eq('company_id', (document as any).company_id)
+        .eq('is_default', true)
+        .maybeSingle();
+
+      // 4. Fetch the company profile from companies table
+      const { data: companyInfo } = await supabase
+        .from('companies' as any)
+        .select('name, logo_url, primary_color')
+        .eq('id', (document as any).company_id)
+        .maybeSingle();
 
       return {
         type,
         document: document as any,
         items: (items || []) as any,
         company: {
-          name: companyData.business_name || 'FastestCRM',
-          logo_url: companyData.business_logo_url,
-          primary_color: companyData.primary_color || '#3b82f6',
-          address: companyData.business_address,
-          email: companyData.business_email,
-          phone: companyData.business_phone,
-          gstin: companyData.business_gstin,
+          name: settings?.business_name || companyInfo?.name || 'FastestCRM',
+          logo_url: settings?.business_logo_url || companyInfo?.logo_url || null,
+          primary_color: defaultTemplate?.color_scheme?.primary || companyInfo?.primary_color || '#3b82f6',
+          address: settings?.business_address || null,
+          email: settings?.business_email || null,
+          phone: settings?.business_phone || null,
+          gstin: settings?.business_gstin || null,
+          pan: settings?.business_pan || null,
+          bank_name: settings?.bank_details?.bank || '',
+          account_number: settings?.bank_details?.account || '',
+          ifsc_code: settings?.bank_details?.ifsc || '',
+          upi_id: settings?.bank_details?.upi || '',
+          show_bank_details: defaultTemplate?.show_bank_details ?? true,
+          show_logo: defaultTemplate?.show_logo ?? true,
         }
       };
     },

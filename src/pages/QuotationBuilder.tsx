@@ -14,7 +14,7 @@ import { useQuotations, QuotationItem, Quotation } from '@/hooks/useQuotations';
 import { SendDocumentDialog } from '@/components/financial/SendDocumentDialog';
 import { DocumentView } from '@/components/financial/DocumentView';
 
-import { useInvoiceTaxes } from '@/hooks/useInvoiceSettings';
+import { useInvoiceTaxes, useInvoiceSettings, useInvoiceTemplates } from '@/hooks/useInvoiceSettings';
 import { useProducts } from '@/hooks/useProducts';
 import { useToast } from '@/hooks/use-toast';
 import { useCompany } from '@/hooks/useCompany';
@@ -36,12 +36,16 @@ export default function QuotationBuilder() {
   const { createQuotation, updateQuotation, fetchQuotationWithItems } = useQuotations();
   const { taxes } = useInvoiceTaxes();
   const { products } = useProducts();
+  const { settings: invoiceSettings } = useInvoiceSettings();
+  const { templates } = useInvoiceTemplates();
+  const defaultTemplate = templates?.find((t) => t.is_default);
 
   const isEditing = !!id;
   const [loading, setLoading] = useState(isEditing);
   const [saving, setSaving] = useState(false);
 
   // Form state
+  const [quotationNumber, setQuotationNumber] = useState('');
   const [clientName, setClientName] = useState('');
   const [clientEmail, setClientEmail] = useState('');
   const [clientPhone, setClientPhone] = useState('');
@@ -147,6 +151,7 @@ export default function QuotationBuilder() {
   useEffect(() => {
     if (isEditing) {
       fetchQuotationWithItems(id!).then((data) => {
+        setQuotationNumber(data.quotation_number);
         setClientName(data.client_name);
         setClientEmail(data.client_email || '');
         setClientPhone(data.client_phone || '');
@@ -731,7 +736,7 @@ export default function QuotationBuilder() {
                     type="quotation" 
                     document={{
                         status,
-                        quotation_number: isEditing ? (id ? "Loading..." : "QUO-NEW") : "QUO-NEW",
+                        quotation_number: isEditing ? (quotationNumber || "Loading...") : (invoiceSettings ? `${invoiceSettings.quotation_prefix || 'QUO-'}${String(invoiceSettings.next_quotation_number || 1).padStart(4, '0')}` : 'QUO-NEW'),
                         currency,
                         subtotal,
                         discount_amount: docDiscountAmount,
@@ -749,13 +754,20 @@ export default function QuotationBuilder() {
                     }}
                     items={computedItems}
                     company={{
-                        name: company?.name || 'FastestCRM',
-                        logo_url: company?.logo_url || null,
-                        primary_color: company?.primary_color || '#3b82f6',
-                        address: company?.address || null,
-                        email: company?.email || null,
-                        phone: company?.phone || null,
-                        gstin: null
+                        name: invoiceSettings?.business_name || company?.name || 'FastestCRM',
+                        logo_url: invoiceSettings?.business_logo_url || company?.logo_url || null,
+                        primary_color: defaultTemplate?.color_scheme?.primary || company?.primary_color || '#3b82f6',
+                        address: invoiceSettings?.business_address || company?.address || null,
+                        email: invoiceSettings?.business_email || company?.email || null,
+                        phone: invoiceSettings?.business_phone || company?.phone || null,
+                        gstin: invoiceSettings?.business_gstin || null,
+                        pan: invoiceSettings?.business_pan || null,
+                        bank_name: invoiceSettings?.bank_details?.bank || '',
+                        account_number: invoiceSettings?.bank_details?.account || '',
+                        ifsc_code: invoiceSettings?.bank_details?.ifsc || '',
+                        upi_id: invoiceSettings?.bank_details?.upi || '',
+                        show_bank_details: defaultTemplate?.show_bank_details ?? true,
+                        show_logo: defaultTemplate?.show_logo ?? true
                     }}
                   />
               </div>

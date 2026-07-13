@@ -16,6 +16,13 @@ interface DocumentViewProps {
         email: string | null;
         phone: string | null;
         gstin: string | null;
+        pan?: string | null;
+        bank_name?: string | null;
+        account_number?: string | null;
+        ifsc_code?: string | null;
+        upi_id?: string | null;
+        show_bank_details?: boolean;
+        show_logo?: boolean;
     };
 }
 
@@ -45,12 +52,14 @@ export function DocumentView({ type, document, items, company }: DocumentViewPro
             {/* Company & Document Meta */}
             <div className="flex flex-col md:flex-row justify-between gap-8 mb-12">
                 <div className="space-y-4">
-                    <img 
-                        src={company.logo_url || '/logo.png'} 
-                        alt={company.name} 
-                        className="h-12 w-auto object-contain" 
-                        onError={(e) => (e.currentTarget.src = 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png')}
-                    />
+                    {company.show_logo !== false && (company.logo_url || '/logo.png') && (
+                        <img 
+                            src={company.logo_url || '/logo.png'} 
+                            alt={company.name} 
+                            className="h-12 w-auto object-contain" 
+                            onError={(e) => (e.currentTarget.src = 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png')}
+                        />
+                    )}
                     <div>
                         <h2 className="text-xl font-bold text-slate-900">{company.name}</h2>
                         <div className="text-slate-500 text-sm space-y-1 mt-2">
@@ -58,6 +67,7 @@ export function DocumentView({ type, document, items, company }: DocumentViewPro
                             {company.email && <p>Email: {company.email}</p>}
                             {company.phone && <p>Phone: {company.phone}</p>}
                             {company.gstin && <p>GSTIN: {company.gstin}</p>}
+                            {company.pan && <p>PAN: {company.pan}</p>}
                         </div>
                     </div>
                 </div>
@@ -172,6 +182,37 @@ export function DocumentView({ type, document, items, company }: DocumentViewPro
                             </p>
                         </div>
                     )}
+                    {company.show_bank_details !== false && (company.bank_name || company.account_number || company.ifsc_code || company.upi_id) && (
+                        <div className="bg-slate-50 p-5 rounded-xl border border-slate-100 space-y-3 mt-4">
+                            <p className="text-slate-500 text-xs uppercase tracking-wider font-bold">Bank Details (For Payment)</p>
+                            <div className="grid grid-cols-2 gap-y-2 text-xs text-slate-700 max-w-md">
+                                {company.bank_name && (
+                                    <>
+                                        <span className="font-medium text-slate-400">Bank Name</span>
+                                        <span className="font-semibold text-slate-800">{company.bank_name}</span>
+                                    </>
+                                )}
+                                {company.account_number && (
+                                    <>
+                                        <span className="font-medium text-slate-400">Account Number</span>
+                                        <span className="font-semibold text-slate-800">{company.account_number}</span>
+                                    </>
+                                )}
+                                {company.ifsc_code && (
+                                    <>
+                                        <span className="font-medium text-slate-400">IFSC Code</span>
+                                        <span className="font-semibold text-slate-800">{company.ifsc_code}</span>
+                                    </>
+                                )}
+                                {company.upi_id && (
+                                    <>
+                                        <span className="font-medium text-slate-400">UPI ID</span>
+                                        <span className="font-semibold text-slate-800">{company.upi_id}</span>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 <div className="w-full md:w-80 space-y-3">
@@ -208,6 +249,12 @@ export function DocumentView({ type, document, items, company }: DocumentViewPro
                         </div>
                     )}
                 </div>
+            </div>
+
+            {/* Brand Footer */}
+            <div className="mt-16 pt-6 border-t border-slate-100 flex justify-between items-center text-slate-400 text-xs select-none">
+                <span>{isQuotation ? 'Quotation' : 'Invoice'} #{isQuotation ? (document.quotation_number || 'QUO-XXXX') : (document.invoice_number || 'INV-XXXX')}</span>
+                <span>Invoicing by <a href="https://fastestcrm.com" target="_blank" rel="noopener noreferrer" className="hover:text-primary font-semibold transition-colors">FastestCRM.com</a></span>
             </div>
         </CardContent>
     );

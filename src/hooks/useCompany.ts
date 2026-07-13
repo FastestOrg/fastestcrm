@@ -29,7 +29,34 @@ async function fetchCompanyData(userId: string): Promise<Company | null> {
     .eq('id', userId)
     .single();
 
-  if (profileError || !profile?.company_id) return null;
+  if (profileError) return null;
+
+  let companyId = profile?.company_id;
+
+  // Fallback for platform_admin if no company is assigned
+  if (!companyId) {
+    const { data: isPrivileged } = await supabase
+      .from('platform_admins')
+      .select('id')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (isPrivileged) {
+      // Find the 'fastestcrm' company to default to
+      const { data: defaultCompany } = await supabase
+        .from('companies')
+        .select('id')
+        .eq('slug', 'fastestcrm')
+        .maybeSingle();
+
+      if (defaultCompany) {
+        companyId = defaultCompany.id;
+        console.log('[useCompany] Super admin detected without company. Defaulting to FastestCRM company:', companyId);
+      }
+    }
+  }
+
+  if (!companyId) return null;
 
   // Step 2: Get company details
   const { data: companyData, error: companyError } = await supabase
