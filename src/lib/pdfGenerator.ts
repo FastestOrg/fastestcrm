@@ -18,32 +18,22 @@ export async function downloadDocumentAsPDF(elementId: string, filename: string)
     useCORS: true,
     allowTaint: true,
     backgroundColor: '#ffffff',
-    windowWidth: element.scrollWidth,
-    windowHeight: element.scrollHeight,
+    logging: false,
   });
 
   const imgData = canvas.toDataURL('image/png');
 
-  // jsPDF parameters: orientation, unit, format
-  // A4: 210mm x 297mm
-  const pdf = new jsPDF('p', 'mm', 'a4');
-  const imgWidth = 210;
-  const pageHeight = 297;
-  const imgHeight = (canvas.height * imgWidth) / canvas.width;
-  let heightLeft = imgHeight;
-  let position = 0;
+  // Generate a single-page PDF matching the exact dimensions of the element in points (pt).
+  // We divide the canvas dimensions by the scale factor to match the element's actual layout size.
+  const pdfWidth = canvas.width / 2;
+  const pdfHeight = canvas.height / 2;
 
-  // Add the first page
-  pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
-  heightLeft -= pageHeight;
+  const pdf = new jsPDF({
+    orientation: pdfWidth > pdfHeight ? 'landscape' : 'portrait',
+    unit: 'pt',
+    format: [pdfWidth, pdfHeight]
+  });
 
-  // Render subsequent pages if content spans across multiple A4 pages
-  while (heightLeft > 0) {
-    position = heightLeft - imgHeight;
-    pdf.addPage();
-    pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
-    heightLeft -= pageHeight;
-  }
-
+  pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
   pdf.save(filename.endsWith('.pdf') ? filename : `${filename}.pdf`);
 }
