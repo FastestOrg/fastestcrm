@@ -9,10 +9,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { ArrowLeft, Plus, Trash2, Loader2, Save, Package, DollarSign, CreditCard, Mail } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Loader2, Save, Package, DollarSign, CreditCard, Mail, Download } from 'lucide-react';
 import { useInvoices, InvoiceItem, Invoice } from '@/hooks/useInvoices';
 import { SendDocumentDialog } from '@/components/financial/SendDocumentDialog';
 import { DocumentView } from '@/components/financial/DocumentView';
+import { downloadDocumentAsPDF } from '@/lib/pdfGenerator';
 
 import { useQuotations } from '@/hooks/useQuotations';
 import { useInvoiceTaxes, useInvoiceSettings, useInvoiceTemplates } from '@/hooks/useInvoiceSettings';
@@ -86,6 +87,27 @@ export default function InvoiceBuilder() {
   const [payMethod, setPayMethod] = useState('');
   const [payReference, setPayReference] = useState('');
   const [payNotes, setPayNotes] = useState('');
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  const handleDownloadPDF = async () => {
+    setIsDownloading(true);
+    try {
+      const invNum = invoiceNumber || (invoiceSettings ? `${invoiceSettings.invoice_prefix || 'INV-'}${String(invoiceSettings.next_invoice_number || 1).padStart(4, '0')}` : 'invoice');
+      await downloadDocumentAsPDF('invoice-preview', `Invoice_${invNum}.pdf`);
+      toast({
+        title: 'Success',
+        description: 'Invoice downloaded as PDF successfully.',
+      });
+    } catch (err: any) {
+      toast({
+        title: 'Error',
+        description: err.message || 'Failed to download PDF.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   // Load existing invoice or quotation
   useEffect(() => {
@@ -324,6 +346,12 @@ export default function InvoiceBuilder() {
                 Preview
               </Button>
             </div>
+            {viewMode === 'preview' && (
+              <Button variant="outline" onClick={handleDownloadPDF} disabled={isDownloading}>
+                {isDownloading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+                Download PDF
+              </Button>
+            )}
             {isEditing && (
               <Button variant="outline" onClick={() => setSendDialogOpen(true)}>
                 <Mail className="h-4 w-4 mr-2" /> Send via Email
@@ -647,7 +675,7 @@ export default function InvoiceBuilder() {
 
       {viewMode === 'preview' && (
           <div className="p-4 md:p-8 max-w-5xl mx-auto">
-              <div className="bg-white rounded-2xl shadow-2xl overflow-hidden border border-border relative">
+              <div id="invoice-preview" className="bg-white rounded-2xl shadow-2xl overflow-hidden border border-border relative">
                   <DocumentView 
                     type="invoice" 
                     document={{

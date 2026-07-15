@@ -7,6 +7,7 @@ import { DocumentView } from '@/components/financial/DocumentView';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useState } from 'react';
+import { downloadDocumentAsPDF } from '@/lib/pdfGenerator';
 
 interface PublicDocumentProps {
     type: 'quotation' | 'invoice';
@@ -16,6 +17,7 @@ export default function PublicDocument({ type }: PublicDocumentProps) {
     const { id } = useParams();
     const { data: data, isLoading, refetch } = usePublicDocument(type, id);
     const [actionLoading, setActionLoading] = useState(false);
+    const [isDownloading, setIsDownloading] = useState(false);
 
     const handlePrint = () => {
         window.print();
@@ -70,6 +72,19 @@ export default function PublicDocument({ type }: PublicDocumentProps) {
     const { document, items, company } = data;
     const isQuotation = type === 'quotation';
 
+    const handleDownloadPDF = async () => {
+        setIsDownloading(true);
+        try {
+            const docNum = document[isQuotation ? 'quotation_number' : 'invoice_number'] || type;
+            await downloadDocumentAsPDF('invoice-preview', `${isQuotation ? 'Quotation' : 'Invoice'}_${docNum}.pdf`);
+            toast.success('Document downloaded as PDF successfully.');
+        } catch (err: any) {
+            toast.error(err.message || 'Failed to download PDF.');
+        } finally {
+            setIsDownloading(false);
+        }
+    };
+
     return (
         <div className="min-h-screen bg-slate-50 py-8 px-4 sm:py-12 sm:px-6 lg:px-8 print:bg-white print:py-0 print:px-0">
             <div className="max-w-4xl mx-auto">
@@ -89,8 +104,8 @@ export default function PublicDocument({ type }: PublicDocumentProps) {
                             <Printer className="h-4 w-4 mr-2" />
                             Print
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => toast.info('PDF Generation coming soon!')}>
-                            <Download className="h-4 w-4 mr-2" />
+                        <Button variant="outline" size="sm" onClick={handleDownloadPDF} disabled={isDownloading}>
+                            {isDownloading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
                             Download
                         </Button>
                         {isQuotation && document.status === 'sent' && (
@@ -115,7 +130,7 @@ export default function PublicDocument({ type }: PublicDocumentProps) {
                 </div>
 
                 {/* Main Document Card */}
-                <Card className="relative border-none shadow-xl overflow-hidden print:shadow-none print:border print:border-slate-200">
+                <Card id="invoice-preview" className="relative border-none shadow-xl overflow-hidden print:shadow-none print:border print:border-slate-200">
                     <DocumentView type={type} document={document} items={items} company={company} />
                     
                     {/* Footer Information */}
