@@ -2,7 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { sendSystemEmail, getEmailTemplate } from "../_shared/email.ts";
 
-const PRICE_PER_SEAT = 500;
+const PRICE_PER_SEAT = 999;
 
 serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''

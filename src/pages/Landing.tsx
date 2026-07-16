@@ -220,7 +220,7 @@ export default function Landing() {
           {/* Pricing pill */}
           <div className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-primary/10 border border-primary/20 mb-12 animate-in fade-in duration-700 delay-150">
             <span className="text-primary font-semibold text-sm">
-              Free 1 seat · Startup plans from ₹10/day/employee ☕
+              Free 1 seat · Startup plans at ₹999/month/employee ☕
             </span>
           </div>
 

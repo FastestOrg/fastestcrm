@@ -53,7 +53,7 @@ interface WalletTransaction {
   created_at: string;
 }
 
-const PRICE_PER_SEAT = 500;
+const PRICE_PER_SEAT = 999;
 
 declare global {
   interface Window {

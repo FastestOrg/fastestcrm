@@ -54,8 +54,8 @@ serve(async (req) => {
     for (const company of expiredCompanies || []) {
       const balance = company.wallets?.[0]?.balance || 0;
       
-      // If balance is too low to auto-renew (e.g. < 500)
-      if (balance < 500) {
+      // If balance is too low to auto-renew (e.g. < 999)
+      if (balance < 999) {
         // Fetch Admin Profile
         const { data: adminProfile } = await supabaseAdmin
           .from("profiles")

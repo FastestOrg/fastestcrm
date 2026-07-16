@@ -154,7 +154,7 @@ export const SoftwareAppSchema = () => {
       "@type": "Offer",
       "price": "0",
       "priceCurrency": "INR",
-      "description": "Free starter plan available. Paid plans start from Rs.10/day/employee."
+      "description": "Free starter plan available. Paid plans start from Rs.999/month/employee."
     },
     "aggregateRating": {
       "@type": "AggregateRating",

@@ -6,7 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const PRICE_PER_SEAT = 500 // Rs. 500 per seat
+const PRICE_PER_SEAT = 999 // Rs. 999 per seat
 
 interface PurchaseRequest {
   quantity: number;

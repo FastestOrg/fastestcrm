@@ -9,7 +9,7 @@ export const comparisonsData: Record<string, any> = {
       { feature: 'AI Integration', us: 'Native Gemini AI', them: 'Add-on only' },
       { feature: 'Setup Time', us: 'Under 5 minutes', them: 'Days to implementation' },
       { feature: 'Auto Dialer', us: 'Built-in (Sequential)', them: 'Requires 3rd party integration' },
-      { feature: 'Price', us: '₹10/day', them: 'Expensive monthly licensing' }
+      { feature: 'Price', us: '₹999/month', them: 'Expensive monthly licensing' }
     ],
     faqs: [
       { question: 'Is it hard to migrate from Zoho to Fastest CRM?', answer: 'No! We offer a one-click CSV import specifically mapped for Zoho data fields.' },

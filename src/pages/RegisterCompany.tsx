@@ -240,7 +240,7 @@ export default function RegisterCompany() {
               </Button>
 
               <p className="text-center text-sm text-muted-foreground">
-                First seat is free. Additional seats at ₹500/month each.
+                First seat is free. Additional seats at ₹999/month each.
               </p>
             </form>
 
