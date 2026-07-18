@@ -36,6 +36,8 @@ import { Plus } from 'lucide-react';
 import { useLeadStatuses, CompanyLeadStatus } from '@/hooks/useLeadStatuses';
 import { StatusReminderDialog } from './StatusReminderDialog';
 import { useLeadsTable } from '@/hooks/useLeadsTable';
+import { Label } from '@/components/ui/label';
+import { useCustomColumns } from '@/hooks/useCustomColumns';
 
 const formSchema = z.object({
     name: z.string().min(2, 'Name must be at least 2 characters'),
@@ -66,6 +68,8 @@ export function AddLeadDialog({ open: controlledOpen, onOpenChange, trigger }: A
     const [pendingStatus, setPendingStatus] = useState<CompanyLeadStatus | null>(null);
     const [reminderAt, setReminderAt] = useState<Date | null>(null);
     const [sendWebPush, setSendWebPush] = useState(false);
+    const { customColumns } = useCustomColumns();
+    const [customFieldValues, setCustomFieldValues] = useState<Record<string, string>>({});
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
@@ -123,6 +127,7 @@ export function AddLeadDialog({ open: controlledOpen, onOpenChange, trigger }: A
                 sales_owner_id: user.id,
                 company_id: company.id,
                 reminder_at: reminderAt ? reminderAt.toISOString() : null,
+                ...customFieldValues,
             };
 
             // Only add industry-specific fields if they exist in the target table or the value is provided
@@ -140,6 +145,7 @@ export function AddLeadDialog({ open: controlledOpen, onOpenChange, trigger }: A
             toast.success('Lead added successfully');
             setOpen(false);
             form.reset();
+            setCustomFieldValues({});
             setReminderAt(null);
         } catch (error: any) {
             console.error('Detailed Error adding lead:', {
@@ -165,111 +171,126 @@ export function AddLeadDialog({ open: controlledOpen, onOpenChange, trigger }: A
                     </Button>
                 </DialogTrigger>
             )}
-            <DialogContent className="sm:max-w-[425px]">
-                <DialogHeader>
+            <DialogContent className="sm:max-w-[450px] max-h-[85vh] flex flex-col overflow-hidden">
+                <DialogHeader className="px-1">
                     <DialogTitle>Add New Lead</DialogTitle>
                     <DialogDescription>
                         Enter the details of the new lead here. Click save when you're done.
                     </DialogDescription>
                 </DialogHeader>
                 <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                        <FormField
-                            control={form.control}
-                            name="name"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Name</FormLabel>
-                                    <FormControl>
-                                        <Input placeholder="John Doe" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                        <FormField
-                            control={form.control}
-                            name="email"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Email</FormLabel>
-                                    <FormControl>
-                                        <Input placeholder="john@example.com" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                        <FormField
-                            control={form.control}
-                            name="phone"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Phone</FormLabel>
-                                    <FormControl>
-                                        <Input placeholder="+91 98765 43210" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                        <FormField
-                            control={form.control}
-                            name="college"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>College</FormLabel>
-                                    <FormControl>
-                                        <Input placeholder="IIT Delhi" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                        <FormField
-                            control={form.control}
-                            name="lead_source"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Lead Source</FormLabel>
-                                    <FormControl>
-                                        <Input placeholder="e.g., Website, Referral, etc." {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                        <FormField
-                            control={form.control}
-                            name="status"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Status</FormLabel>
-                                    <Select
-                                        onValueChange={handleStatusChange}
-                                        value={field.value}
-                                        defaultValue={field.value}
-                                    >
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col flex-1 overflow-hidden">
+                        <div className="flex-1 overflow-y-auto px-1 py-2 space-y-4">
+                            <FormField
+                                control={form.control}
+                                name="name"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Name</FormLabel>
                                         <FormControl>
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select a status" />
-                                            </SelectTrigger>
+                                            <Input placeholder="John Doe" {...field} />
                                         </FormControl>
-                                        <SelectContent>
-                                            {statuses.map((status) => (
-                                                <SelectItem key={status.id} value={status.value} className="capitalize">
-                                                    {status.label}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                        <Button type="submit" className="w-full" disabled={createLead.isPending}>
-                            {createLead.isPending ? 'Adding...' : 'Add Lead'}
-                        </Button>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="email"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Email</FormLabel>
+                                        <FormControl>
+                                            <Input placeholder="john@example.com" {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="phone"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Phone</FormLabel>
+                                        <FormControl>
+                                            <Input placeholder="+91 98765 43210" {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="college"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>College</FormLabel>
+                                        <FormControl>
+                                            <Input placeholder="IIT Delhi" {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="lead_source"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Lead Source</FormLabel>
+                                        <FormControl>
+                                            <Input placeholder="e.g., Website, Referral, etc." {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name="status"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Status</FormLabel>
+                                        <Select
+                                            onValueChange={handleStatusChange}
+                                            value={field.value}
+                                            defaultValue={field.value}
+                                        >
+                                            <FormControl>
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Select a status" />
+                                                </SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent>
+                                                {statuses.map((status) => (
+                                                    <SelectItem key={status.id} value={status.value} className="capitalize">
+                                                        {status.label}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            {customColumns.map((col) => (
+                                <div key={col.id} className="space-y-2">
+                                    <Label htmlFor={`custom-${col.id}`} className="text-sm font-medium">{col.label}</Label>
+                                    <Input
+                                        id={`custom-${col.id}`}
+                                        placeholder={`Enter ${col.label}`}
+                                        value={customFieldValues[col.id] || ''}
+                                        onChange={(e) => setCustomFieldValues(prev => ({ ...prev, [col.id]: e.target.value }))}
+                                    />
+                                </div>
+                            ))}
+                        </div>
+                        <div className="pt-4 border-t mt-4 px-1">
+                            <Button type="submit" className="w-full" disabled={createLead.isPending}>
+                                {createLead.isPending ? 'Adding...' : 'Add Lead'}
+                            </Button>
+                        </div>
                     </form>
                 </Form>
             </DialogContent>

@@ -38,6 +38,7 @@ import { useLeadScoring } from '@/hooks/useLeadScoring';
 import { useCompany } from '@/hooks/useCompany';
 import { AICallerCallButton } from '@/components/ai-caller/AICallerCallButton';
 import { AIAgentHistoryTab } from './AIAgentHistoryTab';
+import { useCustomColumns } from '@/hooks/useCustomColumns';
 
 type Lead = Tables<'leads'> & Partial<Tables<'leads_real_estate'>> & {
     sales_owner?: {
@@ -67,6 +68,7 @@ export function LeadDetailsDialog({ open, onOpenChange, lead, owners, maskLeads 
     const [reminderAt, setReminderAt] = useState<Date | null>(null);
     const [sendWebPush, setSendWebPush] = useState(false);
     const { score, level, breakdown } = useLeadScoring(lead);
+    const { customColumns } = useCustomColumns();
 
     useEffect(() => {
         if (lead) {
@@ -256,6 +258,18 @@ export function LeadDetailsDialog({ open, onOpenChange, lead, owners, maskLeads 
                                             <p className="text-sm">{lead.college}</p>
                                         </div>
                                     )}
+                                    {customColumns.map(col => {
+                                        const val = lead[col.id];
+                                        if (val === undefined || val === null || val === '') return null;
+                                        return (
+                                            <div key={col.id} className="space-y-1">
+                                                <h4 className="text-sm font-medium text-muted-foreground">
+                                                    {col.label}
+                                                </h4>
+                                                <p className="text-sm font-semibold">{val}</p>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             </div>
 

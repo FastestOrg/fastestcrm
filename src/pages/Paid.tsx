@@ -18,6 +18,7 @@ import { toast } from 'sonner';
 import { useUserRole } from '@/hooks/useUserRole';
 import { ColumnConfigDialog } from '@/components/leads/ColumnConfigDialog';
 import { useLeadsTable } from '@/hooks/useLeadsTable';
+import { useCustomColumns } from '@/hooks/useCustomColumns';
 
 type Lead = Tables<'leads'> & {
     sales_owner?: {
@@ -35,8 +36,9 @@ export default function Paid() {
     const [editingLead, setEditingLead] = useState<any>(null);
     const [viewingLead, setViewingLead] = useState<any>(null);
     const { tableName } = useLeadsTable();
+    const { customColumns } = useCustomColumns();
 
-    const isRealEstate = company?.industry === 'real_estate';
+    const isRealEstate = company?.industry === 'real_estate' && !company?.custom_leads_table;
 
     const genericDefaultColumns = [
         { id: 'name', label: 'Name' },
@@ -51,7 +53,8 @@ export default function Paid() {
         { id: 'payment_link', label: 'Payment Link' },
         { id: 'whatsapp', label: 'WhatsApp', defaultHidden: true },
         { id: 'updated_at', label: 'Last Updated', defaultHidden: true },
-        { id: 'company_id', label: 'Company ID', defaultHidden: true }
+        { id: 'company_id', label: 'Company ID', defaultHidden: true },
+        ...customColumns
     ];
 
     const realEstateDefaultColumns = [
@@ -259,6 +262,7 @@ export default function Paid() {
                                     onSelectionChange={setSelectedLeads}
                                     owners={owners}
                                     columnConfig={columnConfig}
+                                    customColumns={customColumns}
                                 />
                             )}
                         </CardContent>

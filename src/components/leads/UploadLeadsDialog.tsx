@@ -19,6 +19,7 @@ import { Upload, FileUp, Download, AlertCircle, CheckCircle } from 'lucide-react
 import Papa from 'papaparse';
 import { Progress } from '@/components/ui/progress';
 import { useQueryClient } from '@tanstack/react-query';
+import { useCustomColumns } from '@/hooks/useCustomColumns';
 
 const BATCH_SIZE = 100; // Process 100 leads at a time
 
@@ -41,6 +42,7 @@ export function UploadLeadsDialog() {
     const { statuses } = useLeadStatuses();
     const queryClient = useQueryClient();
     const abortRef = useRef(false);
+    const { customColumns } = useCustomColumns();
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
@@ -50,10 +52,23 @@ export function UploadLeadsDialog() {
     };
 
     const handleDownloadFormat = () => {
-        const csvContent =
-            'Name,Email,Phone,College,Status,Lead Source,Lead Owner\n' +
-            'John Doe,john@example.com,9876543210,Example University,new,Website,Jane Smith\n' +
-            'Jane Smith,jane@test.com,9123456780,Tech Institute,interested,Referral,John Doe';
+        let headers = ['Name', 'Email', 'Phone', 'College', 'Status', 'Lead Source', 'Lead Owner'];
+        let row1 = ['John Doe', 'john@example.com', '9876543210', 'Example University', 'new', 'Website', 'Jane Smith'];
+        let row2 = ['Jane Smith', 'jane@test.com', '9123456780', 'Tech Institute', 'interested', 'Referral', 'John Doe'];
+
+        if (customColumns && customColumns.length > 0) {
+            customColumns.forEach(col => {
+                headers.push(col.label);
+                row1.push('');
+                row2.push('');
+            });
+        }
+
+        const csvContent = [
+            headers.join(','),
+            row1.join(','),
+            row2.join(',')
+        ].join('\n');
 
         const blob = new Blob([csvContent], { type: 'text/csv' });
         const url = window.URL.createObjectURL(blob);
@@ -104,9 +119,9 @@ export function UploadLeadsDialog() {
                     return {
                         ...currentProgress,
                         processed: currentProgress.processed + leads.length,
-                        success: currentProgress.success + results.filter(r => r === 'success').length,
-                        duplicates: currentProgress.duplicates + results.filter(r => r === 'duplicate').length,
-                        errors: currentProgress.errors + results.filter(r => r === 'error').length,
+                        success: currentProgress.success + results.filter(r === 'success').length,
+                        duplicates: currentProgress.duplicates + results.filter(r === 'duplicate').length,
+                        errors: currentProgress.errors + results.filter(r === 'error').length,
                     };
                 }
                 
@@ -154,7 +169,7 @@ export function UploadLeadsDialog() {
                             ? status.toLowerCase()
                             : 'new';
 
-                        return {
+                        const leadObj: any = {
                             name: row.Name || row.name || 'Unknown',
                             email: row.Email || row.email || null,
                             phone: row.Phone || row.phone || null,
@@ -166,6 +181,21 @@ export function UploadLeadsDialog() {
                             company_id: company.id,
                             _lead_owner_name: row['Lead Owner'] || row.lead_owner || null,
                         };
+
+                        // Dynamically map custom columns from CSV row
+                        if (customColumns && customColumns.length > 0) {
+                            customColumns.forEach(col => {
+                                const rowKey = Object.keys(row).find(key => 
+                                    key.toLowerCase().trim() === col.label.toLowerCase().trim() ||
+                                    key.toLowerCase().trim() === col.id.toLowerCase().trim()
+                                );
+                                if (rowKey) {
+                                    leadObj[col.id] = row[rowKey] || null;
+                                }
+                            });
+                        }
+
+                        return leadObj;
                     }).filter((lead: any) => lead.phone);
 
                     if (leads.length === 0) {

@@ -17,6 +17,7 @@ import { useLeadsTable } from '@/hooks/useLeadsTable';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useCompany } from '@/hooks/useCompany';
 import { ColumnConfigDialog } from '@/components/leads/ColumnConfigDialog';
+import { useCustomColumns } from '@/hooks/useCustomColumns';
 
 export default function PendingPayments() {
     const isMobile = useIsMobile();
@@ -29,6 +30,7 @@ export default function PendingPayments() {
     const [configOpen, setConfigOpen] = useState(false);
     const { data: userRole } = useUserRole();
     const { company } = useCompany();
+    const { customColumns } = useCustomColumns();
 
     const { data: owners } = useQuery({
         queryKey: ['profiles', company?.id],
@@ -58,6 +60,7 @@ export default function PendingPayments() {
         { id: 'phone', label: 'Phone', defaultHidden: true },
         { id: 'whatsapp', label: 'WhatsApp', defaultHidden: true },
         { id: 'updated_at', label: 'Last Updated', defaultHidden: true },
+        ...customColumns,
         { id: 'actions', label: 'Actions' }
     ];
 
@@ -168,7 +171,7 @@ export default function PendingPayments() {
                     </div>
                 );
             default:
-                return null;
+                return lead[columnId] || '-';
         }
     };
 

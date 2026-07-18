@@ -17,6 +17,10 @@ export default function AllLeads() {
     );
   }
 
+  if (company?.custom_leads_table) {
+    return <GenericAllLeads />;
+  }
+
   const industry = (company as any)?.industry?.toLowerCase();
 
   if (industry === 'saas') {

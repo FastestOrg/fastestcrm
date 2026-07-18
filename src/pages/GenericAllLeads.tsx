@@ -28,6 +28,7 @@ import { ColumnConfigDialog } from '@/components/leads/ColumnConfigDialog';
 import { StatusReminderDialog } from '@/components/leads/StatusReminderDialog';
 import { useLeadStatuses, CompanyLeadStatus } from '@/hooks/useLeadStatuses';
 import { LeadsKanbanBoard } from '@/components/leads/LeadsKanbanBoard';
+import { useCustomColumns } from '@/hooks/useCustomColumns';
 
 import { useSearchParams } from 'react-router-dom';
 
@@ -60,6 +61,8 @@ export default function GenericAllLeads() {
     const [reminderDialogOpen, setReminderDialogOpen] = useState(false);
     const [viewMode, setViewMode] = useState<'table' | 'kanban'>('table');
 
+    const { customColumns } = useCustomColumns();
+
     const defaultColumns = [
         { id: 'priority', label: 'Priority' },
         { id: 'name', label: 'Name' },
@@ -74,7 +77,8 @@ export default function GenericAllLeads() {
         { id: 'payment_link', label: 'Payment Link' },
         { id: 'whatsapp', label: 'WhatsApp', defaultHidden: true },
         { id: 'updated_at', label: 'Last Updated', defaultHidden: true },
-        { id: 'company_id', label: 'Company ID', defaultHidden: true }
+        { id: 'company_id', label: 'Company ID', defaultHidden: true },
+        ...customColumns
     ];
 
     const columnConfig = (company as any)?.features?.table_configs?.['all_leads'];
@@ -428,6 +432,7 @@ export default function GenericAllLeads() {
                                 owners={filterOptions?.owners || []}
                                 columnConfig={columnConfig}
                                 maskLeads={company?.mask_leads}
+                                customColumns={customColumns}
                             />
                         </CardContent>
                     </Card>

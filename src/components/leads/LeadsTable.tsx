@@ -66,9 +66,10 @@ interface LeadsTableProps {
   owners?: { label: string; value: string }[];
   columnConfig?: ColumnConfigItem[];
   maskLeads?: boolean;
+  customColumns?: { id: string; label: string }[];
 }
 
-export const LeadsTable = memo(function LeadsTable({ leads, loading, selectedLeads, onSelectionChange, owners = [], columnConfig, maskLeads = false }: LeadsTableProps) {
+export const LeadsTable = memo(function LeadsTable({ leads, loading, selectedLeads, onSelectionChange, owners = [], columnConfig, maskLeads = false, customColumns = [] }: LeadsTableProps) {
   const { products } = useProducts();
   const updateLead = useUpdateLead();
   const { data: userRole } = useUserRole();
@@ -404,10 +405,23 @@ export const LeadsTable = memo(function LeadsTable({ leads, loading, selectedLea
     }
   }), [products, maskLeads, statuses, owners, handleStatusChange, handleProductChange, handleCreatePaymentLink, getStatusColor, getStatusDisplay]);
 
+  const columnDefinitionsWithCustom = useMemo(() => {
+    const base = { ...columnDefinitions };
+    if (customColumns) {
+      customColumns.forEach(col => {
+        base[col.id] = {
+          label: col.label,
+          render: (lead) => (lead as any)[col.id] || '-'
+        };
+      });
+    }
+    return base;
+  }, [columnDefinitions, customColumns]);
+
   const visibleColumnIds = useMemo(() => {
     if (!columnConfig) {
       // Default order
-      return [
+      const baseOrder = [
         'priority',
         'name',
         'email',
@@ -420,9 +434,15 @@ export const LeadsTable = memo(function LeadsTable({ leads, loading, selectedLea
         'product_purchased',
         'payment_link'
       ];
+      if (customColumns) {
+        customColumns.forEach(col => {
+          baseOrder.push(col.id);
+        });
+      }
+      return baseOrder;
     }
-    return columnConfig.filter(c => c.visible).map(c => c.id).filter(id => columnDefinitions[id]);
-  }, [columnConfig, columnDefinitions]);
+    return columnConfig.filter(c => c.visible).map(c => c.id).filter(id => columnDefinitionsWithCustom[id]);
+  }, [columnConfig, columnDefinitionsWithCustom, customColumns]);
 
 
   if (loading) {
@@ -483,7 +503,7 @@ export const LeadsTable = memo(function LeadsTable({ leads, loading, selectedLea
               </TableHead>
               {visibleColumnIds.map(colId => (
                 <TableHead key={colId} className="font-semibold">
-                  {columnDefinitions[colId]?.label}
+                  {columnDefinitionsWithCustom[colId]?.label}
                 </TableHead>
               ))}
               <TableHead className="font-semibold">Actions</TableHead>
@@ -503,7 +523,7 @@ export const LeadsTable = memo(function LeadsTable({ leads, loading, selectedLea
 
                 {visibleColumnIds.map(colId => (
                   <TableCell key={colId}>
-                    {columnDefinitions[colId]?.render(lead)}
+                    {columnDefinitionsWithCustom[colId]?.render(lead)}
                   </TableCell>
                 ))}
 
