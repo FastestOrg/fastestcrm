@@ -9,6 +9,7 @@ import {
     Phone,
     Mail,
     User,
+    UserPlus,
     CheckSquare,
     Video,
 } from 'lucide-react';
@@ -21,7 +22,15 @@ import { useLeadStatuses } from '@/hooks/useLeadStatuses';
 import { LeadDetailsDialog } from '@/components/leads/LeadDetailsDialog';
 import { EditLeadDialog } from '@/components/leads/EditLeadDialog';
 import { RealEstateEditLeadDialog } from '@/industries/real_estate/components/RealEstateEditLeadDialog';
+import { AssignLeadsDialog } from '@/components/leads/AssignLeadsDialog';
+import { RealEstateAssignLeadsDialog } from '@/industries/real_estate/components/RealEstateAssignLeadsDialog';
+import { SaaSAssignLeadsDialog } from '@/industries/saas/components/SaaSAssignLeadsDialog';
+import { HealthcareAssignLeadsDialog } from '@/industries/healthcare/components/HealthcareAssignLeadsDialog';
+import { InsuranceAssignLeadsDialog } from '@/industries/insurance/components/InsuranceAssignLeadsDialog';
+import { TravelAssignLeadsDialog } from '@/industries/travel/components/TravelAssignLeadsDialog';
+import { RescheduleTaskDialog } from '@/components/leads/RescheduleTaskDialog';
 import { useCompany } from '@/hooks/useCompany';
+import { useLeadsTable } from '@/hooks/useLeadsTable';
 import { Tables } from '@/integrations/supabase/types';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -80,12 +89,16 @@ function LeadTaskCard({
     owners = [],
     onView,
     onEdit,
+    onAssign,
+    onReschedule,
 }: {
     lead: TaskLead;
     bucket: TaskBucket;
     owners?: { label: string; value: string }[];
     onView: (lead: TaskLead) => void;
     onEdit: (lead: TaskLead) => void;
+    onAssign: (lead: TaskLead) => void;
+    onReschedule: (lead: TaskLead) => void;
 }) {
     const { getStatusColor, getStatusLabel } = useLeadStatuses();
     const isMeeting = lead.isMeeting;
@@ -98,6 +111,8 @@ function LeadTaskCard({
             : bucket === 'today'
                 ? 'bg-amber-500/10 border-amber-500/20 text-amber-400'
                 : 'bg-blue-500/10 border-blue-500/20 text-blue-400';
+
+    const showAssign = !lead.isMeeting || !!lead.lead_id;
 
     return (
         <Card
@@ -165,19 +180,46 @@ function LeadTaskCard({
 
                 {/* Footer row: time + owner + arrow */}
                 <div className="flex items-center justify-between gap-2">
-                    <span
-                        className={`inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded border ${timeIndicatorClass}`}
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onReschedule(lead);
+                        }}
+                        className={`inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded border cursor-pointer hover:bg-muted/30 transition-all ${timeIndicatorClass}`}
+                        title="Reschedule Task"
                     >
                         <Clock className="h-3 w-3" />
                         {formatReminderDate(lead.reminder_at)}
-                    </span>
+                    </button>
 
-                    <div className="flex items-center gap-2">
-                        {(lead.sales_owner?.full_name || owners.find(o => o.value === lead.sales_owner_id)?.label) && (
-                            <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                                <User className="h-3 w-3" />
-                                {lead.sales_owner?.full_name || owners.find(o => o.value === lead.sales_owner_id)?.label}
-                            </span>
+                    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                        {showAssign ? (
+                            (lead.sales_owner?.full_name || owners.find(o => o.value === lead.sales_owner_id)?.label) ? (
+                                <button
+                                    onClick={() => onAssign(lead)}
+                                    className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors"
+                                    title="Assign Lead"
+                                >
+                                    <User className="h-3 w-3" />
+                                    {lead.sales_owner?.full_name || owners.find(o => o.value === lead.sales_owner_id)?.label}
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={() => onAssign(lead)}
+                                    className="flex items-center gap-1 text-xs text-primary hover:underline"
+                                    title="Assign Lead"
+                                >
+                                    <UserPlus className="h-3 w-3" />
+                                    Assign
+                                </button>
+                            )
+                        ) : (
+                            (lead.sales_owner?.full_name || owners.find(o => o.value === lead.sales_owner_id)?.label) && (
+                                <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                                    <User className="h-3 w-3" />
+                                    {lead.sales_owner?.full_name || owners.find(o => o.value === lead.sales_owner_id)?.label}
+                                </span>
+                            )
                         )}
                         <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
                     </div>
@@ -247,6 +289,8 @@ export default function Tasks() {
 
     const [viewingLead, setViewingLead] = useState<TaskLead | null>(null);
     const [editingLead, setEditingLead] = useState<TaskLead | null>(null);
+    const [assigningLead, setAssigningLead] = useState<TaskLead | null>(null);
+    const [reschedulingLead, setReschedulingLead] = useState<TaskLead | null>(null);
     const { company } = useCompany();
 
     const { data: owners } = useQuery({
@@ -387,6 +431,8 @@ export default function Tasks() {
                             owners={owners || []}
                             onView={handleViewLead}
                             onEdit={setEditingLead}
+                            onAssign={setAssigningLead}
+                            onReschedule={setReschedulingLead}
                         />
                     ))}
                 </div>
@@ -433,6 +479,83 @@ export default function Tasks() {
                         }
                     }}
                     lead={editingLead as unknown as Tables<'leads'>}
+                />
+            )}
+            {assigningLead && company?.industry?.toLowerCase() === 'real_estate' && (
+                <RealEstateAssignLeadsDialog
+                    open={!!assigningLead}
+                    onOpenChange={(open) => !open && setAssigningLead(null)}
+                    selectedLeadIds={[assigningLead.isMeeting ? assigningLead.lead_id! : assigningLead.id]}
+                    onSuccess={() => {
+                        refetch();
+                        setAssigningLead(null);
+                    }}
+                />
+            )}
+            {assigningLead && company?.industry?.toLowerCase() === 'saas' && (
+                <SaaSAssignLeadsDialog
+                    open={!!assigningLead}
+                    onOpenChange={(open) => !open && setAssigningLead(null)}
+                    selectedLeadIds={[assigningLead.isMeeting ? assigningLead.lead_id! : assigningLead.id]}
+                    onSuccess={() => {
+                        refetch();
+                        setAssigningLead(null);
+                    }}
+                />
+            )}
+            {assigningLead && company?.industry?.toLowerCase() === 'healthcare' && (
+                <HealthcareAssignLeadsDialog
+                    open={!!assigningLead}
+                    onOpenChange={(open) => !open && setAssigningLead(null)}
+                    selectedLeadIds={[assigningLead.isMeeting ? assigningLead.lead_id! : assigningLead.id]}
+                    onSuccess={() => {
+                        refetch();
+                        setAssigningLead(null);
+                    }}
+                />
+            )}
+            {assigningLead && company?.industry?.toLowerCase() === 'insurance' && (
+                <InsuranceAssignLeadsDialog
+                    open={!!assigningLead}
+                    onOpenChange={(open) => !open && setAssigningLead(null)}
+                    selectedLeadIds={[assigningLead.isMeeting ? assigningLead.lead_id! : assigningLead.id]}
+                    onSuccess={() => {
+                        refetch();
+                        setAssigningLead(null);
+                    }}
+                />
+            )}
+            {assigningLead && company?.industry?.toLowerCase() === 'travel' && (
+                <TravelAssignLeadsDialog
+                    open={!!assigningLead}
+                    onOpenChange={(open) => !open && setAssigningLead(null)}
+                    selectedLeadIds={[assigningLead.isMeeting ? assigningLead.lead_id! : assigningLead.id]}
+                    onSuccess={() => {
+                        refetch();
+                        setAssigningLead(null);
+                    }}
+                />
+            )}
+            {assigningLead && !['real_estate', 'saas', 'healthcare', 'insurance', 'travel'].includes(company?.industry?.toLowerCase() || '') && (
+                <AssignLeadsDialog
+                    open={!!assigningLead}
+                    onOpenChange={(open) => !open && setAssigningLead(null)}
+                    selectedLeadIds={[assigningLead.isMeeting ? assigningLead.lead_id! : assigningLead.id]}
+                    onSuccess={() => {
+                        refetch();
+                        setAssigningLead(null);
+                    }}
+                />
+            )}
+            {reschedulingLead && (
+                <RescheduleTaskDialog
+                    open={!!reschedulingLead}
+                    onOpenChange={(open) => !open && setReschedulingLead(null)}
+                    lead={reschedulingLead}
+                    onSuccess={() => {
+                        refetch();
+                        setReschedulingLead(null);
+                    }}
                 />
             )}
         </div>
