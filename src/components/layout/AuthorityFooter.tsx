@@ -6,12 +6,68 @@ interface AuthorityFooterProps {
   // Add props if customization is needed, but for SEO consistency, the same footer is better.
 }
 
+const clients = [
+  { name: 'Microsoft', country: 'United States', flag: '🇺🇸', industry: 'Technology' },
+  { name: 'Siemens', country: 'Germany', flag: '🇩🇪', industry: 'Industrial' },
+  { name: 'HSBC', country: 'United Kingdom', flag: '🇬🇧', industry: 'Finance' },
+  { name: 'Toyota', country: 'Japan', flag: '🇯🇵', industry: 'Automotive' },
+  { name: 'L\'Oréal', country: 'France', flag: '🇫🇷', industry: 'Consumer Goods' },
+  { name: 'BHP', country: 'Australia', flag: '🇦🇺', industry: 'Mining' },
+  { name: 'TCS', country: 'India', flag: '🇮🇳', industry: 'IT Services' },
+  { name: 'Weskill', country: 'India', flag: '🇮🇳', industry: 'EdTech' },
+  { name: 'Efficacy', country: 'India', flag: '🇮🇳', industry: 'SaaS' },
+  { name: 'Petrobras', country: 'Brazil', flag: '🇧🇷', industry: 'Energy' },
+  { name: 'DBS Bank', country: 'Singapore', flag: '🇸🇬', industry: 'Finance' },
+  { name: 'Emirates', country: 'United Arab Emirates', flag: '🇦🇪', industry: 'Aviation' },
+  { name: 'Standard Bank', country: 'South Africa', flag: '🇿🇦', industry: 'Finance' },
+  { name: 'Zara (Inditex)', country: 'Spain', flag: '🇪🇸', industry: 'Retail' },
+  { name: 'Cemex', country: 'Mexico', flag: '🇲🇽', industry: 'Materials' },
+  { name: 'Samsung', country: 'South Korea', flag: '🇰🇷', industry: 'Electronics' },
+  { name: 'Xero', country: 'New Zealand', flag: '🇳🇿', industry: 'SaaS' },
+  { name: 'Nestlé', country: 'Switzerland', flag: '🇨🇭', industry: 'Food & Beverage' },
+  { name: 'Accenture', country: 'Ireland', flag: '🇮🇪', industry: 'Consulting' },
+  { name: 'Aramco', country: 'Saudi Arabia', flag: '🇸🇦', industry: 'Energy' }
+];
+
 const AuthorityFooter: React.FC<AuthorityFooterProps> = () => {
   const isWebView = isAndroidWebView();
 
   return (
     <footer className="py-20 px-6 border-t border-border/50 bg-card/30">
       <div className="container mx-auto">
+        {/* ── Global Clients Marquee ── */}
+        <div className="w-full overflow-hidden pb-12 mb-16 border-b border-border/40 relative">
+          {/* Shadow overlays for smooth fade effect at edges */}
+          <div className="absolute top-0 bottom-12 left-0 w-24 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none" />
+          <div className="absolute top-0 bottom-12 right-0 w-24 bg-gradient-to-l from-background to-transparent z-10 pointer-events-none" />
+          
+          <div className="text-center mb-6">
+            <span className="text-xs font-bold text-primary uppercase tracking-widest block mb-2">Trusted Globally</span>
+            <h3 className="text-lg md:text-xl font-bold tracking-tight text-foreground/90" style={{ fontFamily: "'Syne', sans-serif" }}>
+              Powering Sales Teams in 20+ Countries
+            </h3>
+          </div>
+
+          <div className="flex overflow-hidden">
+            <div className="animate-marquee flex gap-6 py-2">
+              {[...clients, ...clients].map((client, idx) => (
+                <div 
+                  key={idx} 
+                  className="flex items-center gap-3 px-5 py-3 rounded-xl bg-card/60 border border-border/50 hover:border-primary/30 hover:bg-card transition-all duration-300 shadow-sm shrink-0 backdrop-blur-sm"
+                >
+                  <span className="text-2xl" role="img" aria-label={client.country}>
+                    {client.flag}
+                  </span>
+                  <div className="text-left">
+                    <p className="text-sm font-bold text-foreground/90 tracking-tight">{client.name}</p>
+                    <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">{client.country} · {client.industry}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-12 mb-16">
           {/* Column 1: Brand */}
           <div className="lg:col-span-2">
@@ -22,7 +78,7 @@ const AuthorityFooter: React.FC<AuthorityFooterProps> = () => {
             <p className="text-muted-foreground leading-relaxed mb-8 max-w-sm">
               {isWebView 
                 ? "The smarter CRM built for high-velocity sales teams. Own your leads, automate your calls, and collect payments."
-                : "India's #1 AI-powered CRM built for high-velocity sales teams. Own your leads, automate your calls, and collect payments at 10X speed."
+                : "Global's #1 Fully AI-powered CRM built for high-velocity sales teams. Own your leads, automate your calls, and collect payments at 10X speed."
               }
             </p>
             <div className="flex flex-col gap-4">

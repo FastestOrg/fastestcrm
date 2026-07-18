@@ -80,9 +80,9 @@ export default function Landing() {
   return (
     <div className="min-h-screen bg-background text-foreground" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       <SEO 
-        title="India's Fastest AI CRM for Sales Teams | Fast CRM for Startups"
-        description="Ranked #1 Fastest CRM in India. Transform your sales with the most advanced AI CRM. Automated lead tracking, fast calling, and Razorpay payments. Built for high-growth Indian sales teams."
-        keywords="Fastest CRM, Fast CRM, AI CRM, best AI CRM India, sales CRM for startups, real estate lead management, edtech sales software, saas crm india, auto dialer crm, sales automation tool india"
+        title="Global First Fully AI CRM for Sales Teams | Fast CRM for Startups"
+        description="Ranked #1 Fully AI CRM. Transform your sales with the most advanced AI CRM. Automated lead tracking, fast calling, and payments. Built for high-growth sales teams."
+        keywords="Fully AI CRM, Global AI CRM, AI CRM, best AI CRM, sales CRM for startups, real estate lead management, edtech sales software, saas crm, auto dialer crm, sales automation tool"
       />
       <SoftwareAppSchema />
       <OrganizationSchema />
@@ -187,7 +187,7 @@ export default function Landing() {
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
               </span>
               <span className="text-xs font-semibold tracking-wide text-foreground/80 uppercase">
-                India's First AI-Powered CRM
+                Global's First Fully AI-Powered CRM
               </span>
               <div className="h-4 w-px bg-border/50 mx-1" />
               <a 
@@ -207,14 +207,14 @@ export default function Landing() {
             className="text-5xl md:text-7xl lg:text-8xl font-bold mb-8 tracking-tight animate-in fade-in slide-in-from-bottom-6 duration-700"
             style={{ fontFamily: "'Syne', sans-serif", letterSpacing: '-0.03em' }}
           >
-            India's <span className="gradient-text">Fastest AI CRM</span> for{' '}
+            Global First <span className="gradient-text">Fully AI CRM</span> for{' '}
             <span className="block mt-2">
               Leads • Calls • Payments
             </span>
           </h1>
 
           <p className="text-lg md:text-xl text-muted-foreground mb-5 max-w-2xl mx-auto leading-relaxed animate-in fade-in slide-in-from-bottom-6 duration-700 delay-100">
-            Automate your entire sales pipeline with the smartest CRM built for the fastest Indian sales teams.
+            Automate your entire sales pipeline with the smartest CRM built for high-growth sales teams.
           </p>
 
           {/* Pricing pill */}

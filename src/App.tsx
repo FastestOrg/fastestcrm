@@ -99,6 +99,7 @@ const AICallerPage = lazy(() => import("./pages/AICallerPage"));
 const LandingPages = lazy(() => import("./pages/LandingPages"));
 const LandingPageBuilder = lazy(() => import("./pages/LandingPageBuilder"));
 const PublicLandingPage = lazy(() => import("./pages/PublicLandingPage"));
+const About = lazy(() => import("./pages/About"));
 
 import { useCompany } from "@/hooks/useCompany";
 import { solutionsData } from "./data/solutions";
@@ -250,6 +251,7 @@ function AppRoutes() {
         <Route path="/glossary/:slug" element={<GlossaryTermPage />} />
         <Route path="/tools" element={<SalesToolsPage />} />
         <Route path="/press" element={<PressKitPage />} />
+        <Route path="/about" element={<About />} />
         
         <Route path="/app" element={<RedirectToApp />} />
         <Route path="/documentation" element={<Documentation />} />
