@@ -50,7 +50,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 export default function Dashboard() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [reportLimit, setReportLimit] = useState<number>(1000);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
@@ -76,7 +76,7 @@ export default function Dashboard() {
     return 'Good Evening';
   }, []);
 
-  const userName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Sales Champ';
+  const userName = profile?.full_name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Sales Champ';
 
   const { 
     leadsToday, revenueToday, totalRevenue, projectedRevenue, pipelineValue, totalIncentive, stats 

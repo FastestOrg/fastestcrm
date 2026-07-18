@@ -105,6 +105,7 @@ export default function DashboardLayout({
 }: DashboardLayoutProps) {
   const {
     user,
+    profile,
     loading,
     signOut
   } = useAuth();
@@ -392,7 +393,7 @@ export default function DashboardLayout({
                 {!isCollapsed && (
                     <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate text-sidebar-foreground">
-                            {user.user_metadata?.full_name || user.email}
+                            {profile?.full_name || user.user_metadata?.full_name || user.email}
                         </p>
                         <p className="text-xs text-muted-foreground truncate">{user.email}</p>
                     </div>

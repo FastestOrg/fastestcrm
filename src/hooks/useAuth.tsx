@@ -43,10 +43,22 @@ function removeSharedCookie(key: string) {
 
 // ─── Context type ─────────────────────────────────────────────────────────────
 
+export interface Profile {
+  id: string;
+  email: string | null;
+  full_name: string | null;
+  phone: string | null;
+  avatar_url: string | null;
+  company_id: string | null;
+  [key: string]: any;
+}
+
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  profile: Profile | null;
+  refreshProfile: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: AuthError | null }>;
   signOut: () => Promise<void>;
@@ -60,34 +72,124 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState<Profile | null>(null);
+
+  // ── Fetch Profile Helper ──────────────────────────────────────────────────
+
+  const fetchProfile = useCallback(async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+      
+      if (error) {
+        console.error('[Auth] Error fetching profile:', error);
+        setProfile(null);
+      } else {
+        setProfile(data);
+      }
+    } catch (err) {
+      console.error('[Auth] Error in fetchProfile:', err);
+      setProfile(null);
+    }
+  }, []);
+
+  const refreshProfile = useCallback(async () => {
+    if (user?.id) {
+      await fetchProfile(user.id);
+    }
+  }, [user?.id, fetchProfile]);
 
   // ── Auth state subscription ───────────────────────────────────────────────
 
   useEffect(() => {
+    let active = true;
+
+    const handleAuthChange = async (newUser: User | null, newSession: Session | null) => {
+      setSession(newSession);
+      setUser(newUser);
+
+      if (newUser) {
+        try {
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', newUser.id)
+            .single();
+          
+          if (active) {
+            if (error) {
+              console.error('[Auth] Error fetching profile:', error);
+              setProfile(null);
+            } else {
+              setProfile(data);
+            }
+          }
+        } catch (err) {
+          console.error('[Auth] Error in handleAuthChange profile fetch:', err);
+          if (active) setProfile(null);
+        }
+      } else {
+        if (active) setProfile(null);
+      }
+      
+      if (active) setLoading(false);
+    };
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, newSession) => {
-        setSession(newSession);
-        setUser(newSession?.user ?? null);
-        setLoading(false);
+        handleAuthChange(newSession?.user ?? null, newSession);
       }
     );
 
     supabase.auth
       .getSession()
       .then(({ data: { session: existingSession } }) => {
-        setSession(existingSession);
-        setUser(existingSession?.user ?? null);
-        setLoading(false);
+        if (active) {
+          handleAuthChange(existingSession?.user ?? null, existingSession);
+        }
       })
       .catch((err) => {
         console.error('[Auth] getSession failed:', err);
-        setLoading(false);
+        if (active) setLoading(false);
       });
 
     return () => {
+      active = false;
       subscription.unsubscribe();
     };
   }, []);
+
+  // ── Profile Real-time sync ───────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!user?.id) {
+      return;
+    }
+
+    const channel = supabase
+      .channel(`public:profiles:id=eq.${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${user.id}`,
+        },
+        (payload) => {
+          console.log('[Auth] Profile real-time update:', payload.new);
+          setProfile(payload.new as Profile);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id]);
 
   // ── Public auth actions ───────────────────────────────────────────────────
 
@@ -121,7 +223,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, session, loading, signIn, signUp, signOut }}
+      value={{ user, session, loading, profile, refreshProfile, signIn, signUp, signOut }}
     >
       {children}
     </AuthContext.Provider>

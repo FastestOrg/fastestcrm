@@ -250,8 +250,8 @@ export default function AIMissionControl() {
             {/* ─── AGENT VITALITY GRID ─── */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {[
-                    { name: 'Fastest Scout', status: 'Scanning Market', efficiency: 98, icon: Globe, color: 'text-purple-400', bg: 'bg-purple-500/10', path: '/dashboard/market-scout', task: 'Monitoring TechCrunch triggers' },
-                    { name: 'Growth Hacker', status: 'Loop Optimization', efficiency: 92, icon: Wand2, color: 'text-blue-400', bg: 'bg-blue-500/10', path: '/dashboard/lg', task: 'Analyzing lead velocity' },
+                    { name: 'Fastest Scout', status: 'Scanning Market', efficiency: 98, icon: Globe, color: 'text-purple-400', bg: 'bg-purple-500/10', path: '/dashboard/fastest-scout', task: 'Monitoring TechCrunch triggers' },
+                    { name: 'Growth Hacker', status: 'Loop Optimization', efficiency: 92, icon: Wand2, color: 'text-blue-400', bg: 'bg-blue-500/10', path: '/dashboard/ai-growth-hacker', task: 'Analyzing lead velocity' },
                     { name: 'Closing Assistant', status: 'Negotiating', efficiency: 87, icon: Sparkles, color: 'text-emerald-400', bg: 'bg-emerald-500/10', path: '/dashboard/fastsend', task: 'Managing 12 active threads' },
                     { name: 'Ops Manager', status: 'Auditing Leads', efficiency: 100, icon: ShieldCheck, color: 'text-amber-400', bg: 'bg-amber-500/10', path: '/dashboard/ai-ops', task: 'Checking stagnation flags' },
                 ].map((agent) => (

@@ -89,6 +89,7 @@ const RevenueForecast = lazy(() => import("./pages/RevenueForecast"));
 const CustomerHealth = lazy(() => import("./pages/CustomerHealth"));
 const PersonalizationEngine = lazy(() => import("./pages/PersonalizationEngine"));
 const ManageAIEmployees = lazy(() => import("./pages/ManageAIEmployees"));
+const LeadGeneration = lazy(() => import("./pages/LeadGeneration"));
 const AIGrowthHacker = lazy(() => import("./pages/AIGrowthHacker"));
 const MarketScout = lazy(() => import("./pages/MarketScout"));
 const FastestScout = lazy(() => import("./pages/FastestScout"));
@@ -260,7 +261,8 @@ function AppRoutes() {
         {/* Dashboard Routes — Wrapped in Layout & Guards */}
         <Route element={<Protected><SubdomainAccessGuard><AppLayout /></SubdomainAccessGuard></Protected>}>
           <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/dashboard/lg" element={<AIGrowthHacker />} />
+          <Route path="/dashboard/lg" element={<LeadGeneration />} />
+          <Route path="/dashboard/ai-growth-hacker" element={<AIGrowthHacker />} />
           <Route path="/dashboard/leads" element={<AllLeads />} />
           <Route path="/dashboard/interested" element={<Interested />} />
           <Route path="/dashboard/paid" element={<Paid />} />

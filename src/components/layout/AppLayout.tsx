@@ -162,7 +162,7 @@ const navItems: NavItem[] = [{
 }, {
     icon: Wand2,
     label: 'AI Growth Hacker',
-    path: '/dashboard/lg',
+    path: '/dashboard/ai-growth-hacker',
     section: 'FastestAI'
 }, {
     icon: Sparkles,
@@ -246,6 +246,7 @@ const navItems: NavItem[] = [{
 export default function AppLayout() {
     const {
         user,
+        profile,
         loading,
         signOut
     } = useAuth();
@@ -1114,7 +1115,7 @@ export default function AppLayout() {
                         {!isCollapsed && (
                             <div className="flex-1 min-w-0">
                                 <p className="text-sm font-medium truncate text-sidebar-foreground">
-                                    {user.user_metadata?.full_name || user.email}
+                                    {profile?.full_name || user.user_metadata?.full_name || user.email}
                                 </p>
                                 <p className="text-xs text-muted-foreground truncate">{user.email}</p>
                             </div>

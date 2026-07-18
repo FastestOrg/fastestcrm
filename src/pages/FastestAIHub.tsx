@@ -79,7 +79,7 @@ const AI_FEATURES = [
   {
     icon: Rocket,
     label: 'AI Growth Hacker',
-    path: '/dashboard/lg',
+    path: '/dashboard/ai-growth-hacker',
     description: 'Autonomous growth engineering. AI analyzes conversion loops and scales your viral reach.',
     color: 'from-emerald-500 to-teal-600',
     badge: 'NEW',
