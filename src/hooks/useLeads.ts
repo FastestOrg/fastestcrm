@@ -26,6 +26,7 @@ interface UseLeadsOptions {
   fetchAll?: boolean;
   limit?: number;
   pendingPaymentOnly?: boolean;
+  dynamicFilters?: Record<string, string[]>;
 }
 
 async function fetchLeadsData({
@@ -40,7 +41,8 @@ async function fetchLeadsData({
   page,
   pageSize,
   fetchAll,
-  limit
+  limit,
+  dynamicFilters
 }: {
   tableName: string;
   companyId: string;
@@ -54,6 +56,7 @@ async function fetchLeadsData({
   pageSize: number;
   fetchAll: boolean;
   limit?: number;
+  dynamicFilters?: Record<string, string[]>;
 }): Promise<{ leads: Lead[]; count: number }> {
   // Early exit if no company context
   if (!companyId) {
@@ -110,6 +113,14 @@ async function fetchLeadsData({
 
   if (productFilter && productFilter.length > 0) {
     query = query.in('product_purchased', productFilter);
+  }
+
+  if (dynamicFilters) {
+    Object.entries(dynamicFilters).forEach(([colId, values]) => {
+      if (values && values.length > 0) {
+        query = query.in(colId, values);
+      }
+    });
   }
 
   if (pendingPaymentOnly) {
@@ -178,6 +189,13 @@ async function fetchLeadsData({
         }
       }
       if (productFilter && productFilter.length > 0) chunkQuery = chunkQuery.in('product_purchased', productFilter);
+      if (dynamicFilters) {
+        Object.entries(dynamicFilters).forEach(([colId, values]) => {
+          if (values && values.length > 0) {
+            chunkQuery = chunkQuery.in(colId, values);
+          }
+        });
+      }
       if (pendingPaymentOnly) chunkQuery = chunkQuery.gt('revenue_received', 0);
       if (search) {
         chunkQuery = chunkQuery.or(`name.ilike.%${search}%,email.ilike.%${search}%,phone.ilike.%${search}%,college.ilike.%${search}%`);
@@ -222,11 +240,11 @@ async function fetchLeadsData({
   return { leads: (data as unknown as Lead[]) || [], count: count || 0 };
 }
 
-export function useLeads({ search, statusFilter, ownerFilter, activeOwnerIds, productFilter, pendingPaymentOnly, page = 1, pageSize = 25, fetchAll = false, limit }: UseLeadsOptions = {}) {
+export function useLeads({ search, statusFilter, ownerFilter, activeOwnerIds, productFilter, pendingPaymentOnly, page = 1, pageSize = 25, fetchAll = false, limit, dynamicFilters }: UseLeadsOptions = {}) {
   const queryClient = useQueryClient();
   const { tableName, companyId, loading: tableLoading } = useLeadsTable();
 
-  const queryKey = ['leads', search, statusFilter, ownerFilter, activeOwnerIds, productFilter, pendingPaymentOnly, page, pageSize, fetchAll, limit, tableName, companyId];
+  const queryKey = ['leads', search, statusFilter, ownerFilter, activeOwnerIds, productFilter, pendingPaymentOnly, page, pageSize, fetchAll, limit, tableName, companyId, JSON.stringify(dynamicFilters)];
 
   const query = useQuery({
     queryKey,
@@ -242,7 +260,8 @@ export function useLeads({ search, statusFilter, ownerFilter, activeOwnerIds, pr
       page,
       pageSize,
       fetchAll,
-      limit
+      limit,
+      dynamicFilters
     }),
     enabled: !tableLoading && !!companyId,
     placeholderData: (previousData) => previousData,
@@ -255,7 +274,7 @@ export function useLeads({ search, statusFilter, ownerFilter, activeOwnerIds, pr
   useEffect(() => {
     if (!fetchAll && query.data && query.data.count > page * pageSize && companyId && tableName) {
       const nextPage = page + 1;
-      const nextQueryKey = ['leads', search, statusFilter, ownerFilter, activeOwnerIds, productFilter, pendingPaymentOnly, nextPage, pageSize, fetchAll, limit, tableName, companyId];
+      const nextQueryKey = ['leads', search, statusFilter, ownerFilter, activeOwnerIds, productFilter, pendingPaymentOnly, nextPage, pageSize, fetchAll, limit, tableName, companyId, JSON.stringify(dynamicFilters)];
       queryClient.prefetchQuery({
         queryKey: nextQueryKey,
         queryFn: () => fetchLeadsData({
@@ -270,12 +289,13 @@ export function useLeads({ search, statusFilter, ownerFilter, activeOwnerIds, pr
           page: nextPage,
           pageSize,
           fetchAll,
-          limit
+          limit,
+          dynamicFilters
         }),
         staleTime: 60000,
       });
     }
-  }, [query.data, page, pageSize, fetchAll, search, statusFilter, ownerFilter, activeOwnerIds, productFilter, pendingPaymentOnly, tableName, companyId, queryClient]);
+  }, [query.data, page, pageSize, fetchAll, search, statusFilter, ownerFilter, activeOwnerIds, productFilter, pendingPaymentOnly, tableName, companyId, queryClient, JSON.stringify(dynamicFilters)]);
 
   return {
     ...query,

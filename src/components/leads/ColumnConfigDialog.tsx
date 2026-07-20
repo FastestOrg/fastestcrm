@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
 import { GripVertical } from 'lucide-react';
 import { useCompany } from '@/hooks/useCompany';
 import { supabase } from '@/integrations/supabase/client';
@@ -35,11 +36,13 @@ interface ColumnConfig {
     id: string;
     label: string;
     visible: boolean;
+    filterable?: boolean;
 }
 
 interface StoredConfig {
     id: string;
     visible: boolean;
+    filterable?: boolean;
 }
 
 interface ColumnConfigDialogProps {
@@ -50,7 +53,21 @@ interface ColumnConfigDialogProps {
     onConfigChange?: () => void;
 }
 
-function SortableItem({ id, label, visible, onToggle }: { id: string, label: string, visible: boolean, onToggle: () => void }) {
+function SortableItem({
+    id,
+    label,
+    visible,
+    filterable,
+    onToggleVisible,
+    onToggleFilterable
+}: {
+    id: string;
+    label: string;
+    visible: boolean;
+    filterable: boolean;
+    onToggleVisible: () => void;
+    onToggleFilterable: () => void;
+}) {
     const {
         attributes,
         listeners,
@@ -68,19 +85,40 @@ function SortableItem({ id, label, visible, onToggle }: { id: string, label: str
         <div
             ref={setNodeRef}
             style={style}
-            className="flex items-center gap-3 p-3 bg-card border rounded-md mb-2"
+            className="flex items-center justify-between p-3 bg-card border rounded-md mb-2 gap-4"
         >
-            <div {...attributes} {...listeners} className="cursor-grab text-muted-foreground hover:text-foreground">
-                <GripVertical className="h-5 w-5" />
+            <div className="flex items-center gap-3 min-w-0">
+                <div {...attributes} {...listeners} className="cursor-grab text-muted-foreground hover:text-foreground shrink-0">
+                    <GripVertical className="h-5 w-5" />
+                </div>
+                <span className="font-medium text-sm truncate">
+                    {label}
+                </span>
             </div>
-            <Checkbox
-                checked={visible}
-                onCheckedChange={onToggle}
-                id={`col-${id}`}
-            />
-            <label htmlFor={`col-${id}`} className="flex-1 font-medium cursor-pointer text-sm">
-                {label}
-            </label>
+
+            <div className="flex items-center gap-6 shrink-0">
+                <div className="flex items-center gap-1.5">
+                    <Checkbox
+                        checked={visible}
+                        onCheckedChange={onToggleVisible}
+                        id={`col-vis-${id}`}
+                    />
+                    <label htmlFor={`col-vis-${id}`} className="text-xs text-muted-foreground cursor-pointer select-none">
+                        Visible
+                    </label>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                    <Switch
+                        checked={filterable}
+                        onCheckedChange={onToggleFilterable}
+                        id={`col-filt-${id}`}
+                    />
+                    <label htmlFor={`col-filt-${id}`} className="text-xs text-muted-foreground cursor-pointer select-none">
+                        Filter
+                    </label>
+                </div>
+            </div>
         </div>
     );
 }
@@ -109,6 +147,7 @@ export function ColumnConfigDialog({
             const storedConfigs = (company.features as any)?.table_configs?.[tableId] as StoredConfig[] | undefined;
 
             let initialColumns: ColumnConfig[] = [];
+            const isPredefinedFilter = (id: string) => id === 'owner' || id === 'status' || id === 'product_purchased';
 
             if (storedConfigs && Array.isArray(storedConfigs)) {
                 // 1. Add stored columns in order
@@ -118,6 +157,7 @@ export function ColumnConfigDialog({
                         id: sc.id,
                         label: def?.label || sc.id, // Fallback if label missing (shouldn't happen often)
                         visible: sc.visible,
+                        filterable: sc.filterable !== undefined ? sc.filterable : isPredefinedFilter(sc.id),
                     };
                 }).filter(c => defaultColumns.some(dc => dc.id === c.id)); // Filter out columns that no longer exist in code
 
@@ -125,12 +165,22 @@ export function ColumnConfigDialog({
                 const storedIds = new Set(storedConfigs.map(sc => sc.id));
                 const newColumns = defaultColumns
                     .filter(dc => !storedIds.has(dc.id))
-                    .map(dc => ({ id: dc.id, label: dc.label, visible: !dc.defaultHidden }));
+                    .map(dc => ({
+                        id: dc.id,
+                        label: dc.label,
+                        visible: !dc.defaultHidden,
+                        filterable: isPredefinedFilter(dc.id),
+                    }));
 
                 initialColumns = [...initialColumns, ...newColumns];
             } else {
                 // No config stored, use defaults
-                initialColumns = defaultColumns.map(dc => ({ id: dc.id, label: dc.label, visible: !dc.defaultHidden }));
+                initialColumns = defaultColumns.map(dc => ({
+                    id: dc.id,
+                    label: dc.label,
+                    visible: !dc.defaultHidden,
+                    filterable: isPredefinedFilter(dc.id),
+                }));
             }
 
             setColumns(initialColumns);
@@ -155,6 +205,12 @@ export function ColumnConfigDialog({
         ));
     };
 
+    const toggleFilterable = (id: string) => {
+        setColumns(prev => prev.map(col =>
+            col.id === id ? { ...col, filterable: !col.filterable } : col
+        ));
+    };
+
     const handleSave = async () => {
         if (!company) return;
         setSaving(true);
@@ -162,8 +218,8 @@ export function ColumnConfigDialog({
             const currentFeatures = (company.features as any) || {};
             const currentTableConfigs = currentFeatures.table_configs || {};
 
-            // Prepare config to save: minimal data (id, visible)
-            const configToSave = columns.map(({ id, visible }) => ({ id, visible }));
+            // Prepare config to save: minimal data (id, visible, filterable)
+            const configToSave = columns.map(({ id, visible, filterable }) => ({ id, visible, filterable }));
 
             const newFeatures = {
                 ...currentFeatures,
@@ -193,8 +249,14 @@ export function ColumnConfigDialog({
     };
 
     const handleReset = () => {
-        // Reset to default order and all visible
-        setColumns(defaultColumns.map(dc => ({ id: dc.id, label: dc.label, visible: !dc.defaultHidden })));
+        const isPredefinedFilter = (id: string) => id === 'owner' || id === 'status' || id === 'product_purchased';
+        // Reset to default order, default visibility and default filters
+        setColumns(defaultColumns.map(dc => ({
+            id: dc.id,
+            label: dc.label,
+            visible: !dc.defaultHidden,
+            filterable: isPredefinedFilter(dc.id)
+        })));
     };
 
     return (
@@ -223,7 +285,9 @@ export function ColumnConfigDialog({
                                     id={column.id}
                                     label={column.label}
                                     visible={column.visible}
-                                    onToggle={() => toggleVisibility(column.id)}
+                                    filterable={column.filterable || false}
+                                    onToggleVisible={() => toggleVisibility(column.id)}
+                                    onToggleFilterable={() => toggleFilterable(column.id)}
                                 />
                             ))}
                         </SortableContext>

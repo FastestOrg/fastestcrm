@@ -179,7 +179,7 @@ export default function DashboardLayout({
   });
 
   if (loading) {
-    return <div className="min-h-screen bg-background dark flex">
+    return <div className="min-h-screen bg-background flex">
       {!isMobile && <div className="w-64 bg-sidebar border-r border-sidebar-border p-4">
         <Skeleton className="h-10 w-full mb-8" />
         {[...Array(8)].map((_, i) => <Skeleton key={i} className="h-10 w-full mb-2" />)}
@@ -195,7 +195,7 @@ export default function DashboardLayout({
   if (!user) return null;
 
   return <TooltipProvider delayDuration={0}>
-    <div className="h-screen overflow-hidden bg-background dark flex">
+    <div className="h-screen overflow-hidden bg-background flex">
       {/* Desktop Sidebar */}
       {!isMobile && <aside className={`${isCollapsed ? 'w-20' : 'w-64'} transition-all duration-300 ease-in-out bg-sidebar border-r border-sidebar-border flex flex-col shrink-0`}>
         <div className={`p-4 border-b border-sidebar-border flex items-center ${isCollapsed ? 'justify-center flex-col gap-2' : 'justify-between'}`}>

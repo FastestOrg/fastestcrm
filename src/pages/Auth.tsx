@@ -125,7 +125,7 @@ export default function Auth() {
 
   if (isWorkspaceDomain && isSubdomainLoading) {
     return (
-      <div className="min-h-screen bg-background dark flex items-center justify-center p-6 relative overflow-hidden">
+      <div className="min-h-screen bg-background flex items-center justify-center p-6 relative overflow-hidden">
         {/* Background effects */}
         <div className="absolute inset-0 dot-grid-bg opacity-40" />
         <div className="absolute top-1/4 left-1/5 w-80 h-80 bg-primary/15 rounded-full blur-[90px] animate-float" />
@@ -140,7 +140,7 @@ export default function Auth() {
   }
 
   return (
-    <div className="min-h-screen bg-background dark flex items-center justify-center p-6 relative overflow-hidden">
+    <div className="min-h-screen bg-background flex items-center justify-center p-6 relative overflow-hidden">
       {/* Background effects */}
       <div className="absolute inset-0 dot-grid-bg opacity-40" />
       <div className="absolute top-1/4 left-1/5 w-80 h-80 bg-primary/15 rounded-full blur-[90px] animate-float" />

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 // DashboardLayout removed
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, LayoutGrid, Table2 } from 'lucide-react';
 
@@ -49,7 +50,7 @@ export default function GenericAllLeads() {
     const [localSearch, setLocalSearch] = useState(searchQuery);
     const debouncedSearchQuery = useDebounce(localSearch, 500);
 
-    const pageSize = 25;
+    const pageSize = parseInt(searchParams.get('pageSize') || '25');
     const [selectedLeads, setSelectedLeads] = useState<Set<string>>(new Set());
     const [assignDialogOpen, setAssignDialogOpen] = useState(false);
     const [editingLead, setEditingLead] = useState<any>(null);
@@ -147,14 +148,36 @@ export default function GenericAllLeads() {
         });
     }
 
+    const handlePageSizeChange = (newSize: string) => {
+        setSearchParams(prev => {
+            const newParams = new URLSearchParams(prev);
+            newParams.set('pageSize', newSize);
+            newParams.set('page', '1');
+            return newParams;
+        });
+    };
+
     // Fetch filter options — all queries run in parallel via Promise.all
     const { data: filterOptions } = useQuery({
-        queryKey: ['leadsFilterOptions', company?.id],
+        queryKey: ['leadsFilterOptions', company?.id, tableName, JSON.stringify(columnConfig)],
         queryFn: async () => {
-            if (!company?.id) return null;
+            if (!company?.id || !tableName) return null;
 
-            // Fire all three independent queries at the same time
-            const [ownersResult, productsResult, statusesResult] = await Promise.all([
+            const isPredefinedFilter = (id: string) => id === 'owner' || id === 'status' || id === 'product_purchased';
+            const filterableCols = (columnConfig || defaultColumns)
+                .filter((c: any) => c.filterable || (columnConfig ? false : isPredefinedFilter(c.id)))
+                .map((c: any) => {
+                    const def = defaultColumns.find(dc => dc.id === c.id);
+                    return {
+                        ...c,
+                        label: def?.label || c.id
+                    };
+                });
+
+            const dynamicColsToFetch = filterableCols.filter((c: any) => !isPredefinedFilter(c.id));
+
+            // Fire all standard and dynamic queries at the same time
+            const [ownersResult, productsResult, statusesResult, ...dynamicResults] = await Promise.all([
                 supabase
                     .from('profiles')
                     .select('id, full_name')
@@ -170,6 +193,38 @@ export default function GenericAllLeads() {
                     .select('label, value, category, order_index')
                     .eq('company_id', company.id)
                     .order('order_index'),
+                ...dynamicColsToFetch.map(async (c: any) => {
+                    try {
+                        const { data, error } = await supabase
+                            .from(tableName as any)
+                            .select(c.id)
+                            .eq('company_id', company.id)
+                            .not(c.id, 'is', null);
+                        if (error) {
+                            console.error(`Error fetching dynamic values for ${c.id}:`, error);
+                            return { id: c.id, options: [] };
+                        }
+                        const uniqueVals = Array.from(new Set(
+                            (data || []).map((r: any) => {
+                                const val = r[c.id];
+                                if (typeof val === 'boolean') return val ? 'true' : 'false';
+                                return val;
+                            })
+                        )).filter((val: any) => val !== undefined && val !== null && val !== '')
+                         .sort();
+                        
+                        return {
+                            id: c.id,
+                            options: uniqueVals.map((val: any) => ({
+                                label: String(val).replace(/_/g, ' ').replace(/\b\w/g, (ch) => ch.toUpperCase()),
+                                value: String(val)
+                            }))
+                        };
+                    } catch (err) {
+                        console.error(`Error in dynamic filter fetch for ${c.id}:`, err);
+                        return { id: c.id, options: [] };
+                    }
+                })
             ]);
 
             // Filter owners to only those with active role entries
@@ -195,17 +250,89 @@ export default function GenericAllLeads() {
                 }))
                 : Constants.public.Enums.lead_status.map(s => ({ label: s.replace('_', ' '), value: s, group: 'System' }));
 
+            const dynamicOptionsMap: Record<string, { label: string; value: string }[]> = {};
+            dynamicResults.forEach((res: any) => {
+                if (res) {
+                    dynamicOptionsMap[res.id] = res.options;
+                }
+            });
+
             return {
                 owners: [
                     { label: 'Unassigned', value: 'unassigned' },
                     ...activeOwners.map(o => ({ label: o.full_name || 'Unknown', value: o.id })),
                 ],
                 products: Array.from(new Set(((products as any[]) || []).map(p => p.name))).map(name => ({ label: name, value: name })),
-                statuses: statuses
+                statuses: statuses,
+                dynamic: dynamicOptionsMap
             };
         },
-        enabled: !!company?.id,
+        enabled: !!company?.id && !!tableName,
         staleTime: 1000 * 60 * 5, // Cache filter options for 5 minutes
+    });
+
+    const isPredefinedFilter = (id: string) => id === 'owner' || id === 'status' || id === 'product_purchased';
+
+    const filterableColumns = (columnConfig || defaultColumns)
+        .filter((c: any) => c.filterable || (columnConfig ? false : isPredefinedFilter(c.id)))
+        .map((c: any) => {
+            const def = defaultColumns.find(dc => dc.id === c.id);
+            return {
+                ...c,
+                label: def?.label || c.id
+            };
+        });
+
+    // Construct dynamic filters object for useLeads/Kanban (excludes owner, status, product_purchased)
+    const dynamicFilters: Record<string, string[]> = {};
+    filterableColumns.forEach((col: any) => {
+        if (!isPredefinedFilter(col.id)) {
+            const vals = searchParams.getAll(col.id);
+            if (vals.length > 0) {
+                dynamicFilters[col.id] = vals;
+            }
+        }
+    });
+
+    // Create the activeFilters list for MobileLeadsHeader
+    const activeFilters = filterableColumns.map((col: any) => {
+        let options: { label: string; value: string; group?: string }[] = [];
+        let selectedValues = new Set<string>();
+        let onSelectionChange = (newValues: Set<string>) => {};
+
+        if (col.id === 'owner') {
+            options = filterOptions?.owners || [];
+            selectedValues = selectedOwners;
+            onSelectionChange = handleSetOwners;
+        } else if (col.id === 'status') {
+            options = filterOptions?.statuses || [];
+            selectedValues = selectedStatuses;
+            onSelectionChange = handleSetStatuses;
+        } else if (col.id === 'product_purchased') {
+            options = filterOptions?.products || [];
+            selectedValues = selectedProducts;
+            onSelectionChange = handleSetProducts;
+        } else {
+            options = filterOptions?.dynamic?.[col.id] || [];
+            selectedValues = new Set(searchParams.getAll(col.id));
+            onSelectionChange = (newValues: Set<string>) => {
+                setSearchParams(prev => {
+                    const newParams = new URLSearchParams(prev);
+                    newParams.delete(col.id);
+                    newValues.forEach(val => newParams.append(col.id, val));
+                    newParams.set('page', '1');
+                    return newParams;
+                });
+            };
+        }
+
+        return {
+            id: col.id,
+            label: col.label,
+            options,
+            selectedValues,
+            onSelectionChange
+        };
     });
 
     // Active owner IDs (excludes the 'unassigned' sentinel) — used by useLeads to build the
@@ -222,6 +349,7 @@ export default function GenericAllLeads() {
         productFilter: Array.from(selectedProducts),
         page,
         pageSize,
+        dynamicFilters,
     });
     const leads = leadsData?.leads || [];
     const totalCount = leadsData?.count || 0;
@@ -338,17 +466,7 @@ export default function GenericAllLeads() {
                     title="All Leads"
                     searchValue={localSearch}
                     onSearchChange={setLocalSearch}
-                    filterOptions={filterOptions ? {
-                        owners: filterOptions.owners,
-                        statuses: filterOptions.statuses,
-                        products: filterOptions.products
-                    } : undefined}
-                    selectedOwners={selectedOwners}
-                    onOwnersChange={handleSetOwners}
-                    selectedStatuses={selectedStatuses}
-                    onStatusesChange={handleSetStatuses}
-                    selectedProducts={selectedProducts}
-                    onProductsChange={handleSetProducts}
+                    activeFilters={activeFilters}
                     selectedCount={selectedLeads.size}
                     onDelete={handleDeleteLeads}
                     onAssign={() => setAssignDialogOpen(true)}
@@ -419,6 +537,7 @@ export default function GenericAllLeads() {
                         ownerFilter={Array.from(selectedOwners)}
                         activeOwnerIds={activeOwnerIds}
                         productFilter={Array.from(selectedProducts)}
+                        dynamicFilters={dynamicFilters}
                     />
                 ) : (
                     /* Desktop Table View */
@@ -441,8 +560,25 @@ export default function GenericAllLeads() {
                 {/* Pagination (hide in kanban mode) */}
                 {viewMode === 'table' && (
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-1">
-                    <div className="text-sm text-muted-foreground">
-                        Showing {((page - 1) * pageSize) + 1} to {Math.min(page * pageSize, totalCount)} of {totalCount}
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                        <div className="text-sm text-muted-foreground">
+                            Showing {((page - 1) * pageSize) + 1} to {Math.min(page * pageSize, totalCount)} of {totalCount}
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <span>Rows per page:</span>
+                            <Select value={pageSize.toString()} onValueChange={handlePageSizeChange}>
+                                <SelectTrigger className="h-8 w-[80px] bg-background border-input">
+                                    <SelectValue placeholder={pageSize.toString()} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {[25, 50, 100, 250, 500, 1000, 5000].map(size => (
+                                        <SelectItem key={size} value={size.toString()}>
+                                            {size}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
                     </div>
                     <div className="flex items-center gap-2">
                         <Button

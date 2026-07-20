@@ -327,25 +327,29 @@ function AppRoutes() {
   );
 }
 
+import { ThemeProvider } from "next-themes";
+
 const App = () => (
   <ErrorBoundary>
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <AuthProvider>
-          <SubdomainProvider>
-            <CompanyBrandingProvider>
-              <TooltipProvider>
-                <Toaster />
-                <Sonner />
-                {/* Gate only handles showing a spinner while resolving non-main domains */}
-                <SubdomainGate mainDomainContent={<AppRoutes />}>
-                  <AppRoutes />
-                </SubdomainGate>
-              </TooltipProvider>
-            </CompanyBrandingProvider>
-          </SubdomainProvider>
-        </AuthProvider>
-      </BrowserRouter>
+      <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
+        <BrowserRouter>
+          <AuthProvider>
+            <SubdomainProvider>
+              <CompanyBrandingProvider>
+                <TooltipProvider>
+                  <Toaster />
+                  <Sonner />
+                  {/* Gate only handles showing a spinner while resolving non-main domains */}
+                  <SubdomainGate mainDomainContent={<AppRoutes />}>
+                    <AppRoutes />
+                  </SubdomainGate>
+                </TooltipProvider>
+              </CompanyBrandingProvider>
+            </SubdomainProvider>
+          </AuthProvider>
+        </BrowserRouter>
+      </ThemeProvider>
     </QueryClientProvider>
   </ErrorBoundary>
 );

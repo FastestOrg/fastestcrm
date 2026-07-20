@@ -2,6 +2,7 @@ import { useState } from 'react';
 // DashboardLayout removed
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Home, ChevronLeft, ChevronRight, LayoutGrid, Table2 } from 'lucide-react';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useQuery } from '@tanstack/react-query';
@@ -34,7 +35,12 @@ export default function RealEstateAllLeads() {
   const [selectedStatuses, setSelectedStatuses] = useState<Set<string>>(new Set());
   const [selectedPropertyTypes, setSelectedPropertyTypes] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(1);
-  const pageSize = 25;
+  const [pageSize, setPageSize] = useState(25);
+  const handlePageSizeChange = (value: string) => {
+    const size = parseInt(value, 10);
+    setPageSize(size);
+    setPage(1);
+  };
   const [selectedLeads, setSelectedLeads] = useState<Set<string>>(new Set());
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [editingLead, setEditingLead] = useState<any>(null);
@@ -340,8 +346,25 @@ export default function RealEstateAllLeads() {
         {/* Pagination (hide in kanban mode) */}
         {viewMode === 'table' && (
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-1">
-          <div className="text-sm text-muted-foreground">
-            Showing {((page - 1) * pageSize) + 1} to {Math.min(page * pageSize, totalCount)} of {totalCount}
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+            <div className="text-sm text-muted-foreground">
+              Showing {((page - 1) * pageSize) + 1} to {Math.min(page * pageSize, totalCount)} of {totalCount}
+            </div>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <span>Rows per page:</span>
+              <Select value={pageSize.toString()} onValueChange={handlePageSizeChange}>
+                <SelectTrigger className="h-8 w-[80px] bg-background border-input">
+                  <SelectValue placeholder={pageSize.toString()} />
+                </SelectTrigger>
+                <SelectContent>
+                  {[25, 50, 100, 250, 500, 1000, 5000].map(size => (
+                    <SelectItem key={size} value={size.toString()}>
+                      {size}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <Button

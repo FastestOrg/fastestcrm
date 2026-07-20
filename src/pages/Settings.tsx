@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
-import { Bell, Shield, User, Globe, Loader2, Database } from 'lucide-react';
+import { Bell, Shield, User, Globe, Loader2, Database, Merge, Sun, Moon } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -14,9 +14,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import ManageLeadAttributes from './ManageLeadAttributes';
 import { useCompany } from '@/hooks/useCompany';
 import GeneralSettingsTab from '@/components/settings/GeneralSettingsTab';
+import LeadManagementSettings from '@/components/settings/LeadManagementSettings';
+import { useTheme } from 'next-themes';
 
 export default function Settings() {
     const { user } = useAuth();
+    const { theme, setTheme } = useTheme();
     const { toast } = useToast();
     const queryClient = useQueryClient();
     const [formData, setFormData] = useState({
@@ -183,6 +186,11 @@ export default function Settings() {
                                 <Database className="h-4 w-4" /> Lead Attributes
                             </TabsTrigger>
                         )}
+                        {isCompanyAdmin && (
+                            <TabsTrigger value="lead-management" className="flex items-center gap-2">
+                                <Merge className="h-4 w-4" /> Lead Management
+                            </TabsTrigger>
+                        )}
                     </TabsList>
 
                     <TabsContent value="profile">
@@ -229,6 +237,34 @@ export default function Settings() {
                                     {updateProfileMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                     Save Changes
                                 </Button>
+
+                                <div className="border-t border-border pt-6 mt-6 space-y-4">
+                                    <div>
+                                        <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider">Appearance</h3>
+                                        <p className="text-xs text-muted-foreground">Customize how the CRM looks on your device.</p>
+                                    </div>
+                                    <div className="flex items-center justify-between p-4 rounded-xl bg-muted/30 border border-border/50">
+                                        <div className="space-y-1">
+                                            <Label htmlFor="theme-mode" className="text-sm font-medium flex items-center gap-2">
+                                                {theme === 'dark' ? <Moon className="h-4 w-4 text-primary" /> : <Sun className="h-4 w-4 text-amber-500" />}
+                                                Theme Mode
+                                            </Label>
+                                            <p className="text-xs text-muted-foreground">
+                                                Switch between dark and light themes
+                                            </p>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-xs font-medium text-muted-foreground">
+                                                {theme === 'dark' ? 'Dark Mode' : 'Light Mode'}
+                                            </span>
+                                            <Switch
+                                                id="theme-mode"
+                                                checked={theme === 'dark'}
+                                                onCheckedChange={(checked) => setTheme(checked ? 'dark' : 'light')}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
                             </CardContent>
                         </Card>
                     </TabsContent>
@@ -315,6 +351,12 @@ export default function Settings() {
                     {isCompanyAdmin && (
                         <TabsContent value="attributes">
                             <ManageLeadAttributes />
+                        </TabsContent>
+                    )}
+
+                    {isCompanyAdmin && (
+                        <TabsContent value="lead-management">
+                            <LeadManagementSettings />
                         </TabsContent>
                     )}
                 </Tabs>

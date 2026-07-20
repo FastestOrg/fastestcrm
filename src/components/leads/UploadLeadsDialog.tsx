@@ -27,7 +27,7 @@ interface UploadProgress {
     total: number;
     processed: number;
     success: number;
-    duplicates: number;
+    merged: number;
     errors: number;
 }
 
@@ -107,21 +107,22 @@ export function UploadLeadsDialog() {
         currentProgress: UploadProgress
     ): Promise<UploadProgress> => {
         try {
-            const { error } = await supabase
+            const { data, error } = await supabase
                 .from(tableName as any)
-                .insert(leads);
+                .insert(leads)
+                .select('id');
 
             if (error) {
-                // Check if it's a unique constraint violation, if so fallback to individual inserts
+                // If bulk fails, fallback to individual inserts
                 if (error.code === '23505' || error.message?.toLowerCase().includes('duplicate') || error.message?.toLowerCase().includes('unique')) {
-                    console.log('Duplicate key found in bulk insert. Falling back to individual inserts for this batch.');
+                    console.log('Conflict in bulk insert. Falling back to individual inserts for this batch.');
                     const results = await Promise.all(leads.map(lead => insertLeadWithRetry(lead)));
                     return {
                         ...currentProgress,
                         processed: currentProgress.processed + leads.length,
-                        success: currentProgress.success + results.filter(r === 'success').length,
-                        duplicates: currentProgress.duplicates + results.filter(r === 'duplicate').length,
-                        errors: currentProgress.errors + results.filter(r === 'error').length,
+                        success: currentProgress.success + results.filter(r => r === 'success').length,
+                        merged: currentProgress.merged + results.filter(r => r === 'duplicate').length,
+                        errors: currentProgress.errors + results.filter(r => r === 'error').length,
                     };
                 }
                 
@@ -133,10 +134,15 @@ export function UploadLeadsDialog() {
                 };
             }
 
+            // Smart merge trigger returns NULL for merged rows, so fewer rows come back
+            const insertedCount = data ? data.length : 0;
+            const mergedCount = leads.length - insertedCount;
+
             return {
                 ...currentProgress,
                 processed: currentProgress.processed + leads.length,
-                success: currentProgress.success + leads.length,
+                success: currentProgress.success + insertedCount,
+                merged: currentProgress.merged + mergedCount,
             };
         } catch (err) {
             console.error('Bulk insert exception:', err);
@@ -244,7 +250,7 @@ export function UploadLeadsDialog() {
                         total: enrichedLeads.length,
                         processed: 0,
                         success: 0,
-                        duplicates: 0,
+                        merged: 0,
                         errors: 0,
                     };
                     setProgress(currentProgress);
@@ -265,14 +271,14 @@ export function UploadLeadsDialog() {
                     queryClient.invalidateQueries({ queryKey: ['leads'] });
 
                     // Show final summary
-                    if (currentProgress.success > 0) {
+                    if (currentProgress.success > 0 || currentProgress.merged > 0) {
                         toast.success(
-                            `Uploaded ${currentProgress.success} leads successfully` +
-                            (currentProgress.duplicates > 0 ? `, ${currentProgress.duplicates} duplicates skipped` : '') +
+                            `Uploaded ${currentProgress.success} leads` +
+                            (currentProgress.merged > 0 ? `, ${currentProgress.merged} merged with existing` : '') +
                             (currentProgress.errors > 0 ? `, ${currentProgress.errors} failed` : '')
                         );
-                    } else if (currentProgress.duplicates > 0) {
-                        toast.warning(`All ${currentProgress.duplicates} leads were duplicates`);
+                    } else if (currentProgress.merged > 0) {
+                        toast.success(`All ${currentProgress.merged} leads were merged with existing records`);
                     } else {
                         toast.error('Failed to upload leads');
                     }
@@ -329,7 +335,7 @@ export function UploadLeadsDialog() {
                 <DialogHeader>
                     <DialogTitle>Upload Leads CSV</DialogTitle>
                     <DialogDescription>
-                        Upload a CSV file with columns: Name, Email, Phone, College, Status, Lead Source. Phone is mandatory. Duplicates will be skipped.
+                        Upload a CSV file with columns: Name, Email, Phone, College, Status, Lead Source. Phone is mandatory. Duplicates will be automatically merged.
                     </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
@@ -361,10 +367,10 @@ export function UploadLeadsDialog() {
                                         <CheckCircle className="h-3 w-3" />
                                         {progress.success} uploaded
                                     </span>
-                                    {progress.duplicates > 0 && (
-                                        <span className="flex items-center gap-1 text-yellow-600">
-                                            <AlertCircle className="h-3 w-3" />
-                                            {progress.duplicates} duplicates
+                                    {progress.merged > 0 && (
+                                        <span className="flex items-center gap-1 text-blue-600">
+                                            <CheckCircle className="h-3 w-3" />
+                                            {progress.merged} merged
                                         </span>
                                     )}
                                     {progress.errors > 0 && (

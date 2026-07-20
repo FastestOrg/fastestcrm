@@ -18,6 +18,14 @@ interface FilterOption {
   group?: string;
 }
 
+export interface ActiveFilter {
+  id: string;
+  label: string;
+  options: FilterOption[];
+  selectedValues: Set<string>;
+  onSelectionChange: (values: Set<string>) => void;
+}
+
 interface MobileLeadsHeaderProps {
   title: string;
   icon?: ReactNode;
@@ -46,6 +54,7 @@ interface MobileLeadsHeaderProps {
   uploadButton?: ReactNode;
   canDelete?: boolean;
   onEditLayout?: () => void;
+  activeFilters?: ActiveFilter[];
 }
 
 export function MobileLeadsHeader({
@@ -68,7 +77,8 @@ export function MobileLeadsHeader({
   addButton,
   uploadButton,
   canDelete = false,
-  onEditLayout
+  onEditLayout,
+  activeFilters
 }: MobileLeadsHeaderProps) {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [localSearch, setLocalSearch] = useState(searchValue);
@@ -86,16 +96,22 @@ export function MobileLeadsHeader({
     return () => clearTimeout(timer);
   }, [localSearch, onSearchChange, searchValue]);
 
-  const hasActiveFilters = selectedOwners.size > 0 ||
-    selectedStatuses.size > 0 ||
-    selectedProducts.size > 0 ||
-    selectedPropertyTypes.size > 0;
+  const hasActiveFilters = activeFilters
+    ? activeFilters.some(f => f.selectedValues.size > 0)
+    : (selectedOwners.size > 0 ||
+       selectedStatuses.size > 0 ||
+       selectedProducts.size > 0 ||
+       selectedPropertyTypes.size > 0);
 
   const clearAllFilters = () => {
-    onOwnersChange?.(new Set());
-    onStatusesChange?.(new Set());
-    onProductsChange?.(new Set());
-    onPropertyTypesChange?.(new Set());
+    if (activeFilters) {
+      activeFilters.forEach(f => f.onSelectionChange(new Set()));
+    } else {
+      onOwnersChange?.(new Set());
+      onStatusesChange?.(new Set());
+      onProductsChange?.(new Set());
+      onPropertyTypesChange?.(new Set());
+    }
   };
 
   return (
@@ -187,49 +203,65 @@ export function MobileLeadsHeader({
                 </SheetTitle>
               </SheetHeader>
               <div className="space-y-4 mt-4">
-                {filterOptions?.owners && onOwnersChange && (
-                  <div>
-                    <label className="text-sm font-medium mb-2 block">Owner</label>
-                    <MultiSelectFilter
-                      title="Owner"
-                      options={filterOptions.owners}
-                      selectedValues={selectedOwners}
-                      onSelectionChange={onOwnersChange}
-                    />
-                  </div>
-                )}
-                {filterOptions?.statuses && onStatusesChange && (
-                  <div>
-                    <label className="text-sm font-medium mb-2 block">Status</label>
-                    <MultiSelectFilter
-                      title="Status"
-                      options={filterOptions.statuses}
-                      selectedValues={selectedStatuses}
-                      onSelectionChange={onStatusesChange}
-                    />
-                  </div>
-                )}
-                {filterOptions?.products && onProductsChange && (
-                  <div>
-                    <label className="text-sm font-medium mb-2 block">Product</label>
-                    <MultiSelectFilter
-                      title="Product"
-                      options={filterOptions.products}
-                      selectedValues={selectedProducts}
-                      onSelectionChange={onProductsChange}
-                    />
-                  </div>
-                )}
-                {filterOptions?.propertyTypes && onPropertyTypesChange && (
-                  <div>
-                    <label className="text-sm font-medium mb-2 block">Property Type</label>
-                    <MultiSelectFilter
-                      title="Property Type"
-                      options={filterOptions.propertyTypes}
-                      selectedValues={selectedPropertyTypes}
-                      onSelectionChange={onPropertyTypesChange}
-                    />
-                  </div>
+                {activeFilters ? (
+                  activeFilters.map((filter) => (
+                    <div key={filter.id}>
+                      <label className="text-sm font-medium mb-2 block">{filter.label}</label>
+                      <MultiSelectFilter
+                        title={filter.label}
+                        options={filter.options}
+                        selectedValues={filter.selectedValues}
+                        onSelectionChange={filter.onSelectionChange}
+                      />
+                    </div>
+                  ))
+                ) : (
+                  <>
+                    {filterOptions?.owners && onOwnersChange && (
+                      <div>
+                        <label className="text-sm font-medium mb-2 block">Owner</label>
+                        <MultiSelectFilter
+                          title="Owner"
+                          options={filterOptions.owners}
+                          selectedValues={selectedOwners}
+                          onSelectionChange={onOwnersChange}
+                        />
+                      </div>
+                    )}
+                    {filterOptions?.statuses && onStatusesChange && (
+                      <div>
+                        <label className="text-sm font-medium mb-2 block">Status</label>
+                        <MultiSelectFilter
+                          title="Status"
+                          options={filterOptions.statuses}
+                          selectedValues={selectedStatuses}
+                          onSelectionChange={onStatusesChange}
+                        />
+                      </div>
+                    )}
+                    {filterOptions?.products && onProductsChange && (
+                      <div>
+                        <label className="text-sm font-medium mb-2 block">Product</label>
+                        <MultiSelectFilter
+                          title="Product"
+                          options={filterOptions.products}
+                          selectedValues={selectedProducts}
+                          onSelectionChange={onProductsChange}
+                        />
+                      </div>
+                    )}
+                    {filterOptions?.propertyTypes && onPropertyTypesChange && (
+                      <div>
+                        <label className="text-sm font-medium mb-2 block">Property Type</label>
+                        <MultiSelectFilter
+                          title="Property Type"
+                          options={filterOptions.propertyTypes}
+                          selectedValues={selectedPropertyTypes}
+                          onSelectionChange={onPropertyTypesChange}
+                        />
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
               <div className="mt-6">
@@ -243,7 +275,7 @@ export function MobileLeadsHeader({
             </SheetContent>
           </Sheet>
         </div>
-
+ 
         {/* Desktop Filters */}
         <div className="hidden md:block">
           <Button variant="outline" size="icon">
@@ -251,40 +283,54 @@ export function MobileLeadsHeader({
           </Button>
         </div>
       </div>
-
+ 
       {/* Desktop Filter Pills */}
       <div className="hidden md:flex flex-wrap gap-2">
-        {filterOptions?.owners && onOwnersChange && (
-          <MultiSelectFilter
-            title="Owner"
-            options={filterOptions.owners}
-            selectedValues={selectedOwners}
-            onSelectionChange={onOwnersChange}
-          />
-        )}
-        {filterOptions?.statuses && onStatusesChange && (
-          <MultiSelectFilter
-            title="Status"
-            options={filterOptions.statuses}
-            selectedValues={selectedStatuses}
-            onSelectionChange={onStatusesChange}
-          />
-        )}
-        {filterOptions?.products && onProductsChange && (
-          <MultiSelectFilter
-            title="Product"
-            options={filterOptions.products}
-            selectedValues={selectedProducts}
-            onSelectionChange={onProductsChange}
-          />
-        )}
-        {filterOptions?.propertyTypes && onPropertyTypesChange && (
-          <MultiSelectFilter
-            title="Property Type"
-            options={filterOptions.propertyTypes}
-            selectedValues={selectedPropertyTypes}
-            onSelectionChange={onPropertyTypesChange}
-          />
+        {activeFilters ? (
+          activeFilters.map((filter) => (
+            <MultiSelectFilter
+              key={filter.id}
+              title={filter.label}
+              options={filter.options}
+              selectedValues={filter.selectedValues}
+              onSelectionChange={filter.onSelectionChange}
+            />
+          ))
+        ) : (
+          <>
+            {filterOptions?.owners && onOwnersChange && (
+              <MultiSelectFilter
+                title="Owner"
+                options={filterOptions.owners}
+                selectedValues={selectedOwners}
+                onSelectionChange={onOwnersChange}
+              />
+            )}
+            {filterOptions?.statuses && onStatusesChange && (
+              <MultiSelectFilter
+                title="Status"
+                options={filterOptions.statuses}
+                selectedValues={selectedStatuses}
+                onSelectionChange={onStatusesChange}
+              />
+            )}
+            {filterOptions?.products && onProductsChange && (
+              <MultiSelectFilter
+                title="Product"
+                options={filterOptions.products}
+                selectedValues={selectedProducts}
+                onSelectionChange={onProductsChange}
+              />
+            )}
+            {filterOptions?.propertyTypes && onPropertyTypesChange && (
+              <MultiSelectFilter
+                title="Property Type"
+                options={filterOptions.propertyTypes}
+                selectedValues={selectedPropertyTypes}
+                onSelectionChange={onPropertyTypesChange}
+              />
+            )}
+          </>
         )}
         {hasActiveFilters && (
           <Button

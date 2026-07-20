@@ -42,6 +42,7 @@ interface LeadsKanbanBoardProps {
   ownerFilter?: string[];
   activeOwnerIds?: string[];
   productFilter?: string[];
+  dynamicFilters?: Record<string, string[]>;
 }
 
 // Hook to fetch leads for a single status column
@@ -54,9 +55,10 @@ function useStatusLeads(
   ownerFilter?: string[],
   activeOwnerIds?: string[],
   productFilter?: string[],
+  dynamicFilters?: Record<string, string[]>,
 ) {
   return useQuery({
-    queryKey: ['kanban-leads', statusValue, companyId, tableName, limit, searchQuery, ownerFilter, activeOwnerIds, productFilter],
+    queryKey: ['kanban-leads', statusValue, companyId, tableName, limit, searchQuery, ownerFilter, activeOwnerIds, productFilter, JSON.stringify(dynamicFilters)],
     queryFn: async (): Promise<{ leads: Lead[]; totalCount: number }> => {
       if (!companyId) return { leads: [], totalCount: 0 };
 
@@ -125,6 +127,14 @@ function useStatusLeads(
         query = query.in('product_purchased', productFilter);
       }
 
+      if (dynamicFilters) {
+        Object.entries(dynamicFilters).forEach(([colId, values]) => {
+          if (values && values.length > 0) {
+            query = query.in(colId, values);
+          }
+        });
+      }
+
       const { data, error, count } = await query;
       if (error) throw error;
       return { leads: (data as unknown as Lead[]) || [], totalCount: count || 0 };
@@ -148,6 +158,7 @@ function KanbanStatusColumn({
   ownerFilter,
   activeOwnerIds,
   productFilter,
+  dynamicFilters,
   allLeadsForDrag,
   setColumnLeads,
 }: {
@@ -161,6 +172,7 @@ function KanbanStatusColumn({
   ownerFilter?: string[];
   activeOwnerIds?: string[];
   productFilter?: string[];
+  dynamicFilters?: Record<string, string[]>;
   allLeadsForDrag: Lead[];
   setColumnLeads: (status: string, leads: Lead[], total: number) => void;
 }) {
@@ -168,7 +180,7 @@ function KanbanStatusColumn({
 
   const { data, isLoading } = useStatusLeads(
     status.value, companyId, tableName, visibleLimit,
-    searchQuery, ownerFilter, activeOwnerIds, productFilter,
+    searchQuery, ownerFilter, activeOwnerIds, productFilter, dynamicFilters
   );
 
   const leads = data?.leads || [];
@@ -375,6 +387,7 @@ export function LeadsKanbanBoard({
   ownerFilter,
   activeOwnerIds,
   productFilter,
+  dynamicFilters,
 }: LeadsKanbanBoardProps) {
   const [activeLead, setActiveLead] = useState<Lead | null>(null);
   const [allColumnLeads, setAllColumnLeads] = useState<Record<string, { leads: Lead[]; total: number }>>({});
@@ -466,6 +479,7 @@ export function LeadsKanbanBoard({
             ownerFilter={ownerFilter}
             activeOwnerIds={activeOwnerIds}
             productFilter={productFilter}
+            dynamicFilters={dynamicFilters}
             allLeadsForDrag={allLeads}
             setColumnLeads={setColumnLeads}
           />
