@@ -30,7 +30,7 @@ export default function LeadGeneration() {
     const { links, loading: linksLoading, createLink } = useLGLinks();
     const { settings, loading: settingsLoading, updateSettings } = useGrowthSettings();
 
-    const activeForms = forms.filter(f => f.status === 'active');
+    const activeForms = forms.filter(f => (f as any).status === 'active' || (f as any).is_active === true || (!(f as any).status && (f as any).is_active !== false));
 
     const handleCreateLink = async () => {
         if (!caName || !selectedForm) {

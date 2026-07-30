@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
+import { useOrgClient } from '@/hooks/useOrgClient';
 import { useLeadStatuses } from '@/hooks/useLeadStatuses';
 import { TRIP_TYPES, PACKAGE_TYPES } from '../config';
 import type { TravelLead } from './TravelLeadsTable';
@@ -50,6 +50,7 @@ interface Props {
 export function TravelEditLeadDialog({ open, onOpenChange, lead, onSuccess }: Props) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { statuses } = useLeadStatuses();
+  const { orgClient } = useOrgClient();
   const [statusReminderOpen, setStatusReminderOpen] = useState(false);
   const [pendingStatus, setPendingStatus] = useState<CompanyLeadStatus | null>(null);
   const [reminderAt, setReminderAt] = useState<Date | null>(null);
@@ -92,7 +93,7 @@ export function TravelEditLeadDialog({ open, onOpenChange, lead, onSuccess }: Pr
     if (!lead) return;
     setIsSubmitting(true);
     try {
-      const { error } = await supabase.from('leads_travel' as any).update({
+      const { error } = await orgClient.from('leads_travel' as any).update({
         name: values.name, email: values.email || null, phone: values.phone || null,
         whatsapp: values.whatsapp || null, destination: values.destination || null,
         travel_date: values.travel_date || null, return_date: values.return_date || null,

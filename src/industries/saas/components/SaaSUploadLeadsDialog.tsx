@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { useAuth } from '@/hooks/useAuth';
 import { useCompany } from '@/hooks/useCompany';
 import { supabase } from '@/integrations/supabase/client';
+import { useOrgClient } from '@/hooks/useOrgClient';
 import { toast } from 'sonner';
 import { Upload, FileUp, Download, AlertCircle, CheckCircle } from 'lucide-react';
 import Papa from 'papaparse';
@@ -31,12 +32,13 @@ export function SaaSUploadLeadsDialog() {
   const [progress, setProgress] = useState<UploadProgress | null>(null);
   const { user } = useAuth();
   const { company } = useCompany();
+  const { orgClient } = useOrgClient();
   const queryClient = useQueryClient();
   const abortRef = useRef(false);
 
   const insertLeadWithRetry = async (lead: any): Promise<'success' | 'duplicate' | 'error'> => {
     try {
-      const { error } = await supabase.from('leads_saas' as any).insert(lead);
+      const { error } = await orgClient.from('leads_saas' as any).insert(lead);
       if (error) {
         if (error.code === '23505' || error.message?.toLowerCase().includes('duplicate') || error.message?.toLowerCase().includes('unique')) {
           return 'duplicate';
@@ -51,7 +53,7 @@ export function SaaSUploadLeadsDialog() {
 
   const processBatch = async (leads: any[], currentProgress: UploadProgress): Promise<UploadProgress> => {
     try {
-      const { error } = await supabase.from('leads_saas' as any).insert(leads);
+      const { error } = await orgClient.from('leads_saas' as any).insert(leads);
       if (error) {
         // Fallback to individual if unique constraint or similar error
         if (error.code === '23505' || error.message?.toLowerCase().includes('duplicate') || error.message?.toLowerCase().includes('unique')) {

@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { useAuth } from '@/hooks/useAuth';
 import { useCompany } from '@/hooks/useCompany';
 import { supabase } from '@/integrations/supabase/client';
+import { useOrgClient } from '@/hooks/useOrgClient';
 import { toast } from 'sonner';
 import { Upload, FileUp, Download, AlertCircle, CheckCircle } from 'lucide-react';
 import Papa from 'papaparse';
@@ -36,6 +37,7 @@ export function RealEstateUploadLeadsDialog() {
     const [progress, setProgress] = useState<UploadProgress | null>(null);
     const { user } = useAuth();
     const { company } = useCompany();
+    const { orgClient } = useOrgClient();
     const queryClient = useQueryClient();
     const abortRef = useRef(false);
 
@@ -65,7 +67,7 @@ export function RealEstateUploadLeadsDialog() {
 
     const insertLeadWithRetry = async (lead: any): Promise<'success' | 'duplicate' | 'error'> => {
         try {
-            const { error } = await supabase
+            const { error } = await orgClient
                 .from('leads_real_estate')
                 .insert(lead);
 
@@ -88,7 +90,7 @@ export function RealEstateUploadLeadsDialog() {
         currentProgress: UploadProgress
     ): Promise<UploadProgress> => {
         try {
-            const { error } = await supabase
+            const { error } = await orgClient
                 .from('leads_real_estate')
                 .insert(leads);
 

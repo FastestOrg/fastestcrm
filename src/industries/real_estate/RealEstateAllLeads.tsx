@@ -106,11 +106,11 @@ export default function RealEstateAllLeads() {
           .select('id, full_name')
           .eq('company_id', company.id)
           .not('full_name', 'is', null),
-        supabase
-          .from('company_lead_statuses' as any)
-          .select('label, value, category, order_index')
+        orgClient
+          .from('lead_statuses' as any)
+          .select('*')
           .eq('company_id', company.id)
-          .order('order_index'),
+          .order('sort_order'),
       ]);
 
       let activeOwners = ownersResult.data || [];
@@ -131,12 +131,21 @@ export default function RealEstateAllLeads() {
         activeOwners = activeOwners.filter(o => accessibleSet.has(o.id));
       }
 
-      const statusesData = statusesResult.data as any[] | null;
+      let statusesData = statusesResult.data as any[] | null;
+      if (!statusesData || statusesData.length === 0) {
+        const { data: fbData } = await orgClient
+          .from('company_lead_statuses' as any)
+          .select('*')
+          .eq('company_id', company.id)
+          .order('order_index');
+        statusesData = fbData;
+      }
+
       const statuses = statusesData && statusesData.length > 0
         ? statusesData.map((s: any) => ({
-          label: s.label,
-          value: s.value,
-          group: s.category
+          label: s.name || s.label || 'Status',
+          value: s.value || (s.name || s.label || 'status').toLowerCase().replace(/[^a-z0-9_]/g, '_'),
+          group: s.category || s.status_type || 'Custom'
         }))
         : [];
 

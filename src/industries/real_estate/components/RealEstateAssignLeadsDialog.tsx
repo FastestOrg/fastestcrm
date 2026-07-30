@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/integrations/supabase/client';
+import { useOrgClient } from '@/hooks/useOrgClient';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
@@ -48,6 +49,7 @@ export function RealEstateAssignLeadsDialog({
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const { user } = useAuth();
   const { company } = useCompany();
+  const { orgClient } = useOrgClient();
   const queryClient = useQueryClient();
 
   // State for which owner types to update
@@ -124,7 +126,7 @@ export function RealEstateAssignLeadsDialog({
         updateData.post_sales_owner_id = postSalesUserId;
       }
 
-      const { error } = await supabase
+      const { error } = await orgClient
         .from('leads_real_estate')
         .update(updateData)
         .in('id', selectedLeadIds);

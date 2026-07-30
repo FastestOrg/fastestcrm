@@ -5,6 +5,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useCompany } from '@/hooks/useCompany';
+import { useOrgClient } from '@/hooks/useOrgClient';
 import { useToast } from '@/hooks/use-toast';
 
 const WA_SERVER_URL = import.meta.env.VITE_WHATSAPP_SERVER_URL || 'http://localhost:3001';
@@ -41,14 +42,15 @@ export interface WhatsAppAccount {
 
 export function useWhatsAppAccounts() {
     const { company } = useCompany();
+    const { orgClient, isBYOSLoading } = useOrgClient();
     const queryClient = useQueryClient();
     const { toast } = useToast();
 
     const accountsQuery = useQuery({
-        queryKey: ['whatsapp-accounts', company?.id],
+        queryKey: ['whatsapp-accounts', (orgClient as any)?.supabaseUrl || 'default', company?.id],
         queryFn: async (): Promise<WhatsAppAccount[]> => {
             if (!company?.id) return [];
-            const { data, error } = await supabase
+            const { data, error } = await orgClient
                 .from('whatsapp_accounts' as any)
                 .select('*')
                 .eq('company_id', company.id)
@@ -56,7 +58,7 @@ export function useWhatsAppAccounts() {
             if (error) throw error;
             return (data as any) || [];
         },
-        enabled: !!company?.id,
+        enabled: !!company?.id && !isBYOSLoading,
         refetchInterval: 10000, // Poll every 10s for status updates
     });
 
@@ -68,7 +70,7 @@ export function useWhatsAppAccounts() {
             if (!user) throw new Error('Not authenticated');
 
             // Create in Supabase first
-            await supabase.from('whatsapp_accounts' as any).upsert(
+            await orgClient.from('whatsapp_accounts' as any).upsert(
                 {
                     session_id: sessionId,
                     company_id: company.id,
@@ -115,7 +117,7 @@ export function useWhatsAppAccounts() {
     const deleteAccount = useMutation({
         mutationFn: async (accountId: string) => {
             // Get session ID first
-            const { data: account } = await supabase
+            const { data: account } = await orgClient
                 .from('whatsapp_accounts' as any)
                 .select('session_id')
                 .eq('id', accountId)
@@ -127,7 +129,7 @@ export function useWhatsAppAccounts() {
                 });
             }
 
-            await supabase.from('whatsapp_accounts' as any).delete().eq('id', accountId);
+            await orgClient.from('whatsapp_accounts' as any).delete().eq('id', accountId);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['whatsapp-accounts'] });
@@ -137,16 +139,32 @@ export function useWhatsAppAccounts() {
 
     const updateAccountAI = useMutation({
         mutationFn: async ({ accountId, ai_enabled, ai_prompt, ai_goal, ai_knowledge_base, ai_response_delay_seconds, ai_max_replies_per_day }: { accountId: string; ai_enabled: boolean; ai_prompt: string; ai_goal: string; ai_knowledge_base: string; ai_response_delay_seconds: number; ai_max_replies_per_day: number }) => {
-            const { data, error } = await supabase
+            const { data, error } = await orgClient
                 .from('whatsapp_accounts' as any)
-                .update({ ai_enabled, ai_prompt, ai_goal, ai_knowledge_base, ai_response_delay_seconds, ai_max_replies_per_day })
-                .eq('id', accountId);
+                .update({
+                    ai_enabled,
+                    ai_prompt,
+                    ai_goal,
+                    ai_knowledge_base,
+                    ai_response_delay_seconds,
+                    ai_max_replies_per_day,
+                })
+                .eq('id', accountId)
+                .select()
+                .single();
             if (error) throw error;
             return data;
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['whatsapp-accounts'] });
-            toast({ title: 'AI Configuration Saved' });
+            toast({ title: 'AI agent settings updated' });
+        },
+        onError: (error: any) => {
+            toast({
+                title: 'Failed to update settings',
+                description: error.message,
+                variant: 'destructive',
+            });
         },
     });
 

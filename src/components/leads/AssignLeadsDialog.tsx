@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
+import { useOrgClient } from '@/hooks/useOrgClient';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { useLeadsTable } from '@/hooks/useLeadsTable';
@@ -28,6 +29,7 @@ export function AssignLeadsDialog({ open, onOpenChange, selectedLeadIds, onSucce
     const [profiles, setProfiles] = useState<Profile[]>([]);
     const [selectedUserId, setSelectedUserId] = useState<string>('');
     const { user } = useAuth();
+    const { orgClient } = useOrgClient();
     const { tableName } = useLeadsTable();
     const queryClient = useQueryClient();
     const { company } = useCompany();
@@ -88,7 +90,7 @@ export function AssignLeadsDialog({ open, onOpenChange, selectedLeadIds, onSucce
 
         setLoading(true);
         try {
-            const { error } = await supabase
+            const { error } = await orgClient
                 .from(tableName as any)
                 .update({ sales_owner_id: selectedUserId })
                 .in('id', selectedLeadIds);

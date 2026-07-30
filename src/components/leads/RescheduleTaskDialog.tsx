@@ -21,6 +21,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { useLeadsTable } from '@/hooks/useLeadsTable';
+import { useOrgClient } from '@/hooks/useOrgClient';
 import { toast } from 'sonner';
 import { TaskLead } from '@/hooks/useTaskLeads';
 
@@ -36,6 +37,7 @@ export function RescheduleTaskDialog({ open, onOpenChange, lead, onSuccess }: Re
     const [time, setTime] = useState('10:00');
     const [saving, setSaving] = useState(false);
     const { tableName } = useLeadsTable();
+    const { orgClient } = useOrgClient();
 
     useEffect(() => {
         if (open && lead) {
@@ -61,26 +63,55 @@ export function RescheduleTaskDialog({ open, onOpenChange, lead, onSuccess }: Re
             newDateTime.setHours(hours, minutes, 0, 0);
 
             if (lead.isMeeting) {
+                const targetUrl = (orgClient as any)?.supabaseUrl || 'default';
+                const isDefaultHost = targetUrl.includes('api.fastestcrm.com') || targetUrl.includes('uykdyqdeyilpulaqlqip');
+
+                const primaryTable = isDefaultHost ? 'calendar_events' : 'calendar_bookings';
+                const fallbackTable = isDefaultHost ? 'calendar_bookings' : 'calendar_events';
+
                 // Fetch the event to get its duration
-                const { data: event, error: eventError } = await supabase
-                    .from('calendar_events')
+                let event: any = null;
+                const { data: pEvent } = await orgClient
+                    .from(primaryTable as any)
                     .select('start_time, end_time')
                     .eq('id', lead.id)
                     .single();
-                if (eventError) throw eventError;
+
+                if (pEvent) {
+                    event = pEvent;
+                } else {
+                    const { data: fbEvent } = await orgClient
+                        .from(fallbackTable as any)
+                        .select('start_time, end_time')
+                        .eq('id', lead.id)
+                        .single();
+                    event = fbEvent;
+                }
+
+                if (!event) throw new Error('Meeting event not found');
 
                 const originalDuration = new Date(event.end_time).getTime() - new Date(event.start_time).getTime();
                 const newEndTime = new Date(newDateTime.getTime() + originalDuration);
 
-                const { error: updateError } = await supabase
-                    .from('calendar_events')
+                const { error: updateError } = await orgClient
+                    .from(primaryTable as any)
                     .update({
                         start_time: newDateTime.toISOString(),
                         end_time: newEndTime.toISOString(),
                         updated_at: new Date().toISOString()
                     })
                     .eq('id', lead.id);
-                if (updateError) throw updateError;
+
+                if (updateError) {
+                    await orgClient
+                        .from(fallbackTable as any)
+                        .update({
+                            start_time: newDateTime.toISOString(),
+                            end_time: newEndTime.toISOString(),
+                            updated_at: new Date().toISOString()
+                        })
+                        .eq('id', lead.id);
+                }
             } else {
                 const { error: updateError } = await supabase
                     .from(tableName as any)

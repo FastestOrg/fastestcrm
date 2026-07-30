@@ -28,6 +28,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useOrgClient } from '@/hooks/useOrgClient';
 import { useLeadsTable } from '@/hooks/useLeadsTable';
 
 const PER_STATUS_LIMIT = 10;
@@ -57,6 +58,8 @@ function useStatusLeads(
   productFilter?: string[],
   dynamicFilters?: Record<string, string[]>,
 ) {
+  const { orgClient } = useOrgClient();
+
   return useQuery({
     queryKey: ['kanban-leads', statusValue, companyId, tableName, limit, searchQuery, ownerFilter, activeOwnerIds, productFilter, JSON.stringify(dynamicFilters)],
     queryFn: async (): Promise<{ leads: Lead[]; totalCount: number }> => {
@@ -76,7 +79,7 @@ function useStatusLeads(
         ? '*, sales_owner:profiles!leads_travel_sales_owner_id_fkey(full_name)'
         : '*';
 
-      let query = supabase
+      let query = orgClient
         .from(tableName as any)
         .select(selectQuery, { count: 'exact' })
         .eq('company_id', companyId)

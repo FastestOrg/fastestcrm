@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useLeadsTable } from './useLeadsTable';
 import { useLeadStatuses } from './useLeadStatuses';
+import { useOrgClient } from './useOrgClient';
 
 export interface TaskLead {
     id: string;
@@ -50,6 +51,7 @@ function getDateBoundaries() {
 export function useTaskLeads(): TaskLeadsResult {
     const { tableName, companyId, loading: tableLoading } = useLeadsTable();
     const { statuses } = useLeadStatuses();
+    const { orgClient } = useOrgClient();
 
     // Build a set of status values that are date/time derived so we know which
     // leads have actionable reminders. We still show all leads with reminder_at
@@ -75,26 +77,51 @@ export function useTaskLeads(): TaskLeadsResult {
                     ? '*, sales_owner:profiles!leads_sales_owner_id_fkey(full_name)'
                     : '*';
 
-            const { data: leadsData, error: leadsError } = await supabase
+            const targetUrl = (orgClient as any)?.supabaseUrl || 'default';
+            const isDefaultHost = targetUrl.includes('api.fastestcrm.com') || targetUrl.includes('uykdyqdeyilpulaqlqip');
+
+            let leadQuery = orgClient
                 .from(tableName as any)
                 .select(selectQuery)
-                .eq('company_id', companyId)
                 .not('reminder_at', 'is', null) // Server-side filter — key for performance
                 .order('reminder_at', { ascending: true });
 
+            if (isDefaultHost) {
+                leadQuery = leadQuery.eq('company_id', companyId);
+            }
+
+            const { data: leadsData, error: leadsError } = await leadQuery;
+
             if (leadsError) throw leadsError;
 
-            // Fetch calendar events starting from today start to prevent past meetings cluttering tasks
+            // Fetch calendar events/bookings starting from today start to prevent past meetings cluttering tasks
             const { todayStart } = getDateBoundaries();
-            const { data: eventsData, error: eventsError } = await supabase
-                .from('calendar_events' as any)
+
+            const primaryTable = isDefaultHost ? 'calendar_events' : 'calendar_bookings';
+            const fallbackTable = isDefaultHost ? 'calendar_bookings' : 'calendar_events';
+
+            let eventsData: any[] = [];
+            const { data: pData, error: pErr } = await orgClient
+                .from(primaryTable as any)
                 .select('*')
                 .eq('company_id', companyId)
                 .gte('start_time', todayStart.toISOString())
                 .neq('status', 'cancelled')
                 .order('start_time', { ascending: true });
 
-            if (eventsError) throw eventsError;
+            if (!pErr && pData) {
+                eventsData = pData;
+            } else {
+                const { data: fbData } = await orgClient
+                    .from(fallbackTable as any)
+                    .select('*')
+                    .eq('company_id', companyId)
+                    .gte('start_time', todayStart.toISOString())
+                    .neq('status', 'cancelled')
+                    .order('start_time', { ascending: true });
+
+                if (fbData) eventsData = fbData;
+            }
 
             const mappedLeads: TaskLead[] = (leadsData || []).map((lead: any) => ({
                 ...lead,

@@ -1,12 +1,14 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 // DashboardLayout removed
 import { supabase } from '@/integrations/supabase/client';
+import { useLeadStatuses } from '@/hooks/useLeadStatuses';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useLeads } from '@/hooks/useLeads';
 import { useCompany } from '@/hooks/useCompany';
+import { useOrgClient } from '@/hooks/useOrgClient';
 import { Tables } from '@/integrations/supabase/types';
 import { LeadsTable } from '@/components/leads/LeadsTable';
 import { RealEstateLeadsTable } from '@/industries/real_estate/components/RealEstateLeadsTable';
@@ -99,24 +101,13 @@ export default function Interested() {
     const defaultColumns = isRealEstate ? realEstateDefaultColumns : genericDefaultColumns;
     const columnConfig = (company as any)?.features?.table_configs?.['interested_leads'];
 
-    // Fetch confirmed 'interested' statuses
-    const { data: interestedStatuses } = useQuery({
-        queryKey: ['interested-statuses', company?.id],
-        queryFn: async () => {
-            if (!company?.id) return [];
-            const { data } = await supabase
-                .from('company_lead_statuses' as any)
-                .select('value')
-                .eq('company_id', company.id)
-                .eq('category', 'interested');
-
-            const statuses = data?.map((s: any) => s.value) || [];
-            return statuses.length > 0 ? statuses : ['interested'];
-        },
-        enabled: !!company?.id
-    });
-
-    const statusFilter = interestedStatuses && interestedStatuses.length > 0 ? interestedStatuses : ['interested'];
+    const { statuses: allStatuses } = useLeadStatuses();
+    const statusFilter = useMemo(() => {
+        const matched = allStatuses
+            .filter(s => s.category === 'interested' || s.status_type === 'interested' || s.value.includes('interested'))
+            .map(s => s.value);
+        return matched.length > 0 ? matched : ['interested'];
+    }, [allStatuses]);
 
     const hookOptions = {
         search: searchQuery,

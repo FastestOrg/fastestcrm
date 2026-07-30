@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 // DashboardLayout removed
 import { supabase } from '@/integrations/supabase/client';
+import { useLeadStatuses } from '@/hooks/useLeadStatuses';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent } from '@/components/ui/card';
 import { useLeads } from '@/hooks/useLeads';
 import { useCompany } from '@/hooks/useCompany';
+import { useOrgClient } from '@/hooks/useOrgClient';
 import { Tables } from '@/integrations/supabase/types';
 import { LeadsTable } from '@/components/leads/LeadsTable';
 import { RealEstateLeadsTable } from '@/industries/real_estate/components/RealEstateLeadsTable';
@@ -95,24 +97,13 @@ export default function Paid() {
     const defaultColumns = isRealEstate ? realEstateDefaultColumns : genericDefaultColumns;
     const columnConfig = (company as any)?.features?.table_configs?.['paid_leads'];
 
-    // Fetch confirmed 'paid' statuses
-    const { data: paidStatuses } = useQuery({
-        queryKey: ['paid-statuses', company?.id],
-        queryFn: async () => {
-            if (!company?.id) return [];
-            const { data } = await supabase
-                .from('company_lead_statuses' as any)
-                .select('value')
-                .eq('company_id', company.id)
-                .eq('category', 'paid');
-
-            const statuses = data?.map((s: any) => s.value) || [];
-            return statuses.length > 0 ? statuses : ['paid'];
-        },
-        enabled: !!company?.id
-    });
-
-    const statusFilter = paidStatuses && paidStatuses.length > 0 ? paidStatuses : ['paid'];
+    const { statuses: allStatuses } = useLeadStatuses();
+    const statusFilter = useMemo(() => {
+        const matched = allStatuses
+            .filter(s => s.category === 'paid' || s.status_type === 'paid' || s.value.includes('paid'))
+            .map(s => s.value);
+        return matched.length > 0 ? matched : ['paid'];
+    }, [allStatuses]);
 
     const hookOptions = {
         search: searchQuery,

@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useCompany } from "@/hooks/useCompany";
+import { useOrgClient } from "@/hooks/useOrgClient";
 
 export interface RealEstateProperty {
     id: string;
@@ -24,13 +25,14 @@ export function useRealEstateProperties() {
     const { toast } = useToast();
     const queryClient = useQueryClient();
     const { company } = useCompany();
+    const { orgClient, isBYOSLoading } = useOrgClient();
 
     const { data: properties, isLoading } = useQuery({
-        queryKey: ['real-estate-properties', company?.id],
+        queryKey: ['real-estate-properties', (orgClient as any)?.supabaseUrl || 'default', company?.id],
         queryFn: async () => {
             if (!company?.id) return [];
 
-            const { data, error } = await supabase
+            const { data, error } = await orgClient
                 .from('real_estate_properties' as any)
                 .select('*')
                 .eq('company_id', company.id)
@@ -47,14 +49,14 @@ export function useRealEstateProperties() {
 
             return (data as unknown) as RealEstateProperty[];
         },
-        enabled: !!company?.id,
+        enabled: !!company?.id && !isBYOSLoading,
     });
 
     const createProperty = useMutation({
         mutationFn: async (newProperty: PropertyFormData) => {
             if (!company?.id) throw new Error("No company ID");
 
-            const { data, error } = await supabase
+            const { data, error } = await orgClient
                 .from('real_estate_properties' as any)
                 .insert([{ ...newProperty, company_id: company.id }])
                 .select()
@@ -81,7 +83,7 @@ export function useRealEstateProperties() {
 
     const updateProperty = useMutation({
         mutationFn: async ({ id, ...updates }: Partial<PropertyFormData> & { id: string }) => {
-            const { data, error } = await supabase
+            const { data, error } = await orgClient
                 .from('real_estate_properties' as any)
                 .update(updates)
                 .eq('id', id)
@@ -109,7 +111,7 @@ export function useRealEstateProperties() {
 
     const deleteProperty = useMutation({
         mutationFn: async (id: string) => {
-            const { error } = await supabase
+            const { error } = await orgClient
                 .from('real_estate_properties' as any)
                 .delete()
                 .eq('id', id);

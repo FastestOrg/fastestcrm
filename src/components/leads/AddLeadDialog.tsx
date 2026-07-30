@@ -141,12 +141,32 @@ export function AddLeadDialog({ open: controlledOpen, onOpenChange, trigger }: A
                 payload.send_web_push = true;
             }
 
-            await createLead.mutateAsync(payload);
-            toast.success('Lead added successfully');
-            setOpen(false);
-            form.reset();
-            setCustomFieldValues({});
-            setReminderAt(null);
+            try {
+                await createLead.mutateAsync(payload);
+                toast.success('Lead added successfully');
+                setOpen(false);
+                form.reset();
+                setCustomFieldValues({});
+                setReminderAt(null);
+            } catch (firstErr: any) {
+                if (firstErr?.code === 'PGRST204' && (firstErr?.message?.includes('lead_source') || firstErr?.message?.includes('column'))) {
+                    try {
+                        const fallbackPayload = { ...payload };
+                        delete fallbackPayload.lead_source;
+                        if (values.lead_source) fallbackPayload.source = values.lead_source;
+                        await createLead.mutateAsync(fallbackPayload);
+                        toast.success('Lead added successfully');
+                        setOpen(false);
+                        form.reset();
+                        setCustomFieldValues({});
+                        setReminderAt(null);
+                        return;
+                    } catch (retryErr: any) {
+                        throw retryErr;
+                    }
+                }
+                throw firstErr;
+            }
         } catch (error: any) {
             console.error('Detailed Error adding lead:', {
                 message: error.message,

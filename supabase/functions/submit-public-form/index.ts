@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
+import { getOrgAdminClient } from "../_shared/byos-client.ts";
 
 
 
@@ -220,8 +221,15 @@ serve(async (req) => {
       }
     }
 
-    // Insert the lead
-    const { data: lead, error: insertError } = await supabaseAdmin
+    // Obtain the correct DB client (BYOS or platform) for inserting the lead
+    let targetAdminClient = supabaseAdmin;
+    if (creatorProfile?.company_id) {
+      const { client } = await getOrgAdminClient(creatorProfile.company_id);
+      targetAdminClient = client;
+    }
+
+    // Insert the lead into target database
+    const { data: lead, error: insertError } = await targetAdminClient
       .from(targetTable)
       .insert(leadData)
       .select("id")

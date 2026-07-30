@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
-import { Bell, Shield, User, Globe, Loader2, Database, Merge, Sun, Moon } from 'lucide-react';
+import { Bell, Shield, User, Globe, Loader2, Database, Merge, Sun, Moon, Server } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -15,6 +15,7 @@ import ManageLeadAttributes from './ManageLeadAttributes';
 import { useCompany } from '@/hooks/useCompany';
 import GeneralSettingsTab from '@/components/settings/GeneralSettingsTab';
 import LeadManagementSettings from '@/components/settings/LeadManagementSettings';
+import BYOSSettings from '@/components/settings/BYOSSettings';
 import { useTheme } from 'next-themes';
 
 export default function Settings() {
@@ -191,6 +192,11 @@ export default function Settings() {
                                 <Merge className="h-4 w-4" /> Lead Management
                             </TabsTrigger>
                         )}
+                        {isCompanyAdmin && (
+                            <TabsTrigger value="data-backend" className="flex items-center gap-2">
+                                <Server className="h-4 w-4" /> Data Backend
+                            </TabsTrigger>
+                        )}
                     </TabsList>
 
                     <TabsContent value="profile">
@@ -357,6 +363,12 @@ export default function Settings() {
                     {isCompanyAdmin && (
                         <TabsContent value="lead-management">
                             <LeadManagementSettings />
+                        </TabsContent>
+                    )}
+
+                    {isCompanyAdmin && (
+                        <TabsContent value="data-backend">
+                            <BYOSSettings />
                         </TabsContent>
                     )}
                 </Tabs>

@@ -205,7 +205,7 @@ export function useWhatsAppCampaigns() {
             scheduledAt: string | null;
         }) => {
             // Fetch current status
-            const { data } = await supabase.from('whatsapp_campaigns' as any).select('status').eq('id', params.campaignId).single();
+            const { data } = await orgClient.from('whatsapp_campaigns' as any).select('status').eq('id', params.campaignId).single();
             const curr = data as any;
             
             const updates: any = {
@@ -222,7 +222,7 @@ export function useWhatsAppCampaigns() {
                 updates.status = params.scheduledAt ? 'scheduled' : 'draft';
             }
 
-            const { error } = await supabase
+            const { error } = await orgClient
                 .from('whatsapp_campaigns' as any)
                 .update(updates)
                 .eq('id', params.campaignId);
@@ -271,8 +271,8 @@ export function useWhatsAppCampaigns() {
 
     const deleteCampaign = useMutation({
         mutationFn: async (campaignId: string) => {
-            await supabase.from('whatsapp_campaign_recipients' as any).delete().eq('campaign_id', campaignId);
-            await supabase.from('whatsapp_campaigns' as any).delete().eq('id', campaignId);
+            await orgClient.from('whatsapp_campaign_recipients' as any).delete().eq('campaign_id', campaignId);
+            await orgClient.from('whatsapp_campaigns' as any).delete().eq('id', campaignId);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['whatsapp-campaigns'] });

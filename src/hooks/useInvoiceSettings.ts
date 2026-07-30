@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useCompany } from '@/hooks/useCompany';
+import { useOrgClient } from '@/hooks/useOrgClient';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 export interface InvoiceSettings {
@@ -56,12 +56,13 @@ export function useInvoiceSettings() {
   const { toast } = useToast();
   const qc = useQueryClient();
   const { company } = useCompany();
+  const { orgClient, isBYOSLoading } = useOrgClient();
   const companyId = company?.id;
 
   const { data: settings, isLoading: settingsLoading } = useQuery({
-    queryKey: ['invoice-settings', companyId],
+    queryKey: ['invoice-settings', (orgClient as any)?.supabaseUrl || 'default', companyId],
     queryFn: async (): Promise<InvoiceSettings | null> => {
-      const { data, error } = await supabase
+      const { data, error } = await orgClient
         .from('invoice_settings' as any)
         .select('*')
         .eq('company_id', companyId!)
@@ -69,12 +70,12 @@ export function useInvoiceSettings() {
       if (error) throw error;
       return data as any;
     },
-    enabled: !!companyId,
+    enabled: !!companyId && !isBYOSLoading,
   });
 
   const upsertSettings = useMutation({
     mutationFn: async (updates: Partial<InvoiceSettings>) => {
-      const { data, error } = await supabase
+      const { data, error } = await orgClient
         .from('invoice_settings' as any)
         .upsert({ company_id: companyId!, ...updates, updated_at: new Date().toISOString() } as any, { onConflict: 'company_id' })
         .select()
@@ -97,12 +98,13 @@ export function useInvoiceTaxes() {
   const { toast } = useToast();
   const qc = useQueryClient();
   const { company } = useCompany();
+  const { orgClient, isBYOSLoading } = useOrgClient();
   const companyId = company?.id;
 
   const { data: taxes = [], isLoading: taxesLoading } = useQuery({
-    queryKey: ['invoice-taxes', companyId],
+    queryKey: ['invoice-taxes', (orgClient as any)?.supabaseUrl || 'default', companyId],
     queryFn: async (): Promise<InvoiceTax[]> => {
-      const { data, error } = await supabase
+      const { data, error } = await orgClient
         .from('invoice_taxes' as any)
         .select('*')
         .eq('company_id', companyId!)
@@ -110,12 +112,12 @@ export function useInvoiceTaxes() {
       if (error) throw error;
       return (data || []) as any;
     },
-    enabled: !!companyId,
+    enabled: !!companyId && !isBYOSLoading,
   });
 
   const createTax = useMutation({
     mutationFn: async (tax: Partial<InvoiceTax>) => {
-      const { data, error } = await supabase
+      const { data, error } = await orgClient
         .from('invoice_taxes' as any)
         .insert({ ...tax, company_id: companyId! } as any)
         .select()
@@ -132,7 +134,7 @@ export function useInvoiceTaxes() {
 
   const updateTax = useMutation({
     mutationFn: async ({ id, ...updates }: Partial<InvoiceTax> & { id: string }) => {
-      const { data, error } = await supabase
+      const { data, error } = await orgClient
         .from('invoice_taxes' as any)
         .update({ ...updates, updated_at: new Date().toISOString() } as any)
         .eq('id', id)
@@ -150,7 +152,7 @@ export function useInvoiceTaxes() {
 
   const deleteTax = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('invoice_taxes' as any).delete().eq('id', id);
+      const { error } = await orgClient.from('invoice_taxes' as any).delete().eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -168,12 +170,13 @@ export function useInvoiceTemplates() {
   const { toast } = useToast();
   const qc = useQueryClient();
   const { company } = useCompany();
+  const { orgClient, isBYOSLoading } = useOrgClient();
   const companyId = company?.id;
 
   const { data: templates = [], isLoading: templatesLoading } = useQuery({
-    queryKey: ['invoice-templates', companyId],
+    queryKey: ['invoice-templates', (orgClient as any)?.supabaseUrl || 'default', companyId],
     queryFn: async (): Promise<InvoiceTemplate[]> => {
-      const { data, error } = await supabase
+      const { data, error } = await orgClient
         .from('invoice_templates' as any)
         .select('*')
         .eq('company_id', companyId!)
@@ -181,12 +184,12 @@ export function useInvoiceTemplates() {
       if (error) throw error;
       return (data || []) as any;
     },
-    enabled: !!companyId,
+    enabled: !!companyId && !isBYOSLoading,
   });
 
   const createTemplate = useMutation({
     mutationFn: async (tpl: Partial<InvoiceTemplate>) => {
-      const { data, error } = await supabase
+      const { data, error } = await orgClient
         .from('invoice_templates' as any)
         .insert({ ...tpl, company_id: companyId! } as any)
         .select()
@@ -203,7 +206,7 @@ export function useInvoiceTemplates() {
 
   const updateTemplate = useMutation({
     mutationFn: async ({ id, ...updates }: Partial<InvoiceTemplate> & { id: string }) => {
-      const { data, error } = await supabase
+      const { data, error } = await orgClient
         .from('invoice_templates' as any)
         .update({ ...updates, updated_at: new Date().toISOString() } as any)
         .eq('id', id)
@@ -221,7 +224,7 @@ export function useInvoiceTemplates() {
 
   const deleteTemplate = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('invoice_templates' as any).delete().eq('id', id);
+      const { error } = await orgClient.from('invoice_templates' as any).delete().eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {

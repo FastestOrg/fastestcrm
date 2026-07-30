@@ -410,6 +410,35 @@ export function useTeam() {
     return { error };
   };
 
+  const resetUserPassword = async (targetUserId: string, newPassword: string) => {
+    if (!user) return { error: new Error('Not authenticated') };
+
+    // Primary: Try Edge Function
+    const { data, error: funcError } = await supabase.functions.invoke('reset-user-password', {
+      body: { targetUserId, newPassword }
+    });
+
+    if (!funcError && !data?.error) {
+      return { error: null };
+    }
+
+    // Fallback: Try RPC function if edge function is not deployed or fails
+    const { data: rpcData, error: rpcError } = await supabase.rpc('reset_user_password' as any, {
+      target_user_id: targetUserId,
+      new_password: newPassword
+    });
+
+    if (rpcError) {
+      return { error: funcError || rpcError };
+    }
+
+    if (rpcData && typeof rpcData === 'object' && 'error' in rpcData && (rpcData as any).error) {
+      return { error: new Error((rpcData as any).error) };
+    }
+
+    return { error: null };
+  };
+
   const addMemberOptimistic = (newMember: TeamMember) => {
     setMembers(prev => [...prev, newMember]);
   };
@@ -430,6 +459,7 @@ export function useTeam() {
     deleteMember,
     toggleMemberStatus,
     updateIncentive,
+    resetUserPassword,
     setManager,
     getRoleLabel,
     getAssignableRoles,

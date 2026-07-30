@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useCompany } from '@/hooks/useCompany';
+import { useOrgClient } from '@/hooks/useOrgClient';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -69,17 +70,40 @@ export default function ManageLeadAttributes() {
     });
 
     // Fetch dynamic columns
+    const { orgClient, isBYOSLoading } = useOrgClient();
     const { data: dbColumns, refetch: refetchColumns, isLoading: columnsLoading } = useQuery({
-        queryKey: ['lead-columns', company?.id],
+        queryKey: ['lead-columns', (orgClient as any)?.supabaseUrl || 'default', company?.id],
         queryFn: async () => {
             if (!company?.id) return [];
-            const { data, error } = await supabase.rpc('get_company_lead_columns' as any, {
-                input_company_id: company.id
-            });
-            if (error) throw error;
-            return (data as any) as ColumnDef[];
+            try {
+                const { data, error } = await orgClient
+                    .from('leads' as any)
+                    .select('*')
+                    .eq('company_id', company.id)
+                    .limit(5);
+
+                if (!error && data && data.length > 0) {
+                    const keysSet = new Set<string>();
+                    data.forEach((row: any) => {
+                        Object.keys(row).forEach((k) => keysSet.add(k));
+                        if (row.custom_data && typeof row.custom_data === 'object') {
+                            Object.keys(row.custom_data).forEach((ck) => keysSet.add(ck));
+                        }
+                    });
+
+                    return Array.from(keysSet).map((k) => ({
+                        column_name: k,
+                        data_type: 'text',
+                        is_nullable: 'YES'
+                    })) as ColumnDef[];
+                }
+
+                return [];
+            } catch (e) {
+                return [];
+            }
         },
-        enabled: !!company?.id
+        enabled: !!company?.id && !isBYOSLoading
     });
 
     // System columns we want to hide or show specifically

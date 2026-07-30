@@ -15,7 +15,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
+import { useOrgClient } from '@/hooks/useOrgClient';
 import { useLeadStatuses } from '@/hooks/useLeadStatuses';
 import { HEALTHCARE_DEPARTMENTS, HEALTHCARE_GENDERS } from '../config';
 import type { HealthcareLead } from './HealthcareLeadsTable';
@@ -57,6 +57,7 @@ interface HealthcareEditLeadDialogProps {
 export function HealthcareEditLeadDialog({ open, onOpenChange, lead, onSuccess }: HealthcareEditLeadDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { statuses } = useLeadStatuses();
+  const { orgClient } = useOrgClient();
   const [statusReminderOpen, setStatusReminderOpen] = useState(false);
   const [pendingStatus, setPendingStatus] = useState<CompanyLeadStatus | null>(null);
   const [reminderAt, setReminderAt] = useState<Date | null>(null);
@@ -127,7 +128,7 @@ export function HealthcareEditLeadDialog({ open, onOpenChange, lead, onSuccess }
     if (!lead) return;
     setIsSubmitting(true);
     try {
-      const { error } = await supabase.from('leads_healthcare' as any).update({
+      const { error } = await orgClient.from('leads_healthcare' as any).update({
         name: values.name,
         email: values.email || null,
         phone: values.phone || null,

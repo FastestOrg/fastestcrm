@@ -22,6 +22,7 @@ import { MobileLeadsHeader } from '@/components/leads/MobileLeadsHeader';
 import { FloatingAddButton } from '@/components/leads/FloatingAddButton';
 import { useLeadsTable } from '@/hooks/useLeadsTable';
 import { useCompany } from '@/hooks/useCompany';
+import { useOrgClient } from '@/hooks/useOrgClient';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { EditLeadDialog } from '@/components/leads/EditLeadDialog';
 import { LeadDetailsDialog } from '@/components/leads/LeadDetailsDialog';
@@ -157,9 +158,9 @@ export default function GenericAllLeads() {
         });
     };
 
-    // Fetch filter options — all queries run in parallel via Promise.all
+    const { orgClient, isBYOSLoading } = useOrgClient();
     const { data: filterOptions } = useQuery({
-        queryKey: ['leadsFilterOptions', company?.id, tableName, JSON.stringify(columnConfig)],
+        queryKey: ['leadsFilterOptions', (orgClient as any)?.supabaseUrl || 'default', company?.id, tableName, JSON.stringify(columnConfig)],
         queryFn: async () => {
             if (!company?.id || !tableName) return null;
 
@@ -183,35 +184,50 @@ export default function GenericAllLeads() {
                     .select('id, full_name')
                     .eq('company_id', company.id)
                     .not('full_name', 'is', null),
-                supabase
+                orgClient
                     .from('products')
                     .select('name')
                     .eq('company_id', company.id)
                     .order('name'),
-                supabase
-                    .from('company_lead_statuses' as any)
-                    .select('label, value, category, order_index')
+                orgClient
+                    .from('lead_statuses' as any)
+                    .select('*')
                     .eq('company_id', company.id)
-                    .order('order_index'),
+                    .order('sort_order'),
                 ...dynamicColsToFetch.map(async (c: any) => {
                     try {
-                        const { data, error } = await supabase
-                            .from(tableName as any)
-                            .select(c.id)
-                            .eq('company_id', company.id)
-                            .not(c.id, 'is', null);
-                        if (error) {
-                            console.error(`Error fetching dynamic values for ${c.id}:`, error);
-                            return { id: c.id, options: [] };
+                        let uniqueVals: string[] = [];
+
+                        // 1. Try high-performance RPC first to bypass 1,000-row REST limit and get all distinct options across 300K+ leads
+                        const { data: rpcData, error: rpcError } = await (orgClient as any).rpc('get_distinct_column_values', {
+                            p_table_name: tableName,
+                            p_column_name: c.id,
+                            p_company_id: company.id
+                        });
+
+                        if (!rpcError && Array.isArray(rpcData)) {
+                            uniqueVals = rpcData;
+                        } else {
+                            // 2. Fallback to standard select query if RPC fails or is unavailable
+                            const { data, error } = await orgClient
+                                .from(tableName as any)
+                                .select(c.id)
+                                .eq('company_id', company.id)
+                                .not(c.id, 'is', null);
+
+                            if (error) {
+                                console.error(`Error fetching dynamic values for ${c.id}:`, error);
+                                return { id: c.id, options: [] };
+                            }
+                            uniqueVals = Array.from(new Set(
+                                (data || []).map((r: any) => {
+                                    const val = r[c.id];
+                                    if (typeof val === 'boolean') return val ? 'true' : 'false';
+                                    return val;
+                                })
+                            )).filter((val: any) => val !== undefined && val !== null && val !== '')
+                             .sort();
                         }
-                        const uniqueVals = Array.from(new Set(
-                            (data || []).map((r: any) => {
-                                const val = r[c.id];
-                                if (typeof val === 'boolean') return val ? 'true' : 'false';
-                                return val;
-                            })
-                        )).filter((val: any) => val !== undefined && val !== null && val !== '')
-                         .sort();
                         
                         return {
                             id: c.id,
@@ -240,13 +256,22 @@ export default function GenericAllLeads() {
             }
 
             const products = productsResult.data;
-            const statusesData = statusesResult.data as any[] | null;
+            let statusesData = statusesResult.data as any[] | null;
+
+            if (!statusesData || statusesData.length === 0) {
+                const { data: fbData } = await orgClient
+                    .from('company_lead_statuses' as any)
+                    .select('*')
+                    .eq('company_id', company.id)
+                    .order('order_index');
+                statusesData = fbData;
+            }
 
             const statuses = statusesData && statusesData.length > 0
                 ? statusesData.map((s: any) => ({
-                    label: s.label,
-                    value: s.value,
-                    group: s.category
+                    label: s.name || s.label || 'Status',
+                    value: s.value || (s.name || s.label || 'status').toLowerCase().replace(/[^a-z0-9_]/g, '_'),
+                    group: s.category || s.status_type || 'Custom'
                 }))
                 : Constants.public.Enums.lead_status.map(s => ({ label: s.replace('_', ' '), value: s, group: 'System' }));
 

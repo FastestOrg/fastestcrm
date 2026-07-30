@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
+import { useOrgClient } from '@/hooks/useOrgClient';
 import { useAuth } from '@/hooks/useAuth';
 import { useCompany } from '@/hooks/useCompany';
 import { useLeadStatuses } from '@/hooks/useLeadStatuses';
@@ -51,6 +51,7 @@ export function TravelAddLeadDialog({ open: controlledOpen, onOpenChange, trigge
   const { user } = useAuth();
   const { company } = useCompany();
   const { statuses } = useLeadStatuses();
+  const { orgClient } = useOrgClient();
   const queryClient = useQueryClient();
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -67,7 +68,7 @@ export function TravelAddLeadDialog({ open: controlledOpen, onOpenChange, trigge
     if (!user || !company) { toast.error('You must be logged in and part of a company'); return; }
     setIsSubmitting(true);
     try {
-      const { error } = await supabase.from('leads_travel' as any).insert({
+      const { error } = await orgClient.from('leads_travel' as any).insert({
         name: values.name,
         email: values.email || null,
         phone: values.phone || null,

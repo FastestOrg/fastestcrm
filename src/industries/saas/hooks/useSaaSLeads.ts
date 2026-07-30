@@ -2,7 +2,10 @@ import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useCompany } from '@/hooks/useCompany';
+import { useOrgClient } from '@/hooks/useOrgClient';
 import type { SaaSLead } from '../components/SaaSLeadsTable';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Database } from '@/integrations/supabase/types';
 
 interface UseSaaSLeadsOptions {
   search?: string;
@@ -17,6 +20,7 @@ interface UseSaaSLeadsOptions {
 }
 
 async function fetchSaaSLeadsData({
+  client,
   companyId,
   search,
   statusFilter,
@@ -28,6 +32,7 @@ async function fetchSaaSLeadsData({
   accessibleUserIds,
   canViewAll
 }: {
+  client?: SupabaseClient<Database>;
   companyId: string;
   search?: string;
   statusFilter?: string | string[];
@@ -39,9 +44,10 @@ async function fetchSaaSLeadsData({
   accessibleUserIds: string[];
   canViewAll: boolean;
 }): Promise<{ leads: SaaSLead[]; count: number }> {
-  let query = supabase
+  const dbClient = client || supabase;
+  let query = dbClient
     .from('leads_saas' as any)
-    .select('*, sales_owner:profiles!leads_saas_sales_owner_id_fkey(full_name)', { count: 'exact' })
+    .select('*', { count: 'exact' })
     .eq('company_id', companyId)
     .order('created_at', { ascending: false });
 
@@ -104,10 +110,12 @@ export function useSaaSLeads({
   canViewAll = true,
 }: UseSaaSLeadsOptions = {}) {
   const { company, loading: companyLoading } = useCompany();
+  const { orgClient, isBYOSLoading } = useOrgClient();
   const queryClient = useQueryClient();
 
   const queryKey = [
     'saas-leads',
+    (orgClient as any)?.supabaseUrl || 'default',
     search,
     statusFilter,
     ownerFilter,
@@ -123,6 +131,7 @@ export function useSaaSLeads({
   const query = useQuery({
     queryKey,
     queryFn: () => fetchSaaSLeadsData({
+      client: orgClient,
       companyId: company!.id,
       search,
       statusFilter,
@@ -134,7 +143,7 @@ export function useSaaSLeads({
       accessibleUserIds,
       canViewAll
     }),
-    enabled: !companyLoading && !!company?.id,
+    enabled: !companyLoading && !!company?.id && !isBYOSLoading,
     placeholderData: (prev) => prev,
     retry: 2,
     staleTime: 60000,
@@ -161,6 +170,7 @@ export function useSaaSLeads({
       queryClient.prefetchQuery({
         queryKey: nextQueryKey,
         queryFn: () => fetchSaaSLeadsData({
+          client: orgClient,
           companyId: company.id,
           search,
           statusFilter,

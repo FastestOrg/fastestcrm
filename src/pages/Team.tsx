@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Users, UserPlus, ChevronRight, Shield, Loader2, ArrowUp, Mail, Trash2, Lock, Pencil, UserX, UserCheck } from 'lucide-react';
+import { Users, UserPlus, ChevronRight, Shield, Loader2, ArrowUp, Mail, Trash2, Lock, Pencil, UserX, UserCheck, Key, Eye, EyeOff } from 'lucide-react';
 import { useTeam, AppRole } from '@/hooks/useTeam';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/components/ui/use-toast';
@@ -65,6 +65,7 @@ export default function Team() {
         deleteMember,
         toggleMemberStatus,
         updateIncentive,
+        resetUserPassword,
         getRoleLabel,
         getAssignableRoles,
         refetch,
@@ -107,7 +108,18 @@ export default function Team() {
     const [incentivePercentInput, setIncentivePercentInput] = useState('0');
     const [isSavingIncentive, setIsSavingIncentive] = useState(false);
 
+    // Password Reset State
+    const [resetPasswordInput, setResetPasswordInput] = useState('');
+    const [showResetPassword, setShowResetPassword] = useState(false);
+    const [isResettingPassword, setIsResettingPassword] = useState(false);
+
+    // Danger Zone Collapsible State
+    const [isDangerZoneOpen, setIsDangerZoneOpen] = useState(false);
+
     useEffect(() => {
+        setResetPasswordInput('');
+        setShowResetPassword(false);
+        setIsDangerZoneOpen(false);
         if (selectedMember) {
             const member = members.find(m => m.id === selectedMember);
             if (member) {
@@ -174,6 +186,48 @@ export default function Team() {
                 title: "Success",
                 description: `Incentive percentage set to ${percent}%.`,
             });
+        }
+    };
+
+    const handleResetPassword = async () => {
+        if (!selectedMember) return;
+
+        if (!resetPasswordInput || resetPasswordInput.trim().length < 6) {
+            toast({
+                title: "Invalid Password",
+                description: "Password must be at least 6 characters.",
+                variant: "destructive"
+            });
+            return;
+        }
+
+        if (resetPasswordInput.length > 72) {
+            toast({
+                title: "Invalid Password",
+                description: "Password must be less than 72 characters.",
+                variant: "destructive"
+            });
+            return;
+        }
+
+        setIsResettingPassword(true);
+        const { error } = await resetUserPassword(selectedMember, resetPasswordInput.trim());
+        setIsResettingPassword(false);
+
+        if (error) {
+            toast({
+                title: "Error",
+                description: error.message || "Failed to reset password.",
+                variant: "destructive"
+            });
+        } else {
+            const member = members.find(m => m.id === selectedMember);
+            toast({
+                title: "Password Reset Successful",
+                description: `Password for ${member?.full_name || member?.email || 'user'} has been updated.`,
+            });
+            setResetPasswordInput('');
+            setShowResetPassword(false);
         }
     };
 
@@ -696,7 +750,7 @@ export default function Team() {
 
                 {/* Manage Member Dialog - Controlled by selectedMember state */}
                 <Dialog open={!!selectedMember} onOpenChange={(open) => !open && setSelectedMember(null)}>
-                    <DialogContent>
+                    <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
                         <DialogHeader>
                             <DialogTitle className="flex flex-col gap-1">
                                 <span>Manage {members.find(m => m.id === selectedMember)?.full_name}</span>
@@ -825,77 +879,136 @@ export default function Team() {
                                 </div>
                             </div>
 
+                            {/* Danger Zone Section (Collapsible) */}
                             <div className="pt-4 border-t">
-                                <label className="text-sm font-medium mb-2 block text-destructive">
-                                    Danger Zone
-                                </label>
-                                <div className="space-y-3">
-                                    {/* Deactivate / Reactivate */}
-                                    {(() => {
-                                        const member = members.find(m => m.id === selectedMember);
-                                        const isDeactivated = member?.is_deactivated;
-                                        return (
-                                            <>
-                                                <p className="text-xs text-muted-foreground">
-                                                    {isDeactivated
-                                                        ? "This user is currently deactivated and cannot access the CRM. Reactivate to restore access."
-                                                        : "Deactivating a user will prevent them from logging in. Their data (leads, forms) will be preserved."}
-                                                </p>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    className="w-full flex items-center justify-between border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                    onClick={() => setIsDangerZoneOpen(!isDangerZoneOpen)}
+                                >
+                                    <span className="flex items-center gap-2 text-sm font-medium">
+                                        <Trash2 className="h-4 w-4" />
+                                        Danger Zone
+                                    </span>
+                                    <ChevronRight className={`h-4 w-4 transition-transform duration-200 ${isDangerZoneOpen ? 'rotate-90' : ''}`} />
+                                </Button>
+                                {isDangerZoneOpen && (
+                                    <div className="mt-3 space-y-4 bg-destructive/5 p-3 rounded-lg border border-destructive/20">
+                                        {/* Reset Password */}
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-semibold flex items-center gap-1.5 text-foreground">
+                                                <Key className="h-3.5 w-3.5 text-primary" />
+                                                Reset User Password
+                                            </label>
+                                            <p className="text-xs text-muted-foreground">
+                                                Set a new login password for this employee.
+                                            </p>
+                                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-1">
+                                                <div className="relative flex-1">
+                                                    <Input
+                                                        type={showResetPassword ? "text" : "password"}
+                                                        placeholder="New password (min 6 chars)"
+                                                        value={resetPasswordInput}
+                                                        onChange={(e) => setResetPasswordInput(e.target.value)}
+                                                        className="pr-10 bg-background"
+                                                    />
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="absolute right-0 top-0 h-full px-3 text-muted-foreground hover:text-foreground"
+                                                        onClick={() => setShowResetPassword(!showResetPassword)}
+                                                        title={showResetPassword ? "Hide password" : "Show password"}
+                                                    >
+                                                        {showResetPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                                    </Button>
+                                                </div>
                                                 <Button
-                                                    variant={isDeactivated ? "default" : "outline"}
-                                                    className={`w-full ${isDeactivated ? '' : 'border-warning text-warning hover:bg-warning/10'}`}
-                                                    onClick={() => setDeactivateDialogOpen(true)}
+                                                    type="button"
+                                                    onClick={handleResetPassword}
+                                                    disabled={isResettingPassword || !resetPasswordInput}
+                                                    className="shrink-0"
                                                 >
-                                                    {isDeactivated ? (
-                                                        <><UserCheck className="h-4 w-4 mr-2" /> Reactivate User</>
-                                                    ) : (
-                                                        <><UserX className="h-4 w-4 mr-2" /> Deactivate User</>
-                                                    )}
+                                                    {isResettingPassword ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Key className="h-4 w-4 mr-2" />}
+                                                    Reset Password
                                                 </Button>
-                                            </>
-                                        );
-                                    })()}
+                                            </div>
+                                        </div>
 
-                                    {/* Separator */}
-                                    <div className="border-t" />
+                                        {/* Separator */}
+                                        <div className="border-t border-destructive/20" />
 
-                                    <p className="text-xs text-muted-foreground">
-                                        When removing a member permanently, you must choose what to do with their assigned leads and forms.
-                                    </p>
-                                    <Select
-                                        value={reassignToId}
-                                        onValueChange={(v) => setReassignToId(v)}
-                                    >
-                                        <SelectTrigger className="border-destructive/30 focus:ring-destructive">
-                                            <SelectValue placeholder="Reassign data to..." />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="unassigned">Leave Unassigned</SelectItem>
-                                            {members
-                                                .filter(m => m.id !== selectedMember)
-                                                .map(m => (
-                                                    <SelectItem key={m.id} value={m.id}>
-                                                        {m.full_name || m.email} ({getRoleLabel(m.role)})
-                                                    </SelectItem>
-                                                ))
-                                            }
-                                        </SelectContent>
-                                    </Select>
-                                    <Button
-                                        variant="destructive"
-                                        className="w-full"
-                                        disabled={!reassignToId}
-                                        onClick={() => {
-                                            if (selectedMember) {
-                                                setMemberToDelete(selectedMember);
-                                                setDeleteDialogOpen(true);
-                                            }
-                                        }}
-                                    >
-                                        <Trash2 className="h-4 w-4 mr-2" />
-                                        Remove Member
-                                    </Button>
-                                </div>
+                                        {/* Deactivate / Reactivate */}
+                                        {(() => {
+                                            const member = members.find(m => m.id === selectedMember);
+                                            const isDeactivated = member?.is_deactivated;
+                                            return (
+                                                <div className="space-y-2">
+                                                    <p className="text-xs text-muted-foreground">
+                                                        {isDeactivated
+                                                            ? "This user is currently deactivated and cannot access the CRM. Reactivate to restore access."
+                                                            : "Deactivating a user will prevent them from logging in. Their data (leads, forms) will be preserved."}
+                                                    </p>
+                                                    <Button
+                                                        variant={isDeactivated ? "default" : "outline"}
+                                                        className={`w-full ${isDeactivated ? '' : 'border-warning text-warning hover:bg-warning/10'}`}
+                                                        onClick={() => setDeactivateDialogOpen(true)}
+                                                    >
+                                                        {isDeactivated ? (
+                                                            <><UserCheck className="h-4 w-4 mr-2" /> Reactivate User</>
+                                                        ) : (
+                                                            <><UserX className="h-4 w-4 mr-2" /> Deactivate User</>
+                                                        )}
+                                                    </Button>
+                                                </div>
+                                            );
+                                        })()}
+
+                                        {/* Separator */}
+                                        <div className="border-t border-destructive/20" />
+
+                                        {/* Remove Member */}
+                                        <div className="space-y-2">
+                                            <p className="text-xs text-muted-foreground">
+                                                When removing a member permanently, you must choose what to do with their assigned leads and forms.
+                                            </p>
+                                            <Select
+                                                value={reassignToId}
+                                                onValueChange={(v) => setReassignToId(v)}
+                                            >
+                                                <SelectTrigger className="border-destructive/30 focus:ring-destructive bg-background">
+                                                    <SelectValue placeholder="Reassign data to..." />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="unassigned">Leave Unassigned</SelectItem>
+                                                    {members
+                                                        .filter(m => m.id !== selectedMember)
+                                                        .map(m => (
+                                                            <SelectItem key={m.id} value={m.id}>
+                                                                {m.full_name || m.email} ({getRoleLabel(m.role)})
+                                                            </SelectItem>
+                                                        ))
+                                                    }
+                                                </SelectContent>
+                                            </Select>
+                                            <Button
+                                                variant="destructive"
+                                                className="w-full"
+                                                disabled={!reassignToId}
+                                                onClick={() => {
+                                                    if (selectedMember) {
+                                                        setMemberToDelete(selectedMember);
+                                                        setDeleteDialogOpen(true);
+                                                    }
+                                                }}
+                                            >
+                                                <Trash2 className="h-4 w-4 mr-2" />
+                                                Remove Member
+                                            </Button>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </DialogContent>

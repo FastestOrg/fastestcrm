@@ -15,7 +15,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
+import { useOrgClient } from '@/hooks/useOrgClient';
 import { useLeadStatuses } from '@/hooks/useLeadStatuses';
 import { COMPANY_SIZES, PLAN_TYPES, DEAL_STAGES, LOSS_REASONS } from '../config';
 import type { SaaSLead } from './SaaSLeadsTable';
@@ -62,6 +62,7 @@ interface SaaSEditLeadDialogProps {
 export function SaaSEditLeadDialog({ open, onOpenChange, lead, onSuccess }: SaaSEditLeadDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { statuses } = useLeadStatuses();
+  const { orgClient } = useOrgClient();
   const [statusReminderOpen, setStatusReminderOpen] = useState(false);
   const [pendingStatus, setPendingStatus] = useState<CompanyLeadStatus | null>(null);
   const [reminderAt, setReminderAt] = useState<Date | null>(null);
@@ -140,7 +141,7 @@ export function SaaSEditLeadDialog({ open, onOpenChange, lead, onSuccess }: SaaS
     if (!lead) return;
     setIsSubmitting(true);
     try {
-      const { error } = await supabase
+      const { error } = await orgClient
         .from('leads_saas' as any)
         .update({
           name: values.name,

@@ -2,16 +2,18 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { useCompany } from './useCompany';
+import { useOrgClient } from './useOrgClient';
 import { toast } from '@/components/ui/sonner';
 
 export function useCalendarConnection() {
   const { user } = useAuth();
+  const { orgClient } = useOrgClient();
 
   return useQuery({
     queryKey: ['calendar-connection', user?.id],
     queryFn: async () => {
       if (!user?.id) return null;
-      const { data, error } = await supabase
+      const { data, error } = await orgClient
         .from('calendar_connections' as any)
         .select('*')
         .eq('user_id', user.id)
@@ -24,38 +26,76 @@ export function useCalendarConnection() {
   });
 }
 
+const missingCalendarTablesCache = new Set<string>();
+
 export function useCalendarEvents(startDate?: Date, endDate?: Date) {
   const { user } = useAuth();
+  const { orgClient, isBYOSLoading } = useOrgClient();
 
   return useQuery({
-    queryKey: ['calendar-events', user?.id, startDate?.toISOString(), endDate?.toISOString()],
+    queryKey: ['calendar-events', (orgClient as any)?.supabaseUrl || 'default', user?.id, startDate?.toISOString(), endDate?.toISOString()],
     queryFn: async () => {
       if (!user?.id) return [];
-      let query = supabase
-        .from('calendar_events' as any)
-        .select('*')
-        .eq('user_id', user.id)
-        .order('start_time', { ascending: true });
 
-      if (startDate) query = query.gte('start_time', startDate.toISOString());
-      if (endDate) query = query.lte('start_time', endDate.toISOString());
+      const targetUrl = (orgClient as any)?.supabaseUrl || 'default';
+      const isDefaultHost = targetUrl.includes('api.fastestcrm.com') || targetUrl.includes('uykdyqdeyilpulaqlqip');
 
-      const { data, error } = await query;
-      if (error) throw error;
-      return data || [];
+      const primaryTable = isDefaultHost ? 'calendar_events' : 'calendar_bookings';
+      const fallbackTable = isDefaultHost ? 'calendar_bookings' : 'calendar_events';
+
+      const cacheKeyMissingPrimary = `${targetUrl}_missing_${primaryTable}`;
+
+      try {
+        if (!missingCalendarTablesCache.has(cacheKeyMissingPrimary)) {
+          let query = orgClient
+            .from(primaryTable as any)
+            .select('*')
+            .eq('user_id', user.id)
+            .neq('status', 'cancelled')
+            .order('start_time', { ascending: true });
+
+          if (startDate) query = query.gte('start_time', startDate.toISOString());
+          if (endDate) query = query.lte('start_time', endDate.toISOString());
+
+          const { data, error } = await query;
+          if (!error && data) return data;
+
+          if (error) {
+            missingCalendarTablesCache.add(cacheKeyMissingPrimary);
+          }
+        }
+
+        let fbQuery = orgClient
+          .from(fallbackTable as any)
+          .select('*')
+          .eq('user_id', user.id)
+          .neq('status', 'cancelled')
+          .order('start_time', { ascending: true });
+
+        if (startDate) fbQuery = fbQuery.gte('start_time', startDate.toISOString());
+        if (endDate) fbQuery = fbQuery.lte('start_time', endDate.toISOString());
+
+        const { data: fbData, error: fbErr } = await fbQuery;
+        if (!fbErr && fbData) return fbData;
+
+        return [];
+      } catch (e) {
+        return [];
+      }
     },
-    enabled: !!user?.id,
+    enabled: !!user?.id && !isBYOSLoading,
   });
 }
 
 export function useBookingPage() {
   const { user } = useAuth();
+  const { orgClient } = useOrgClient();
 
   return useQuery({
     queryKey: ['booking-page', user?.id],
     queryFn: async () => {
       if (!user?.id) return null;
-      const { data, error } = await supabase
+      const { data, error } = await orgClient
         .from('booking_pages' as any)
         .select('*')
         .eq('user_id', user.id)
@@ -70,12 +110,13 @@ export function useBookingPage() {
 export function useCreateBookingPage() {
   const { user } = useAuth();
   const { company } = useCompany();
+  const { orgClient } = useOrgClient();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (config: { title: string; description?: string; durations: number[]; availability: any; slug: string; bufferMinutes?: number; id?: string }) => {
       if (!user?.id || !company?.id) throw new Error('Not authenticated');
-      const { data, error } = await supabase
+      const { data, error } = await orgClient
         .from('booking_pages' as any)
         .upsert({
           id: config.id, // Primary key for matching

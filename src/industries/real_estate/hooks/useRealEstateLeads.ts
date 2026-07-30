@@ -2,7 +2,10 @@ import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useCompany } from '@/hooks/useCompany';
+import { useOrgClient } from '@/hooks/useOrgClient';
 import type { RealEstateLead } from '../components/RealEstateLeadsTable';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Database } from '@/integrations/supabase/types';
 
 interface UseRealEstateLeadsOptions {
   search?: string;
@@ -17,6 +20,7 @@ interface UseRealEstateLeadsOptions {
 }
 
 async function fetchRealEstateLeadsData({
+  client,
   companyId,
   search,
   statusFilter,
@@ -28,6 +32,7 @@ async function fetchRealEstateLeadsData({
   canViewAll,
   activeOwnerIds
 }: {
+  client?: SupabaseClient<Database>;
   companyId: string;
   search?: string;
   statusFilter?: string | string[];
@@ -39,10 +44,11 @@ async function fetchRealEstateLeadsData({
   canViewAll: boolean;
   activeOwnerIds: string[];
 }): Promise<{ leads: RealEstateLead[]; count: number }> {
+  const dbClient = client || supabase;
   // Use direct query instead of RPC to avoid TypeScript issues
-  let query = supabase
+  let query = dbClient
     .from('leads_real_estate')
-    .select('*, sales_owner:profiles!leads_real_estate_sales_owner_id_fkey(full_name)', { count: 'exact' })
+    .select('*', { count: 'exact' })
     .eq('company_id', companyId)
     .order('created_at', { ascending: false });
 
@@ -125,10 +131,12 @@ export function useRealEstateLeads({
   activeOwnerIds = [],
 }: UseRealEstateLeadsOptions = {}) {
   const { company, loading: companyLoading } = useCompany();
+  const { orgClient, isBYOSLoading } = useOrgClient();
   const queryClient = useQueryClient();
 
   const queryKey = [
     'real-estate-leads',
+    (orgClient as any)?.supabaseUrl || 'default',
     search,
     statusFilter,
     ownerFilter,
@@ -144,6 +152,7 @@ export function useRealEstateLeads({
   const query = useQuery({
     queryKey,
     queryFn: () => fetchRealEstateLeadsData({
+      client: orgClient,
       companyId: company!.id,
       search,
       statusFilter,
@@ -155,7 +164,7 @@ export function useRealEstateLeads({
       canViewAll,
       activeOwnerIds
     }),
-    enabled: !companyLoading && !!company?.id,
+    enabled: !companyLoading && !!company?.id && !isBYOSLoading,
     placeholderData: (prev) => prev,
     retry: 2,
     staleTime: 60000,
@@ -182,6 +191,7 @@ export function useRealEstateLeads({
       queryClient.prefetchQuery({
         queryKey: nextQueryKey,
         queryFn: () => fetchRealEstateLeadsData({
+          client: orgClient,
           companyId: company.id,
           search,
           statusFilter,

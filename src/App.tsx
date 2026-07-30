@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { SubdomainProvider, useSubdomainContext } from "@/contexts/SubdomainContext";
 import { SubdomainGate } from "@/components/SubdomainGate";
 import { CompanyBrandingProvider } from "@/contexts/CompanyBrandingContext";
+import { BYOSProvider } from "@/contexts/BYOSContext";
 import { SubdomainAccessGuard } from "@/components/SubdomainAccessGuard";
 import AppLayout from "@/components/layout/AppLayout";
 import { usePlatformAdmin } from "@/hooks/usePlatformAdmin";
@@ -337,14 +338,16 @@ const App = () => (
           <AuthProvider>
             <SubdomainProvider>
               <CompanyBrandingProvider>
-                <TooltipProvider>
-                  <Toaster />
-                  <Sonner />
-                  {/* Gate only handles showing a spinner while resolving non-main domains */}
-                  <SubdomainGate mainDomainContent={<AppRoutes />}>
-                    <AppRoutes />
-                  </SubdomainGate>
-                </TooltipProvider>
+                <BYOSProvider>
+                  <TooltipProvider>
+                    <Toaster />
+                    <Sonner />
+                    {/* Gate only handles showing a spinner while resolving non-main domains */}
+                    <SubdomainGate mainDomainContent={<AppRoutes />}>
+                      <AppRoutes />
+                    </SubdomainGate>
+                  </TooltipProvider>
+                </BYOSProvider>
               </CompanyBrandingProvider>
             </SubdomainProvider>
           </AuthProvider>

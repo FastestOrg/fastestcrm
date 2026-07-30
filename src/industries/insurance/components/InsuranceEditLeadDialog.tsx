@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
+import { useOrgClient } from '@/hooks/useOrgClient';
 import { useLeadStatuses } from '@/hooks/useLeadStatuses';
 import { INSURANCE_TYPES, CONTRIBUTION_FREQUENCIES, GENDERS, NOMINEE_RELATIONS, LOSS_REASONS } from '../config';
 import type { InsuranceLead } from './InsuranceLeadsTable';
@@ -56,6 +56,7 @@ interface Props {
 export function InsuranceEditLeadDialog({ open, onOpenChange, lead, onSuccess }: Props) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { statuses } = useLeadStatuses();
+  const { orgClient } = useOrgClient();
   const [statusReminderOpen, setStatusReminderOpen] = useState(false);
   const [pendingStatus, setPendingStatus] = useState<CompanyLeadStatus | null>(null);
   const [reminderAt, setReminderAt] = useState<Date | null>(null);
@@ -101,7 +102,7 @@ export function InsuranceEditLeadDialog({ open, onOpenChange, lead, onSuccess }:
     if (!lead) return;
     setIsSubmitting(true);
     try {
-      const { error } = await supabase.from('leads_insurance' as any).update({
+      const { error } = await orgClient.from('leads_insurance' as any).update({
         name: values.name, email: values.email || null, phone: values.phone || null,
         whatsapp: values.whatsapp || null, age: values.age ? parseInt(values.age) : null,
         gender: values.gender || null, pan_number: values.pan_number || null,

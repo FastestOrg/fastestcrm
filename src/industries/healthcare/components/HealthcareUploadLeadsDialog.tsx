@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { useAuth } from '@/hooks/useAuth';
 import { useCompany } from '@/hooks/useCompany';
 import { supabase } from '@/integrations/supabase/client';
+import { useOrgClient } from '@/hooks/useOrgClient';
 import { toast } from 'sonner';
 import { Upload, FileUp, Download, AlertCircle, CheckCircle } from 'lucide-react';
 import Papa from 'papaparse';
@@ -27,6 +28,7 @@ export function HealthcareUploadLeadsDialog() {
   const [progress, setProgress] = useState<UploadProgress | null>(null);
   const { user } = useAuth();
   const { company } = useCompany();
+  const { orgClient } = useOrgClient();
   const queryClient = useQueryClient();
   const abortRef = useRef(false);
 
@@ -132,7 +134,7 @@ export function HealthcareUploadLeadsDialog() {
             const batch = enrichedLeads.slice(i, i + BATCH_SIZE);
 
             // Try bulk insert first for performance
-            const { error: bulkError } = await supabase.from('leads_healthcare' as any).insert(batch).select('id');
+            const { error: bulkError } = await orgClient.from('leads_healthcare' as any).insert(batch).select('id');
 
             if (!bulkError) {
               // Bulk insert successful
@@ -145,7 +147,7 @@ export function HealthcareUploadLeadsDialog() {
               // Fallback to individual inserts if bulk fails (e.g., due to a duplicate)
               const results = await Promise.all(batch.map(async (lead: any) => {
                 try {
-                  const { error } = await supabase.from('leads_healthcare' as any).insert(lead);
+                  const { error } = await orgClient.from('leads_healthcare' as any).insert(lead);
                   if (error) return error.code === '23505' ? 'duplicate' : 'error';
                   return 'success';
                 } catch { return 'error'; }

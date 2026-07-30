@@ -35,6 +35,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { useOrgClient } from '@/hooks/useOrgClient';
 import { useLeadStatuses } from '@/hooks/useLeadStatuses';
 import { RealEstateEditLeadDialog } from './RealEstateEditLeadDialog';
 import { RealEstateLeadDetailsDialog } from './RealEstateLeadDetailsDialog';
@@ -137,6 +138,7 @@ export const RealEstateLeadsTable = memo(function RealEstateLeadsTable({
   const [cameraDialogLead, setCameraDialogLead] = useState<RealEstateLead | null>(null);
   const [pendingStatus, setPendingStatus] = useState<{ leadId: string; status: CompanyLeadStatus } | null>(null);
   const [reminderDialogOpen, setReminderDialogOpen] = useState(false);
+  const { orgClient } = useOrgClient();
   const queryClient = useQueryClient();
 
   // New state for Notes editing
@@ -165,7 +167,7 @@ export const RealEstateLeadsTable = memo(function RealEstateLeadsTable({
 
   const handleUpdateField = async (leadId: string, field: keyof RealEstateLead, value: any) => {
     try {
-      const { error } = await supabase
+      const { error } = await orgClient
         .from('leads_real_estate')
         .update({ [field]: value })
         .eq('id', leadId);
@@ -233,7 +235,7 @@ export const RealEstateLeadsTable = memo(function RealEstateLeadsTable({
         }
       }
 
-      const { error } = await supabase
+      const { error } = await orgClient
         .from('leads_real_estate')
         .update(updateData)
         .eq('id', leadId);

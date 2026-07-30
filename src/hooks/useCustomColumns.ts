@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useCompany } from './useCompany';
 import { supabase } from '@/integrations/supabase/client';
+import { useOrgClient } from './useOrgClient';
 import { useMemo } from 'react';
 
 export interface CustomColumn {
@@ -17,30 +18,67 @@ const systemColumns = [
   'reminder_at', 'send_web_push', 'last_notification_sent_at', 'pre_sales_owner_id', 'post_sales_owner_id', 'lead_history'
 ];
 
-export function useCustomColumns() {
+export function useCustomColumns(tableName: string = 'leads') {
   const { company } = useCompany();
+  const { orgClient, isBYOSLoading } = useOrgClient();
 
   const { data: dbColumns = [], isLoading } = useQuery({
-    queryKey: ['lead-columns', company?.id],
+    queryKey: ['lead-columns', (orgClient as any)?.supabaseUrl || 'default', company?.id, tableName],
     queryFn: async () => {
       if (!company?.id) return [];
-      const { data, error } = await supabase.rpc('get_company_lead_columns' as any, {
-        input_company_id: company.id
-      });
-      if (error) throw error;
-      return data as any[];
+      try {
+        // Inspect actual lead record keys directly from database
+        const { data, error } = await orgClient
+          .from(tableName as any)
+          .select('*')
+          .eq('company_id', company.id)
+          .limit(5);
+
+        if (!error && data && data.length > 0) {
+          const keysSet = new Set<string>();
+          const customDataKeysSet = new Set<string>();
+
+          data.forEach((row: any) => {
+            Object.keys(row).forEach((k) => {
+              if (!hiddenColumns.includes(k) && !systemColumns.includes(k)) {
+                keysSet.add(k);
+              }
+            });
+
+            if (row.custom_data && typeof row.custom_data === 'object') {
+              Object.keys(row.custom_data).forEach((ck) => {
+                customDataKeysSet.add(ck);
+              });
+            }
+          });
+
+          const tableCols = Array.from(keysSet).map((k) => ({
+            column_name: k,
+            data_type: 'text'
+          }));
+
+          const jsonCols = Array.from(customDataKeysSet).map((ck) => ({
+            column_name: ck,
+            data_type: 'json_field'
+          }));
+
+          return [...tableCols, ...jsonCols];
+        }
+
+        return [];
+      } catch (e) {
+        return [];
+      }
     },
-    enabled: !!company?.id
+    enabled: !!company?.id && !isBYOSLoading
   });
 
   const customColumns = useMemo(() => {
-    return dbColumns
-      .filter((col: any) => !hiddenColumns.includes(col.column_name) && !systemColumns.includes(col.column_name))
-      .map((col: any) => ({
-        id: col.column_name,
-        label: col.column_name.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()),
-        type: col.data_type
-      }));
+    return dbColumns.map((col: any) => ({
+      id: col.column_name,
+      label: col.column_name.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()),
+      type: col.data_type || 'text'
+    }));
   }, [dbColumns]);
 
   return {

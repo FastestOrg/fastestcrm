@@ -27,6 +27,10 @@ verify_jwt = false
 [functions.delete-team-member]
 verify_jwt = true
 
+[functions.reset-user-password]
+verify_jwt = true
+
+
 [functions.verify-domain]
 verify_jwt = false
 

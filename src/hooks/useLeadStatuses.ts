@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useCompany } from './useCompany';
+import { useOrgClient } from './useOrgClient';
 
 export interface CompanyLeadStatus {
     id: string;
@@ -16,24 +17,84 @@ export interface CompanyLeadStatus {
     web_push_enabled: boolean;
 }
 
+const missingTablesCache = new Set<string>();
+
 export function useLeadStatuses() {
     const { company } = useCompany();
+    const { orgClient, isBYOSLoading } = useOrgClient();
 
     const { data: statuses, isLoading, error } = useQuery({
-        queryKey: ['company-lead-statuses', company?.id],
-        queryFn: async () => {
+        queryKey: ['lead-statuses', (orgClient as any)?.supabaseUrl || 'default', company?.id],
+        queryFn: async (): Promise<CompanyLeadStatus[]> => {
             if (!company?.id) return [];
 
-            const { data, error } = await (supabase
-                .from('company_lead_statuses' as any)
-                .select('*')
-                .eq('company_id', company.id)
-                .order('order_index', { ascending: true }));
+            const targetUrl = (orgClient as any)?.supabaseUrl || 'default';
+            const isDefaultHost = targetUrl.includes('api.fastestcrm.com') || targetUrl.includes('uykdyqdeyilpulaqlqip');
 
-            if (error) throw error;
-            return data as unknown as CompanyLeadStatus[];
+            // Default Supabase host has company_lead_statuses; BYOS hosts prefer lead_statuses
+            const primaryTable = isDefaultHost ? 'company_lead_statuses' : 'lead_statuses';
+            const fallbackTable = isDefaultHost ? 'lead_statuses' : 'company_lead_statuses';
+
+            const cacheKeyMissingPrimary = `${targetUrl}_missing_${primaryTable}`;
+
+            try {
+                if (!missingTablesCache.has(cacheKeyMissingPrimary)) {
+                    const { data, error } = await orgClient
+                        .from(primaryTable as any)
+                        .select('*')
+                        .eq('company_id', company.id)
+                        .order(primaryTable === 'company_lead_statuses' ? 'order_index' : 'sort_order', { ascending: true });
+
+                    if (!error && data && data.length > 0) {
+                        return data.map((s: any) => ({
+                            id: s.id,
+                            company_id: s.company_id,
+                            label: s.label || s.name || 'Status',
+                            value: s.value || (s.name || s.label || 'status').toLowerCase().replace(/[^a-z0-9_]/g, '_'),
+                            color: s.color || '#3B82F6',
+                            category: s.category || s.status_type || 'other',
+                            sub_statuses: s.sub_statuses || [],
+                            order_index: s.order_index ?? s.sort_order ?? 0,
+                            is_active: s.is_active !== undefined ? s.is_active : true,
+                            status_type: s.status_type || 'simple',
+                            web_push_enabled: s.web_push_enabled || false
+                        }));
+                    }
+
+                    if (error) {
+                        missingTablesCache.add(cacheKeyMissingPrimary);
+                    }
+                }
+
+                // Fallback table
+                const { data: fbData, error: fbErr } = await orgClient
+                    .from(fallbackTable as any)
+                    .select('*')
+                    .eq('company_id', company.id)
+                    .order(fallbackTable === 'company_lead_statuses' ? 'order_index' : 'sort_order', { ascending: true });
+
+                if (!fbErr && fbData) {
+                    return fbData.map((s: any) => ({
+                        id: s.id,
+                        company_id: s.company_id,
+                        label: s.label || s.name || 'Status',
+                        value: s.value || (s.name || s.label || 'status').toLowerCase().replace(/[^a-z0-9_]/g, '_'),
+                        color: s.color || '#3B82F6',
+                        category: s.category || s.status_type || 'other',
+                        sub_statuses: s.sub_statuses || [],
+                        order_index: s.order_index ?? s.sort_order ?? 0,
+                        is_active: s.is_active !== undefined ? s.is_active : true,
+                        status_type: s.status_type || 'simple',
+                        web_push_enabled: s.web_push_enabled || false
+                    }));
+                }
+
+                return [];
+            } catch (e) {
+                return [];
+            }
         },
-        enabled: !!company?.id,
+        enabled: !!company?.id && !isBYOSLoading,
         // Cache for a bit to avoid constant refetching on every dropdown open
         staleTime: 1000 * 60 * 5,
     });

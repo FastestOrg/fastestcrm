@@ -17,6 +17,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { useOrgClient } from '@/hooks/useOrgClient';
 import { useLeadStatuses } from '@/hooks/useLeadStatuses';
 import { StatusReminderDialog } from '@/components/leads/StatusReminderDialog';
 import { CompanyLeadStatus } from '@/hooks/useLeadStatuses';
@@ -84,6 +85,7 @@ export function HealthcareLeadsTable({
   onRefetch, onViewDetails, onEditLead, columnConfig, maskLeads = false,
 }: HealthcareLeadsTableProps) {
   const { statuses } = useLeadStatuses();
+  const { orgClient } = useOrgClient();
   const [pendingStatus, setPendingStatus] = useState<{ leadId: string; status: CompanyLeadStatus } | null>(null);
   const [reminderDialogOpen, setReminderDialogOpen] = useState(false);
   const [viewingHistoryLead, setViewingHistoryLead] = useState<HealthcareLead | null>(null);
@@ -91,7 +93,7 @@ export function HealthcareLeadsTable({
 
   const handleUpdateField = async (leadId: string, field: string, value: any) => {
     try {
-      const { error } = await supabase.from('leads_healthcare' as any).update({ [field]: value }).eq('id', leadId);
+      const { error } = await orgClient.from('leads_healthcare' as any).update({ [field]: value }).eq('id', leadId);
       if (error) throw error;
       toast.success('Updated successfully');
       onRefetch();
@@ -111,7 +113,7 @@ export function HealthcareLeadsTable({
   const handleReminderConfirm = async (date: Date | null) => {
     if (pendingStatus) {
       try {
-        const { error } = await supabase.from('leads_healthcare' as any)
+        const { error } = await orgClient.from('leads_healthcare' as any)
           .update({ status: pendingStatus.status.value, reminder_at: date ? date.toISOString() : null })
           .eq('id', pendingStatus.leadId);
         if (error) throw error;

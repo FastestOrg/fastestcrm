@@ -32,9 +32,10 @@ import {
 } from "@/components/ui/table";
 import { useCompany } from '@/hooks/useCompany';
 import { useAuth } from '@/hooks/useAuth';
+import { useOrgClient } from '@/hooks/useOrgClient';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Loader2, Plus, Edit2, Trash2, GripVertical, Save, RefreshCw } from 'lucide-react';
+import { Loader2, Plus, Edit2, Trash2, GripVertical, Save, RefreshCw, AlertTriangle, Copy } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
     DndContext,
@@ -132,15 +133,47 @@ function SortableRow({ status, handleOpenEdit, handleDelete }: SortableRowProps)
     );
 }
 
+const missingTablesCache = new Set<string>();
+
 export default function ManageStatuses() {
     const { company, isCompanyAdmin } = useCompany();
     const { user } = useAuth();
+    const { orgClient, isBYOSLoading } = useOrgClient();
     const queryClient = useQueryClient();
 
     const [isaddDialogOpen, setIsAddDialogOpen] = useState(false);
     const [editingStatus, setEditingStatus] = useState<CompanyLeadStatus | null>(null);
     const [saving, setSaving] = useState(false);
     const [localStatuses, setLocalStatuses] = useState<CompanyLeadStatus[]>([]);
+    const [isTableMissing, setIsTableMissing] = useState(false);
+
+    // Copy SQL Helper
+    const handleCopySQL = () => {
+        const sql = `-- FastestCRM — BYOS Migration Bundle
+CREATE TABLE IF NOT EXISTS public.company_lead_statuses (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id UUID NOT NULL,
+  label TEXT NOT NULL,
+  value TEXT NOT NULL,
+  color TEXT NOT NULL,
+  category TEXT NOT NULL DEFAULT 'other',
+  status_type TEXT DEFAULT 'simple',
+  web_push_enabled BOOLEAN DEFAULT false,
+  sub_statuses TEXT[] DEFAULT ARRAY[]::TEXT[],
+  order_index INTEGER NOT NULL DEFAULT 0,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE public.company_lead_statuses ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "byos_company_lead_statuses_all" ON public.company_lead_statuses;
+CREATE POLICY "byos_company_lead_statuses_all" ON public.company_lead_statuses FOR ALL USING (true) WITH CHECK (true);
+CREATE INDEX IF NOT EXISTS idx_company_lead_statuses_company_id ON public.company_lead_statuses(company_id);
+NOTIFY pgrst, 'reload schema';
+`;
+        navigator.clipboard.writeText(sql);
+        toast.success('Migration SQL copied to clipboard! Paste into your Supabase Dashboard -> SQL Editor and click RUN.');
+    };
 
     // Form State
     const [formData, setFormData] = useState({
@@ -152,19 +185,79 @@ export default function ManageStatuses() {
     });
 
     const { data: statuses, isLoading, refetch } = useQuery({
-        queryKey: ['company-lead-statuses', company?.id],
+        queryKey: ['lead-statuses', (orgClient as any)?.supabaseUrl || 'default', company?.id],
         queryFn: async (): Promise<CompanyLeadStatus[]> => {
             if (!company?.id) return [];
-            const { data, error } = await supabase
-                .from('company_lead_statuses' as any)
-                .select('*')
-                .eq('company_id', company.id)
-                .order('order_index', { ascending: true });
 
-            if (error) throw error;
-            return (data as unknown as CompanyLeadStatus[]) || [];
+            const targetUrl = (orgClient as any)?.supabaseUrl || 'default';
+            const isDefaultHost = targetUrl.includes('api.fastestcrm.com') || targetUrl.includes('uykdyqdeyilpulaqlqip');
+
+            const primaryTable = isDefaultHost ? 'company_lead_statuses' : 'lead_statuses';
+            const fallbackTable = isDefaultHost ? 'lead_statuses' : 'company_lead_statuses';
+
+            const cacheKeyMissingPrimary = `${targetUrl}_missing_${primaryTable}`;
+
+            try {
+                if (!missingTablesCache.has(cacheKeyMissingPrimary)) {
+                    const { data, error } = await orgClient
+                        .from(primaryTable as any)
+                        .select('*')
+                        .eq('company_id', company.id)
+                        .order(primaryTable === 'company_lead_statuses' ? 'order_index' : 'sort_order', { ascending: true });
+
+                    if (!error && data && data.length > 0) {
+                        setIsTableMissing(false);
+                        return data.map((s: any) => ({
+                            id: s.id,
+                            company_id: s.company_id,
+                            label: s.label || s.name || 'Status',
+                            value: s.value || (s.name || s.label || 'status').toLowerCase().replace(/[^a-z0-9_]/g, '_'),
+                            color: s.color || '#3B82F6',
+                            category: s.category || s.status_type || 'other',
+                            sub_statuses: s.sub_statuses || [],
+                            order_index: s.order_index ?? s.sort_order ?? 0,
+                            is_active: s.is_active !== undefined ? s.is_active : true,
+                            status_type: s.status_type || 'simple',
+                            web_push_enabled: s.web_push_enabled || false
+                        }));
+                    }
+                    if (error) {
+                        missingTablesCache.add(cacheKeyMissingPrimary);
+                    }
+                }
+
+                // Fallback table
+                const { data: fbData, error: fbErr } = await orgClient
+                    .from(fallbackTable as any)
+                    .select('*')
+                    .eq('company_id', company.id)
+                    .order(fallbackTable === 'company_lead_statuses' ? 'order_index' : 'sort_order', { ascending: true });
+
+                if (!fbErr && fbData) {
+                    setIsTableMissing(false);
+                    return fbData.map((s: any) => ({
+                        id: s.id,
+                        company_id: s.company_id,
+                        label: s.label || s.name || 'Status',
+                        value: s.value || (s.name || s.label || 'status').toLowerCase().replace(/[^a-z0-9_]/g, '_'),
+                        color: s.color || '#3B82F6',
+                        category: s.category || s.status_type || 'other',
+                        sub_statuses: s.sub_statuses || [],
+                        order_index: s.order_index ?? s.sort_order ?? 0,
+                        is_active: s.is_active !== undefined ? s.is_active : true,
+                        status_type: s.status_type || 'simple',
+                        web_push_enabled: s.web_push_enabled || false
+                    }));
+                }
+
+                setIsTableMissing(true);
+                return [];
+            } catch (e) {
+                setIsTableMissing(true);
+                return [];
+            }
         },
-        enabled: !!company?.id
+        enabled: !!company?.id && !isBYOSLoading
     });
 
     useEffect(() => {
@@ -193,13 +286,11 @@ export default function ManageStatuses() {
                 const newIndex = items.findIndex((item) => item.id === over.id);
                 const newItems = arrayMove(items, oldIndex, newIndex);
 
-                // Update order_index for all items
                 const updates = newItems.map((item, index) => ({
                     id: item.id,
                     order_index: index,
                 }));
 
-                // Optimistically update backend
                 updateOrder(updates);
 
                 return newItems;
@@ -209,27 +300,33 @@ export default function ManageStatuses() {
 
     const updateOrder = async (updates: { id: string, order_index: number }[]) => {
         try {
-            // We can't do a bulk update easily with supabase js client without rpc or loop
-            // For now, let's use a loop, but perform it quietly
-            // Or better, trigger a background promise
-            // Ideally we should have an RPC for this, but for <20 items standard loop is fine
-
-            // Using Promise.all for parallel updates
+            // Standard Primary: lead_statuses
             await Promise.all(updates.map(update =>
-                supabase
-                    .from('company_lead_statuses' as any)
-                    .update({ order_index: update.order_index })
+                orgClient
+                    .from('lead_statuses' as any)
+                    .update({ sort_order: update.order_index })
                     .eq('id', update.id)
             ));
 
-            // Invalidate query to ensure sync
-            queryClient.invalidateQueries({ queryKey: ['company-lead-statuses'] });
+            queryClient.invalidateQueries({ queryKey: ['lead-statuses'] });
             toast.success('Order updated');
 
         } catch (error) {
-            console.error('Failed to update order', error);
-            toast.error('Failed to save new order');
-            refetch(); // convert back on error
+            try {
+                // Legacy Fallback: company_lead_statuses
+                await Promise.all(updates.map(update =>
+                    orgClient
+                        .from('company_lead_statuses' as any)
+                        .update({ order_index: update.order_index })
+                        .eq('id', update.id)
+                ));
+                queryClient.invalidateQueries({ queryKey: ['lead-statuses'] });
+                toast.success('Order updated');
+            } catch (fbError) {
+                console.error('Failed to update order', fbError);
+                toast.error('Failed to save new order');
+                refetch();
+            }
         }
     };
 
@@ -258,10 +355,6 @@ export default function ManageStatuses() {
         setIsAddDialogOpen(true);
     };
 
-    // ... handleSave ... is unchanged basically, but we should make sure order_index is correct for new items.
-    // The previous implementation was: order_index: editingStatus ? editingStatus.order_index : (statuses?.length || 0),
-    // This is still fine as it appends to the end.
-
     const handleSave = async () => {
         if (!company || !user) return;
         if (!formData.label.trim()) {
@@ -273,42 +366,76 @@ export default function ManageStatuses() {
         try {
             const value = formData.label.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_');
 
-            const payload = {
+            // Standard Primary Payload for lead_statuses
+            const primaryPayload = {
                 company_id: company.id,
-                label: formData.label.trim(),
-                value: editingStatus ? editingStatus.value : value,
+                name: formData.label.trim(),
                 color: formData.color,
-                category: formData.category,
+                sort_order: editingStatus ? editingStatus.order_index : (statuses?.length || 0),
                 status_type: formData.status_type,
-                web_push_enabled: formData.web_push_enabled,
-                order_index: editingStatus ? editingStatus.order_index : (statuses?.length || 0),
             };
 
+            let saveErr: any = null;
             if (editingStatus) {
-                const { error } = await supabase
-                    .from('company_lead_statuses' as any)
+                const { error } = await orgClient
+                    .from('lead_statuses' as any)
                     .update({
-                        label: payload.label,
-                        color: payload.color,
-                        category: payload.category,
-                        status_type: payload.status_type,
-                        web_push_enabled: payload.web_push_enabled
+                        name: primaryPayload.name,
+                        color: primaryPayload.color,
+                        sort_order: primaryPayload.sort_order,
+                        status_type: primaryPayload.status_type
                     })
                     .eq('id', editingStatus.id);
-                if (error) throw error;
-                toast.success('Status updated');
+                saveErr = error;
             } else {
-                const { error } = await supabase
-                    .from('company_lead_statuses' as any)
-                    .insert(payload);
-                if (error) throw error;
-                toast.success('Status created');
+                const { error } = await orgClient
+                    .from('lead_statuses' as any)
+                    .insert(primaryPayload);
+                saveErr = error;
             }
 
+            // Legacy Fallback to company_lead_statuses if lead_statuses failed
+            if (saveErr) {
+                const fbPayload = {
+                    company_id: company.id,
+                    label: formData.label.trim(),
+                    value: editingStatus ? editingStatus.value : value,
+                    color: formData.color,
+                    category: formData.category,
+                    status_type: formData.status_type,
+                    web_push_enabled: formData.web_push_enabled,
+                    order_index: editingStatus ? editingStatus.order_index : (statuses?.length || 0),
+                };
+
+                if (editingStatus) {
+                    const { error: fbErr } = await orgClient
+                        .from('company_lead_statuses' as any)
+                        .update(fbPayload)
+                        .eq('id', editingStatus.id);
+                    if (fbErr) throw saveErr;
+                } else {
+                    const { error: fbErr } = await orgClient
+                        .from('company_lead_statuses' as any)
+                        .insert(fbPayload);
+                    if (fbErr) throw saveErr;
+                }
+            }
+
+            toast.success(editingStatus ? 'Status updated' : 'Status created');
             setIsAddDialogOpen(false);
+            setIsTableMissing(false);
             refetch();
         } catch (error: any) {
-            toast.error('Failed to save: ' + error.message);
+            if (error?.code === 'PGRST205' || error?.message?.includes('schema cache') || error?.message?.includes('does not exist') || error?.message?.includes('relation')) {
+                setIsTableMissing(true);
+                handleCopySQL();
+                toast.error(
+                    '⚠️ lead_statuses table missing on your BYOS Supabase! The Migration SQL script has been copied to your clipboard. Paste into your Supabase SQL Editor and click RUN.',
+                    { duration: 12000 }
+                );
+            } else {
+                toast.error('Failed to save: ' + error.message);
+            }
         } finally {
             setSaving(false);
         }
@@ -317,8 +444,11 @@ export default function ManageStatuses() {
     const handleDelete = async (id: string) => {
         if (!confirm('Are you sure? leads with this status might display incorrectly if not migrated.')) return;
         try {
-            const { error } = await supabase.from('company_lead_statuses' as any).delete().eq('id', id);
-            if (error) throw error;
+            const { error } = await orgClient.from('lead_statuses' as any).delete().eq('id', id);
+            if (error) {
+                const { error: fbErr } = await orgClient.from('company_lead_statuses' as any).delete().eq('id', id);
+                if (fbErr) throw error;
+            }
             toast.success('Status deleted');
             refetch();
         } catch (error: any) {
@@ -342,6 +472,23 @@ export default function ManageStatuses() {
                         Add New Status
                     </Button>
                 </div>
+
+                {isTableMissing && (
+                    <Card className="border-amber-500/40 bg-amber-500/10">
+                        <CardContent className="pt-4 flex items-center justify-between flex-wrap gap-4">
+                            <div className="flex items-center gap-3">
+                                <AlertTriangle className="h-6 w-6 text-amber-500 shrink-0" />
+                                <div>
+                                    <p className="font-semibold text-sm text-foreground">BYOS Setup Action Required: Table Missing</p>
+                                    <p className="text-xs text-muted-foreground">Your connected Supabase database is missing the <code className="bg-muted px-1 rounded text-foreground">company_lead_statuses</code> table. Paste the migration SQL script into your Supabase SQL Editor to enable custom statuses.</p>
+                                </div>
+                            </div>
+                            <Button size="sm" onClick={handleCopySQL} className="gap-2 bg-amber-600 hover:bg-amber-700 text-white text-xs">
+                                <Copy className="h-4 w-4" /> Copy Migration SQL Script
+                            </Button>
+                        </CardContent>
+                    </Card>
+                )}
 
                 <Card>
                     <CardHeader>

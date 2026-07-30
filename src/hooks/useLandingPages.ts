@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useCompany } from './useCompany';
 import { useAuth } from './useAuth';
 import { useHierarchy } from './useHierarchy';
+import { useOrgClient } from './useOrgClient';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -40,13 +41,14 @@ export interface LandingPageInput {
 export function useLandingPages() {
   const { company } = useCompany();
   const { accessibleUserIds, canViewAll, loading: hierarchyLoading } = useHierarchy();
+  const { orgClient, isBYOSLoading } = useOrgClient();
 
   return useQuery({
-    queryKey: ['landing-pages', company?.id, canViewAll, accessibleUserIds],
+    queryKey: ['landing-pages', (orgClient as any)?.supabaseUrl || 'default', company?.id, canViewAll, accessibleUserIds],
     queryFn: async () => {
       if (!company?.id) return [];
 
-      let query = supabase
+      let query = orgClient
         .from('landing_pages' as any)
         .select('*, profiles(full_name)')
         .eq('company_id', company.id)
@@ -61,7 +63,7 @@ export function useLandingPages() {
       if (error) throw error;
       return (data as unknown as LandingPage[]) || [];
     },
-    enabled: !!company?.id && !hierarchyLoading,
+    enabled: !!company?.id && !hierarchyLoading && !isBYOSLoading,
   });
 }
 
@@ -69,11 +71,12 @@ export function useLandingPages() {
  * Fetches a single landing page by ID (for the editor).
  */
 export function useLandingPage(id: string | undefined) {
+  const { orgClient } = useOrgClient();
   return useQuery({
     queryKey: ['landing-page', id],
     queryFn: async () => {
       if (!id) return null;
-      const { data, error } = await supabase
+      const { data, error } = await orgClient
         .from('landing_pages' as any)
         .select('*, profiles(full_name)')
         .eq('id', id)
@@ -93,12 +96,13 @@ export function useCreateLandingPage() {
   const queryClient = useQueryClient();
   const { company } = useCompany();
   const { user } = useAuth();
+  const { orgClient } = useOrgClient();
 
   return useMutation({
     mutationFn: async (input: LandingPageInput) => {
       if (!company?.id || !user?.id) throw new Error('Missing company or user context');
 
-      const { data, error } = await supabase
+      const { data, error } = await orgClient
         .from('landing_pages' as any)
         .insert({
           company_id: company.id,
@@ -126,6 +130,7 @@ export function useCreateLandingPage() {
  */
 export function useUpdateLandingPage() {
   const queryClient = useQueryClient();
+  const { orgClient } = useOrgClient();
 
   return useMutation({
     mutationFn: async ({ id, ...updates }: { id: string } & Partial<LandingPageInput>) => {
@@ -134,7 +139,7 @@ export function useUpdateLandingPage() {
         payload.slug = updates.slug.toLowerCase().replace(/[^a-z0-9-]/g, '-');
       }
 
-      const { data, error } = await supabase
+      const { data, error } = await orgClient
         .from('landing_pages' as any)
         .update(payload)
         .eq('id', id)
@@ -156,10 +161,11 @@ export function useUpdateLandingPage() {
  */
 export function useDeleteLandingPage() {
   const queryClient = useQueryClient();
+  const { orgClient } = useOrgClient();
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
+      const { error } = await orgClient
         .from('landing_pages' as any)
         .delete()
         .eq('id', id);

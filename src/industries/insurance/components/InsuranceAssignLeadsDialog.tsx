@@ -5,6 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/integrations/supabase/client';
+import { useOrgClient } from '@/hooks/useOrgClient';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
@@ -23,6 +24,7 @@ export function InsuranceAssignLeadsDialog({ open, onOpenChange, selectedLeadIds
   const [profiles, setProfiles] = useState<{ id: string; full_name: string | null; email: string | null }[]>([]);
   const { user } = useAuth();
   const { company } = useCompany();
+  const { orgClient } = useOrgClient();
   const queryClient = useQueryClient();
   const [updatePreSales, setUpdatePreSales] = useState(false);
   const [updateSales, setUpdateSales] = useState(true);
@@ -53,7 +55,7 @@ export function InsuranceAssignLeadsDialog({ open, onOpenChange, selectedLeadIds
       if (updatePreSales && preSalesUserId) updateData.pre_sales_owner_id = preSalesUserId;
       if (updateSales && salesUserId) updateData.sales_owner_id = salesUserId;
       if (updatePostSales && postSalesUserId) updateData.post_sales_owner_id = postSalesUserId;
-      const { error } = await supabase.from('leads_insurance' as any).update(updateData).in('id', selectedLeadIds);
+      const { error } = await orgClient.from('leads_insurance' as any).update(updateData).in('id', selectedLeadIds);
       if (error) throw error;
       const notifs = [];
       if (updatePreSales && preSalesUserId && preSalesUserId !== user?.id) notifs.push({ userId: preSalesUserId, role: 'Pre-Sales' });

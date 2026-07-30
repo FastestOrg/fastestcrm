@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useCompany } from './useCompany';
+import { useOrgClient } from './useOrgClient';
 import { toast } from 'sonner';
 
 export interface AIEmployee {
@@ -31,13 +32,14 @@ export interface AIEmployee {
 
 export function useAIEmployees() {
   const { company } = useCompany();
+  const { orgClient, isBYOSLoading } = useOrgClient();
   const queryClient = useQueryClient();
 
   const { data: employees, isLoading } = useQuery({
-    queryKey: ['ai-employees', company?.id],
+    queryKey: ['ai-employees', (orgClient as any)?.supabaseUrl || 'default', company?.id],
     queryFn: async () => {
       if (!company?.id) return [];
-      const { data, error } = await supabase
+      const { data, error } = await orgClient
         .from('ai_employees' as any)
         .select('*')
         .eq('company_id', company.id)
@@ -46,13 +48,13 @@ export function useAIEmployees() {
       if (error) throw error;
       return data as AIEmployee[];
     },
-    enabled: !!company?.id,
+    enabled: !!company?.id && !isBYOSLoading,
   });
 
   const createEmployee = useMutation({
     mutationFn: async (newEmployee: Partial<AIEmployee>) => {
       if (!company?.id) throw new Error('Company not found');
-      const { data, error } = await supabase
+      const { data, error } = await orgClient
         .from('ai_employees' as any)
         .insert([{ ...newEmployee, company_id: company.id }])
         .select()
@@ -72,7 +74,7 @@ export function useAIEmployees() {
 
   const updateEmployee = useMutation({
     mutationFn: async ({ id, ...updates }: Partial<AIEmployee> & { id: string }) => {
-      const { data, error } = await supabase
+      const { data, error } = await orgClient
         .from('ai_employees' as any)
         .update(updates)
         .eq('id', id)
@@ -93,7 +95,7 @@ export function useAIEmployees() {
 
   const deleteEmployee = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
+      const { error } = await orgClient
         .from('ai_employees' as any)
         .delete()
         .eq('id', id);

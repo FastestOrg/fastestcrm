@@ -2,7 +2,10 @@ import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useCompany } from '@/hooks/useCompany';
+import { useOrgClient } from '@/hooks/useOrgClient';
 import type { TravelLead } from '../components/TravelLeadsTable';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Database } from '@/integrations/supabase/types';
 
 interface UseTravelLeadsOptions {
   search?: string;
@@ -16,6 +19,7 @@ interface UseTravelLeadsOptions {
 }
 
 async function fetchTravelLeadsData({
+  client,
   companyId,
   search,
   statusFilter,
@@ -26,6 +30,7 @@ async function fetchTravelLeadsData({
   accessibleUserIds,
   canViewAll
 }: {
+  client?: SupabaseClient<Database>;
   companyId: string;
   search?: string;
   statusFilter?: string | string[];
@@ -36,9 +41,10 @@ async function fetchTravelLeadsData({
   accessibleUserIds: string[];
   canViewAll: boolean;
 }): Promise<{ leads: TravelLead[]; count: number }> {
-  let q = supabase
+  const dbClient = client || supabase;
+  let q = dbClient
     .from('leads_travel' as any)
-    .select('*, sales_owner:profiles!leads_travel_sales_owner_id_fkey(full_name)', { count: 'exact' })
+    .select('*', { count: 'exact' })
     .eq('company_id', companyId)
     .order('created_at', { ascending: false });
 
@@ -74,16 +80,18 @@ export function useTravelLeads({
   page = 1, pageSize = 25, accessibleUserIds = [], canViewAll = true,
 }: UseTravelLeadsOptions = {}) {
   const { company, loading: companyLoading } = useCompany();
+  const { orgClient, isBYOSLoading } = useOrgClient();
   const queryClient = useQueryClient();
 
   const queryKey = [
-    'travel-leads', search, statusFilter, ownerFilter, tripTypeFilter,
+    'travel-leads', (orgClient as any)?.supabaseUrl || 'default', search, statusFilter, ownerFilter, tripTypeFilter,
     page, pageSize, company?.id, accessibleUserIds, canViewAll,
   ];
 
   const query = useQuery({
     queryKey,
     queryFn: () => fetchTravelLeadsData({
+      client: orgClient,
       companyId: company!.id,
       search,
       statusFilter,
@@ -94,7 +102,7 @@ export function useTravelLeads({
       accessibleUserIds,
       canViewAll
     }),
-    enabled: !companyLoading && !!company?.id,
+    enabled: !companyLoading && !!company?.id && !isBYOSLoading,
     placeholderData: (prev) => prev,
     retry: 2,
     staleTime: 60000,
@@ -112,6 +120,7 @@ export function useTravelLeads({
       queryClient.prefetchQuery({
         queryKey: nextQueryKey,
         queryFn: () => fetchTravelLeadsData({
+          client: orgClient,
           companyId: company.id,
           search,
           statusFilter,

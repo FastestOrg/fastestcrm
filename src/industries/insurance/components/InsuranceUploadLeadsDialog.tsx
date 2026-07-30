@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { useAuth } from '@/hooks/useAuth';
 import { useCompany } from '@/hooks/useCompany';
 import { supabase } from '@/integrations/supabase/client';
+import { useOrgClient } from '@/hooks/useOrgClient';
 import { toast } from 'sonner';
 import { Upload, FileUp, Download, AlertCircle, CheckCircle } from 'lucide-react';
 import Papa from 'papaparse';
@@ -21,6 +22,7 @@ export function InsuranceUploadLeadsDialog() {
   const [progress, setProgress] = useState<{ total: number; processed: number; success: number; duplicates: number; errors: number } | null>(null);
   const { user } = useAuth();
   const { company } = useCompany();
+  const { orgClient } = useOrgClient();
   const queryClient = useQueryClient();
   const abortRef = useRef(false);
 
@@ -127,7 +129,7 @@ export function InsuranceUploadLeadsDialog() {
 
             try {
               // Attempt bulk insert first for performance
-              const { data, error } = await supabase.from('leads_insurance' as any).insert(batch).select('id');
+              const { data, error } = await orgClient.from('leads_insurance' as any).insert(batch).select('id');
 
               if (error) {
                 // If there's an error (likely a duplicate constraint violation 23505),
@@ -152,7 +154,7 @@ export function InsuranceUploadLeadsDialog() {
               // Fallback: individual inserts
               results = await Promise.all(batch.map(async (lead: any) => {
                 try {
-                  const { error } = await supabase.from('leads_insurance' as any).insert(lead);
+                  const { error } = await orgClient.from('leads_insurance' as any).insert(lead);
                   if (error) return error.code === '23505' ? 'duplicate' : 'error';
                   return 'success';
                 } catch { return 'error'; }

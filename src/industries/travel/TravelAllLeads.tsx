@@ -6,6 +6,7 @@ import { Plane, ChevronLeft, ChevronRight, LayoutGrid, Table2 } from 'lucide-rea
 import { useDebounce } from '@/hooks/useDebounce';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useOrgClient } from '@/hooks/useOrgClient';
 import { useCompany } from '@/hooks/useCompany';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -45,6 +46,7 @@ export default function TravelAllLeads() {
   const [viewingLead, setViewingLead] = useState<any>(null);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const { company } = useCompany();
+  const { orgClient } = useOrgClient();
   const { data: userRole } = useUserRole();
   const isMobile = useIsMobile();
   const [configOpen, setConfigOpen] = useState(false);
@@ -84,7 +86,7 @@ export default function TravelAllLeads() {
       if (!company?.id) return null;
       const [ownersResult, statusesResult] = await Promise.all([
         supabase.from('profiles').select('id, full_name').eq('company_id', company.id).not('full_name', 'is', null),
-        supabase.from('company_lead_statuses' as any).select('label, value, category, order_index').eq('company_id', company.id).order('order_index'),
+        orgClient.from('lead_statuses' as any).select('*').eq('company_id', company.id).order('sort_order'),
       ]);
       let activeOwners = ownersResult.data || [];
       if (activeOwners.length > 0) {
@@ -96,9 +98,18 @@ export default function TravelAllLeads() {
         const accessibleSet = new Set(accessibleUserIds);
         activeOwners = activeOwners.filter(o => accessibleSet.has(o.id));
       }
+      let statusesData = statusesResult.data as any[] | null;
+      if (!statusesData || statusesData.length === 0) {
+        const { data: fbData } = await orgClient.from('company_lead_statuses' as any).select('*').eq('company_id', company.id).order('order_index');
+        statusesData = fbData;
+      }
       return {
         owners: activeOwners.map(o => ({ label: o.full_name || 'Unknown', value: o.id })),
-        statuses: (statusesResult.data as any[] || []).map((s: any) => ({ label: s.label, value: s.value, group: s.category })),
+        statuses: (statusesData || []).map((s: any) => ({
+          label: s.name || s.label || 'Status',
+          value: s.value || (s.name || s.label || 'status').toLowerCase().replace(/[^a-z0-9_]/g, '_'),
+          group: s.category || s.status_type || 'Custom'
+        })),
         tripTypes: TRIP_TYPES.map(t => ({ label: t, value: t })),
       };
     },
@@ -121,7 +132,7 @@ export default function TravelAllLeads() {
   const handleDeleteLeads = async () => {
     if (!confirm('Delete selected leads? This cannot be undone.')) return;
     try {
-      const { error } = await supabase.from('leads_travel' as any).delete().in('id', Array.from(selectedLeads));
+      const { error } = await orgClient.from('leads_travel' as any).delete().in('id', Array.from(selectedLeads));
       if (error) throw error;
       toast.success(`Deleted ${selectedLeads.size} leads`);
       setSelectedLeads(new Set()); await refetch();
@@ -130,7 +141,7 @@ export default function TravelAllLeads() {
 
   const handleStatusChange = async (leadId: string, newStatus: string) => {
     try {
-      const { error } = await supabase.from('leads_travel' as any).update({ status: newStatus }).eq('id', leadId);
+      const { error } = await orgClient.from('leads_travel' as any).update({ status: newStatus }).eq('id', leadId);
       if (error) throw error;
       toast.success('Status updated'); await refetch();
     } catch { toast.error('Failed to update status'); }

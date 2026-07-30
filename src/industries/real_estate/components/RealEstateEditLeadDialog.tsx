@@ -28,7 +28,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
+import { useOrgClient } from '@/hooks/useOrgClient';
 import { useLeadStatuses } from '@/hooks/useLeadStatuses';
 import { REAL_ESTATE_PROPERTY_TYPES, REAL_ESTATE_PURPOSES } from '../config';
 import type { RealEstateLead } from './RealEstateLeadsTable';
@@ -69,6 +69,7 @@ export function RealEstateEditLeadDialog({
 }: RealEstateEditLeadDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { statuses } = useLeadStatuses();
+  const { orgClient } = useOrgClient();
   const [statusReminderOpen, setStatusReminderOpen] = useState(false);
   const [pendingStatus, setPendingStatus] = useState<CompanyLeadStatus | null>(null);
   const [reminderAt, setReminderAt] = useState<Date | null>(null);
@@ -152,7 +153,7 @@ export function RealEstateEditLeadDialog({
 
     setIsSubmitting(true);
     try {
-      const { error } = await supabase
+      const { error } = await orgClient
         .from('leads_real_estate')
         .update({
           name: values.name,

@@ -1,13 +1,15 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useCompany } from './useCompany';
 import { supabase } from '@/integrations/supabase/client';
+import { useOrgClient } from './useOrgClient';
 import { toast } from 'sonner';
 
 export function useLeadDedup() {
     const { company, isCompanyAdmin } = useCompany();
+    const { orgClient } = useOrgClient();
     const queryClient = useQueryClient();
 
-    // Fetch current unique constraints from the company record
+    // Fetch current unique constraints from the company record (platform-scoped)
     const { data: uniqueConstraints = [], isLoading, refetch } = useQuery({
         queryKey: ['lead-dedup-config', company?.id],
         queryFn: async () => {
@@ -30,7 +32,7 @@ export function useLeadDedup() {
     const toggleMutation = useMutation({
         mutationFn: async ({ attribute, enabled }: { attribute: string; enabled: boolean }) => {
             if (!company?.id) throw new Error('No company');
-            const { data, error } = await supabase.rpc('toggle_lead_unique_constraint' as any, {
+            const { data, error } = await orgClient.rpc('toggle_lead_unique_constraint' as any, {
                 input_company_id: company.id,
                 attribute_name: attribute,
                 is_unique: enabled,
@@ -54,7 +56,7 @@ export function useLeadDedup() {
     const mergeMutation = useMutation({
         mutationFn: async () => {
             if (!company?.id) throw new Error('No company');
-            const { data, error } = await supabase.rpc('merge_duplicate_leads' as any, {
+            const { data, error } = await orgClient.rpc('merge_duplicate_leads' as any, {
                 input_company_id: company.id,
             });
             if (error) throw error;

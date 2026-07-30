@@ -438,10 +438,10 @@ export function useEmailCampaigns() {
 
     const deleteCampaign = useMutation({
         mutationFn: async (campaignId: string) => {
-            await supabase.from('email_campaign_logs' as any).delete().eq('campaign_id', campaignId);
-            await supabase.from('email_campaign_recipients' as any).delete().eq('campaign_id', campaignId);
-            await supabase.from('email_campaign_sequences' as any).delete().eq('campaign_id', campaignId);
-            await supabase.from('email_campaigns' as any).delete().eq('id', campaignId);
+            await orgClient.from('email_campaign_logs' as any).delete().eq('campaign_id', campaignId);
+            await orgClient.from('email_campaign_recipients' as any).delete().eq('campaign_id', campaignId);
+            await orgClient.from('email_campaign_sequences' as any).delete().eq('campaign_id', campaignId);
+            await orgClient.from('email_campaigns' as any).delete().eq('id', campaignId);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['email-campaigns'] });

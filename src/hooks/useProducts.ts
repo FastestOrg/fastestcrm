@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useOrgClient } from '@/hooks/useOrgClient';
 
 export interface Product {
     id: string;
@@ -23,11 +24,12 @@ export interface ProductInput {
 export function useProducts() {
     const { toast } = useToast();
     const queryClient = useQueryClient();
+    const { orgClient, isBYOSLoading } = useOrgClient();
 
     const { data: products, isLoading, error } = useQuery({
-        queryKey: ['products'],
+        queryKey: ['products', (orgClient as any)?.supabaseUrl || 'default'],
         queryFn: async (): Promise<Product[]> => {
-            const { data, error } = await supabase
+            const { data, error } = await orgClient
                 .from('products')
                 .select('*')
                 .order('category', { ascending: true })
@@ -39,11 +41,12 @@ export function useProducts() {
             }
             return (data || []) as Product[];
         },
+        enabled: !isBYOSLoading,
     });
 
     const createProduct = useMutation({
         mutationFn: async (newProduct: ProductInput) => {
-            // Get current user's company_id
+            // Get current user's company_id from platform auth/profile
             const { data: profile } = await supabase.auth.getUser();
             if (!profile.user) throw new Error('Not authenticated');
 
@@ -55,7 +58,7 @@ export function useProducts() {
 
             if (!userProfile?.company_id) throw new Error('No company found');
 
-            const { data, error } = await supabase
+            const { data, error } = await orgClient
                 .from('products')
                 .insert([{ ...newProduct, company_id: userProfile.company_id }])
                 .select()
@@ -82,7 +85,7 @@ export function useProducts() {
 
     const updateProduct = useMutation({
         mutationFn: async ({ id, ...updates }: Partial<ProductInput> & { id: string }) => {
-            const { data, error } = await supabase
+            const { data, error } = await orgClient
                 .from('products')
                 .update(updates)
                 .eq('id', id)
@@ -110,7 +113,7 @@ export function useProducts() {
 
     const deleteProduct = useMutation({
         mutationFn: async (id: string) => {
-            const { error } = await supabase
+            const { error } = await orgClient
                 .from('products')
                 .delete()
                 .eq('id', id);

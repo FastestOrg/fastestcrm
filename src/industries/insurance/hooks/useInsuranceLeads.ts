@@ -2,7 +2,10 @@ import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useCompany } from '@/hooks/useCompany';
+import { useOrgClient } from '@/hooks/useOrgClient';
 import type { InsuranceLead } from '../components/InsuranceLeadsTable';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Database } from '@/integrations/supabase/types';
 
 interface UseInsuranceLeadsOptions {
   search?: string;
@@ -16,6 +19,7 @@ interface UseInsuranceLeadsOptions {
 }
 
 async function fetchInsuranceLeadsData({
+  client,
   companyId,
   search,
   statusFilter,
@@ -26,6 +30,7 @@ async function fetchInsuranceLeadsData({
   accessibleUserIds,
   canViewAll
 }: {
+  client?: SupabaseClient<Database>;
   companyId: string;
   search?: string;
   statusFilter?: string | string[];
@@ -36,9 +41,10 @@ async function fetchInsuranceLeadsData({
   accessibleUserIds: string[];
   canViewAll: boolean;
 }): Promise<{ leads: InsuranceLead[]; count: number }> {
-  let query = supabase
+  const dbClient = client || supabase;
+  let query = dbClient
     .from('leads_insurance' as any)
-    .select('*, sales_owner:profiles!leads_insurance_sales_owner_id_fkey(full_name)', { count: 'exact' })
+    .select('*', { count: 'exact' })
     .eq('company_id', companyId)
     .order('created_at', { ascending: false });
 
@@ -87,16 +93,18 @@ export function useInsuranceLeads({
   canViewAll = true,
 }: UseInsuranceLeadsOptions = {}) {
   const { company, loading: companyLoading } = useCompany();
+  const { orgClient, isBYOSLoading } = useOrgClient();
   const queryClient = useQueryClient();
 
   const queryKey = [
-    'insurance-leads', search, statusFilter, ownerFilter, insuranceTypeFilter,
+    'insurance-leads', (orgClient as any)?.supabaseUrl || 'default', search, statusFilter, ownerFilter, insuranceTypeFilter,
     page, pageSize, company?.id, accessibleUserIds, canViewAll
   ];
 
   const query = useQuery({
     queryKey,
     queryFn: () => fetchInsuranceLeadsData({
+      client: orgClient,
       companyId: company!.id,
       search,
       statusFilter,
@@ -107,7 +115,7 @@ export function useInsuranceLeads({
       accessibleUserIds,
       canViewAll
     }),
-    enabled: !companyLoading && !!company?.id,
+    enabled: !companyLoading && !!company?.id && !isBYOSLoading,
     placeholderData: (prev) => prev,
     retry: 2,
     staleTime: 60000,
@@ -125,6 +133,7 @@ export function useInsuranceLeads({
       queryClient.prefetchQuery({
         queryKey: nextQueryKey,
         queryFn: () => fetchInsuranceLeadsData({
+          client: orgClient,
           companyId: company.id,
           search,
           statusFilter,

@@ -14,6 +14,7 @@ import { useCompany } from '@/hooks/useCompany';
 import { useLeadsTable } from '@/hooks/useLeadsTable';
 import { useLeadStatuses } from '@/hooks/useLeadStatuses';
 import { supabase } from '@/integrations/supabase/client';
+import { useOrgClient } from '@/hooks/useOrgClient';
 import { toast } from 'sonner';
 import { Upload, FileUp, Download, AlertCircle, CheckCircle } from 'lucide-react';
 import Papa from 'papaparse';
@@ -39,6 +40,7 @@ export function UploadLeadsDialog() {
     const { user } = useAuth();
     const { company } = useCompany();
     const { tableName } = useLeadsTable();
+    const { orgClient } = useOrgClient();
     const { statuses } = useLeadStatuses();
     const queryClient = useQueryClient();
     const abortRef = useRef(false);
@@ -83,7 +85,7 @@ export function UploadLeadsDialog() {
 
     const insertLeadWithRetry = async (lead: any): Promise<'success' | 'duplicate' | 'error'> => {
         try {
-            const { error } = await supabase
+            const { error } = await orgClient
                 .from(tableName as any)
                 .insert(lead);
 
@@ -107,7 +109,7 @@ export function UploadLeadsDialog() {
         currentProgress: UploadProgress
     ): Promise<UploadProgress> => {
         try {
-            const { data, error } = await supabase
+            const { data, error } = await orgClient
                 .from(tableName as any)
                 .insert(leads)
                 .select('id');

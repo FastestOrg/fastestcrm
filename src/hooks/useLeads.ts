@@ -3,7 +3,9 @@ import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Tables, TablesInsert, Database } from '@/integrations/supabase/types';
 import { useLeadsTable } from './useLeadsTable';
+import { useOrgClient } from './useOrgClient';
 import { automationService } from '@/services/automationService';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 export type Lead = Tables<'leads'> & Partial<Tables<'leads_real_estate'>> & {
   sales_owner?: {
@@ -30,6 +32,7 @@ interface UseLeadsOptions {
 }
 
 async function fetchLeadsData({
+  client,
   tableName,
   companyId,
   search,
@@ -44,6 +47,7 @@ async function fetchLeadsData({
   limit,
   dynamicFilters
 }: {
+  client?: SupabaseClient<Database>;
   tableName: string;
   companyId: string;
   search?: string;
@@ -64,19 +68,35 @@ async function fetchLeadsData({
     return { leads: [], count: 0 };
   }
 
+  const dbClient = client || supabase;
+
   // Build select query with dynamic foreign key reference
   const selectQuery = tableName === 'leads'
     ? '*, sales_owner:profiles!leads_sales_owner_id_fkey(full_name)'
     : '*';
 
-  let query = supabase
+  // Determine count strategy: Use 'planned' for unfiltered default view to prevent 300K row scans & timeouts, 'exact' when filters are applied
+  const hasFilters = !!(
+    search ||
+    (statusFilter && statusFilter !== 'all') ||
+    (ownerFilter && ownerFilter.length > 0) ||
+    (productFilter && productFilter.length > 0) ||
+    pendingPaymentOnly ||
+    (dynamicFilters && Object.keys(dynamicFilters).length > 0)
+  );
+
+  let query = dbClient
     .from(tableName as any)
-    .select(selectQuery, { count: 'exact' })
+    .select(selectQuery, { count: hasFilters ? 'exact' : 'planned' })
     .order('created_at', { ascending: false })
     .order('id', { ascending: false });
 
-  // CRITICAL: Enforce company isolation for all lead tables
-  query = query.eq('company_id', companyId);
+  // Enforce company isolation for multi-tenant default database.
+  // Bypassed on BYOS single-tenant databases to hit direct single-column indexes & eliminate redundant PostgREST URL predicates.
+  const isBYOSHost = (dbClient as any)?.supabaseUrl && !(dbClient as any).supabaseUrl.includes('api.fastestcrm.com') && !(dbClient as any).supabaseUrl.includes('uykdyqdeyilpulaqlqip');
+  if (!isBYOSHost) {
+    query = query.eq('company_id', companyId);
+  }
 
   if (statusFilter) {
     if (Array.isArray(statusFilter)) {
@@ -152,8 +172,7 @@ async function fetchLeadsData({
 
       const to = from + fetchSize - 1;
 
-      // Clone the base query for this chunk
-      let chunkQuery = supabase
+      let chunkQuery = dbClient
         .from(tableName as any)
         .select(selectQuery, { count: 'exact' });
 
@@ -243,12 +262,14 @@ async function fetchLeadsData({
 export function useLeads({ search, statusFilter, ownerFilter, activeOwnerIds, productFilter, pendingPaymentOnly, page = 1, pageSize = 25, fetchAll = false, limit, dynamicFilters }: UseLeadsOptions = {}) {
   const queryClient = useQueryClient();
   const { tableName, companyId, loading: tableLoading } = useLeadsTable();
+  const { orgClient, isBYOSLoading } = useOrgClient();
 
-  const queryKey = ['leads', search, statusFilter, ownerFilter, activeOwnerIds, productFilter, pendingPaymentOnly, page, pageSize, fetchAll, limit, tableName, companyId, JSON.stringify(dynamicFilters)];
+  const queryKey = ['leads', (orgClient as any)?.supabaseUrl || 'default', search, statusFilter, ownerFilter, activeOwnerIds, productFilter, pendingPaymentOnly, page, pageSize, fetchAll, limit, tableName, companyId, JSON.stringify(dynamicFilters)];
 
   const query = useQuery({
     queryKey,
     queryFn: () => fetchLeadsData({
+      client: orgClient,
       tableName: tableName!,
       companyId: companyId!,
       search,
@@ -263,37 +284,67 @@ export function useLeads({ search, statusFilter, ownerFilter, activeOwnerIds, pr
       limit,
       dynamicFilters
     }),
-    enabled: !tableLoading && !!companyId,
+    enabled: !tableLoading && !!companyId && !isBYOSLoading,
     placeholderData: (previousData) => previousData,
     retry: 2,
     staleTime: 60000,
     gcTime: 5 * 60 * 1000,
   });
 
-  // Prefetch the next page
+  // Prefetch both next and previous pages for instant 0ms pagination
   useEffect(() => {
-    if (!fetchAll && query.data && query.data.count > page * pageSize && companyId && tableName) {
-      const nextPage = page + 1;
-      const nextQueryKey = ['leads', search, statusFilter, ownerFilter, activeOwnerIds, productFilter, pendingPaymentOnly, nextPage, pageSize, fetchAll, limit, tableName, companyId, JSON.stringify(dynamicFilters)];
-      queryClient.prefetchQuery({
-        queryKey: nextQueryKey,
-        queryFn: () => fetchLeadsData({
-          tableName: tableName!,
-          companyId: companyId!,
-          search,
-          statusFilter,
-          ownerFilter,
-          activeOwnerIds,
-          productFilter,
-          pendingPaymentOnly,
-          page: nextPage,
-          pageSize,
-          fetchAll,
-          limit,
-          dynamicFilters
-        }),
-        staleTime: 60000,
-      });
+    if (!fetchAll && query.data && companyId && tableName) {
+      // Prefetch Next Page
+      if (query.data.count > page * pageSize) {
+        const nextPage = page + 1;
+        const nextQueryKey = ['leads', search, statusFilter, ownerFilter, activeOwnerIds, productFilter, pendingPaymentOnly, nextPage, pageSize, fetchAll, limit, tableName, companyId, JSON.stringify(dynamicFilters)];
+        queryClient.prefetchQuery({
+          queryKey: nextQueryKey,
+          queryFn: () => fetchLeadsData({
+            client: orgClient,
+            tableName: tableName!,
+            companyId: companyId!,
+            search,
+            statusFilter,
+            ownerFilter,
+            activeOwnerIds,
+            productFilter,
+            pendingPaymentOnly,
+            page: nextPage,
+            pageSize,
+            fetchAll,
+            limit,
+            dynamicFilters
+          }),
+          staleTime: 60000,
+        });
+      }
+
+      // Prefetch Previous Page
+      if (page > 1) {
+        const prevPage = page - 1;
+        const prevQueryKey = ['leads', search, statusFilter, ownerFilter, activeOwnerIds, productFilter, pendingPaymentOnly, prevPage, pageSize, fetchAll, limit, tableName, companyId, JSON.stringify(dynamicFilters)];
+        queryClient.prefetchQuery({
+          queryKey: prevQueryKey,
+          queryFn: () => fetchLeadsData({
+            client: orgClient,
+            tableName: tableName!,
+            companyId: companyId!,
+            search,
+            statusFilter,
+            ownerFilter,
+            activeOwnerIds,
+            productFilter,
+            pendingPaymentOnly,
+            page: prevPage,
+            pageSize,
+            fetchAll,
+            limit,
+            dynamicFilters
+          }),
+          staleTime: 60000,
+        });
+      }
     }
   }, [query.data, page, pageSize, fetchAll, search, statusFilter, ownerFilter, activeOwnerIds, productFilter, pendingPaymentOnly, tableName, companyId, queryClient, JSON.stringify(dynamicFilters)]);
 
@@ -306,14 +357,17 @@ export function useLeads({ search, statusFilter, ownerFilter, activeOwnerIds, pr
 export function useUpdateLead() {
   const queryClient = useQueryClient();
   const { tableName } = useLeadsTable();
+  const { orgClient } = useOrgClient();
 
   return useMutation({
     mutationFn: async ({ id, ...updates }: { id: string } & Partial<Lead>) => {
-      const { data, error } = await supabase
+      const keys = Object.keys(updates);
+      const selectStr = ['id', 'created_at', ...keys.filter(k => k !== 'id' && k !== 'created_at')].join(',');
+      const { data, error } = await orgClient
         .from(tableName as any)
         .update(updates)
         .eq('id', id)
-        .select()
+        .select(selectStr)
         .single();
 
       if (error) throw error;
@@ -364,13 +418,16 @@ export function useUpdateLead() {
 export function useCreateLead() {
   const queryClient = useQueryClient();
   const { tableName } = useLeadsTable();
+  const { orgClient } = useOrgClient();
 
   return useMutation({
     mutationFn: async (newLead: TablesInsert<'leads'>) => {
-      const { data, error } = await supabase
+      const keys = Object.keys(newLead);
+      const selectStr = ['id', 'created_at', ...keys.filter(k => k !== 'id' && k !== 'created_at')].join(',');
+      const { data, error } = await orgClient
         .from(tableName as any)
         .insert(newLead)
-        .select()
+        .select(selectStr)
         .single();
 
       if (error) throw error;
@@ -387,13 +444,17 @@ export function useCreateLead() {
 export function useCreateLeads() {
   const queryClient = useQueryClient();
   const { tableName } = useLeadsTable();
+  const { orgClient } = useOrgClient();
 
   return useMutation({
     mutationFn: async (newLeads: TablesInsert<'leads'>[]) => {
-      const { data, error } = await supabase
+      const firstLead = newLeads[0] || {};
+      const keys = Object.keys(firstLead);
+      const selectStr = ['id', 'created_at', ...keys.filter(k => k !== 'id' && k !== 'created_at')].join(',');
+      const { data, error } = await orgClient
         .from(tableName as any)
         .insert(newLeads)
-        .select();
+        .select(selectStr);
 
       if (error) throw error;
       return data;
@@ -411,10 +472,11 @@ export function useCreateLeads() {
 export function useDeleteLead() {
   const queryClient = useQueryClient();
   const { tableName } = useLeadsTable();
+  const { orgClient } = useOrgClient();
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
+      const { error } = await orgClient
         .from(tableName as any)
         .delete()
         .eq('id', id);

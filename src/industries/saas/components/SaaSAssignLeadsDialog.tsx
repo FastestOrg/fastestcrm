@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/integrations/supabase/client';
+import { useOrgClient } from '@/hooks/useOrgClient';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
@@ -33,6 +34,7 @@ export function SaaSAssignLeadsDialog({ open, onOpenChange, selectedLeadIds, onS
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const { user } = useAuth();
   const { company } = useCompany();
+  const { orgClient } = useOrgClient();
   const queryClient = useQueryClient();
 
   const [updatePreSales, setUpdatePreSales] = useState(false);
@@ -66,7 +68,7 @@ export function SaaSAssignLeadsDialog({ open, onOpenChange, selectedLeadIds, onS
       if (updateSales && salesUserId) updateData.sales_owner_id = salesUserId;
       if (updatePostSales && postSalesUserId) updateData.post_sales_owner_id = postSalesUserId;
 
-      const { error } = await supabase.from('leads_saas' as any).update(updateData).in('id', selectedLeadIds);
+      const { error } = await orgClient.from('leads_saas' as any).update(updateData).in('id', selectedLeadIds);
       if (error) throw error;
 
       const notifs = [];

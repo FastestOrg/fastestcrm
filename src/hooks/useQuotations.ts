@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useCompany } from '@/hooks/useCompany';
 import { useAuth } from '@/hooks/useAuth';
+import { useOrgClient } from '@/hooks/useOrgClient';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 export interface QuotationItem {
@@ -83,25 +84,34 @@ export function useQuotations() {
   const qc = useQueryClient();
   const { company } = useCompany();
   const { user } = useAuth();
+  const { orgClient, isBYOSLoading } = useOrgClient();
   const companyId = company?.id;
 
   const { data: quotations = [], isLoading } = useQuery({
-    queryKey: ['quotations', companyId],
+    queryKey: ['quotations', (orgClient as any)?.supabaseUrl || 'default', companyId],
     queryFn: async (): Promise<Quotation[]> => {
-      const { data, error } = await supabase
+      const targetUrl = (orgClient as any)?.supabaseUrl || 'default';
+      const isDefaultHost = targetUrl.includes('api.fastestcrm.com') || targetUrl.includes('uykdyqdeyilpulaqlqip');
+
+      let query = orgClient
         .from('quotations' as any)
         .select('*')
-        .eq('company_id', companyId!)
         .order('created_at', { ascending: false });
+
+      if (isDefaultHost) {
+        query = query.eq('company_id', companyId!);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       return (data || []) as any;
     },
-    enabled: !!companyId,
+    enabled: !!companyId && !isBYOSLoading,
   });
 
   const generateNumber = async (): Promise<string> => {
     // Get settings or use defaults
-    const { data: settings } = await supabase
+    const { data: settings } = await orgClient
       .from('invoice_settings' as any)
       .select('quotation_prefix, next_quotation_number')
       .eq('company_id', companyId!)
@@ -112,7 +122,7 @@ export function useQuotations() {
     const number = `${prefix}${String(nextNum).padStart(4, '0')}`;
 
     // Increment
-    await supabase
+    await orgClient
       .from('invoice_settings' as any)
       .upsert({
         company_id: companyId!,
@@ -128,7 +138,7 @@ export function useQuotations() {
       const quotationNumber = await generateNumber();
       const { items, ...quotationData } = input;
 
-      const { data: quo, error: quoErr } = await supabase
+      const { data: quo, error: quoErr } = await orgClient
         .from('quotations' as any)
         .insert({
           ...quotationData,
@@ -143,13 +153,15 @@ export function useQuotations() {
       if (quoErr) throw quoErr;
 
       if (items.length > 0) {
-        const itemRows = items.map((item, i) => ({
-          ...item,
-          quotation_id: (quo as any).id,
-          sort_order: i,
-          id: undefined,
-        }));
-        const { error: itemErr } = await supabase
+        const itemRows = items.map((item, i) => {
+          const { id: _, ...itemWithoutId } = item as any;
+          return {
+            ...itemWithoutId,
+            quotation_id: (quo as any).id,
+            sort_order: i,
+          };
+        });
+        const { error: itemErr } = await orgClient
           .from('quotation_items' as any)
           .insert(itemRows as any);
         if (itemErr) throw itemErr;
@@ -168,22 +180,24 @@ export function useQuotations() {
     mutationFn: async ({ id, ...input }: QuotationInput & { id: string }) => {
       const { items, ...quotationData } = input;
 
-      const { error: quoErr } = await supabase
+      const { error: quoErr } = await orgClient
         .from('quotations' as any)
         .update({ ...quotationData, updated_at: new Date().toISOString() } as any)
         .eq('id', id);
       if (quoErr) throw quoErr;
 
       // Replace items: delete all then re-insert
-      await supabase.from('quotation_items' as any).delete().eq('quotation_id', id);
+      await orgClient.from('quotation_items' as any).delete().eq('quotation_id', id);
       if (items.length > 0) {
-        const itemRows = items.map((item, i) => ({
-          ...item,
-          quotation_id: id,
-          sort_order: i,
-          id: undefined,
-        }));
-        const { error: itemErr } = await supabase
+        const itemRows = items.map((item, i) => {
+          const { id: _, ...itemWithoutId } = item as any;
+          return {
+            ...itemWithoutId,
+            quotation_id: id,
+            sort_order: i,
+          };
+        });
+        const { error: itemErr } = await orgClient
           .from('quotation_items' as any)
           .insert(itemRows as any);
         if (itemErr) throw itemErr;
@@ -198,7 +212,7 @@ export function useQuotations() {
 
   const deleteQuotation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('quotations' as any).delete().eq('id', id);
+      const { error } = await orgClient.from('quotations' as any).delete().eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -212,7 +226,7 @@ export function useQuotations() {
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
       const updates: any = { status, updated_at: new Date().toISOString() };
       if (status === 'sent') updates.issued_at = new Date().toISOString();
-      const { error } = await supabase.from('quotations' as any).update(updates).eq('id', id);
+      const { error } = await orgClient.from('quotations' as any).update(updates).eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -223,14 +237,14 @@ export function useQuotations() {
   });
 
   const fetchQuotationWithItems = async (id: string): Promise<Quotation & { items: QuotationItem[] }> => {
-    const { data: quo, error: quoErr } = await supabase
+    const { data: quo, error: quoErr } = await orgClient
       .from('quotations' as any)
       .select('*')
       .eq('id', id)
       .single();
     if (quoErr) throw quoErr;
 
-    const { data: items, error: itemErr } = await supabase
+    const { data: items, error: itemErr } = await orgClient
       .from('quotation_items' as any)
       .select('*')
       .eq('quotation_id', id)

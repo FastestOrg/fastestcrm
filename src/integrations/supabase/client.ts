@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import Cookies from 'js-cookie';
 import type { Database } from './types';
 
@@ -135,3 +135,33 @@ export const anonSupabase = createClient<Database>(DIRECT_URL, SUPABASE_PUBLISHA
     storageKey: 'sb-anon-auth-token', // Unique key to avoid conflict with main client
   },
 });
+
+// ─── BYOS (Bring Your Own Supabase) Client Factory ──────────────────────────
+// Creates a Supabase client pointing to a customer's project for org data ops.
+// Clients are cached per URL+key combo to avoid re-creation.
+const byosClientCache = new Map<string, SupabaseClient<Database>>();
+
+export function createOrgSupabaseClient(url: string, anonKey: string): SupabaseClient<Database> {
+  const cacheKey = `${url}|${anonKey}`;
+  const cached = byosClientCache.get(cacheKey);
+  if (cached) return cached;
+
+  const client = createClient<Database>(url, anonKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+      storageKey: `sb-byos-${url.slice(-8)}`,
+    },
+  });
+
+  byosClientCache.set(cacheKey, client);
+  return client;
+}
+
+/**
+ * Clear the BYOS client cache (used when disconnecting BYOS)
+ */
+export function clearBYOSClientCache(): void {
+  byosClientCache.clear();
+}

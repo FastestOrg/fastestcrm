@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useCompany } from '@/hooks/useCompany';
 import { useAuth } from '@/hooks/useAuth';
+import { useOrgClient } from '@/hooks/useOrgClient';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 export interface InvoiceItem {
@@ -105,24 +106,33 @@ export function useInvoices() {
   const qc = useQueryClient();
   const { company } = useCompany();
   const { user } = useAuth();
+  const { orgClient, isBYOSLoading } = useOrgClient();
   const companyId = company?.id;
 
   const { data: invoices = [], isLoading } = useQuery({
-    queryKey: ['invoices', companyId],
+    queryKey: ['invoices', (orgClient as any)?.supabaseUrl || 'default', companyId],
     queryFn: async (): Promise<Invoice[]> => {
-      const { data, error } = await supabase
+      const targetUrl = (orgClient as any)?.supabaseUrl || 'default';
+      const isDefaultHost = targetUrl.includes('api.fastestcrm.com') || targetUrl.includes('uykdyqdeyilpulaqlqip');
+
+      let query = orgClient
         .from('invoices' as any)
         .select('*')
-        .eq('company_id', companyId!)
         .order('created_at', { ascending: false });
+
+      if (isDefaultHost) {
+        query = query.eq('company_id', companyId!);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       return (data || []) as any;
     },
-    enabled: !!companyId,
+    enabled: !!companyId && !isBYOSLoading,
   });
 
   const generateNumber = async (): Promise<string> => {
-    const { data: settings, error: settingsReadErr } = await supabase
+    const { data: settings, error: settingsReadErr } = await orgClient
       .from('invoice_settings' as any)
       .select('invoice_prefix, next_invoice_number')
       .eq('company_id', companyId!)
@@ -141,7 +151,7 @@ export function useInvoices() {
     };
     console.log('[Invoice Debug] Upsert payload:', upsertPayload);
 
-    const { error: upsertErr } = await supabase
+    const { error: upsertErr } = await orgClient
       .from('invoice_settings' as any)
       .upsert(upsertPayload as any, { onConflict: 'company_id' });
 
@@ -165,12 +175,6 @@ export function useInvoices() {
         userFromHook: user?.id 
       });
 
-      // Debug: test RPC
-      const { data: rpcCompanyId, error: rpcErr } = await supabase.rpc('get_user_company_id' as any);
-      console.log('[Invoice Debug] get_user_company_id() RPC:', { rpcCompanyId, rpcErr });
-      console.log('[Invoice Debug] companyId from useCompany:', companyId);
-      console.log('[Invoice Debug] Match:', rpcCompanyId === companyId);
-
       const invoiceNumber = await generateNumber();
       const { items, ...invoiceData } = input;
 
@@ -184,7 +188,7 @@ export function useInvoices() {
       };
       console.log('[Invoice Debug] Insert payload:', JSON.stringify(insertPayload, null, 2));
 
-      const { data: inv, error: invErr } = await supabase
+      const { data: inv, error: invErr } = await orgClient
         .from('invoices' as any)
         .insert(insertPayload as any)
         .select()
@@ -205,7 +209,7 @@ export function useInvoices() {
             sort_order: i,
           };
         });
-        const { error: itemErr } = await supabase
+        const { error: itemErr } = await orgClient
           .from('invoice_items' as any)
           .insert(itemRows as any);
         if (itemErr) throw itemErr;
@@ -213,7 +217,7 @@ export function useInvoices() {
 
       // If created from a quotation, mark the quotation as converted
       if (input.quotation_id) {
-        await supabase
+        await orgClient
           .from('quotations' as any)
           .update({
             status: 'converted',
@@ -236,7 +240,7 @@ export function useInvoices() {
     mutationFn: async ({ id, ...input }: InvoiceInput & { id: string }) => {
       const { items, ...invoiceData } = input;
 
-      const { error: invErr } = await supabase
+      const { error: invErr } = await orgClient
         .from('invoices' as any)
         .update({
           ...invoiceData,
@@ -247,7 +251,7 @@ export function useInvoices() {
       if (invErr) throw invErr;
 
       // Replace items
-      await supabase.from('invoice_items' as any).delete().eq('invoice_id', id);
+      await orgClient.from('invoice_items' as any).delete().eq('invoice_id', id);
       if (items.length > 0) {
         const itemRows = items.map((item, i) => {
           const { id: _, ...itemWithoutId } = item;
@@ -257,7 +261,7 @@ export function useInvoices() {
             sort_order: i,
           };
         });
-        const { error: itemErr } = await supabase
+        const { error: itemErr } = await orgClient
           .from('invoice_items' as any)
           .insert(itemRows as any);
         if (itemErr) throw itemErr;
@@ -272,7 +276,7 @@ export function useInvoices() {
 
   const deleteInvoice = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('invoices' as any).delete().eq('id', id);
+      const { error } = await orgClient.from('invoices' as any).delete().eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -291,7 +295,7 @@ export function useInvoices() {
       notes?: string;
     }) => {
       // Insert payment record
-      const { error: payErr } = await supabase
+      const { error: payErr } = await orgClient
         .from('invoice_payments' as any)
         .insert({
           invoice_id,
@@ -305,7 +309,7 @@ export function useInvoices() {
       if (payErr) throw payErr;
 
       // Get current invoice
-      const { data: inv } = await supabase
+      const { data: inv } = await orgClient
         .from('invoices' as any)
         .select('total, amount_paid')
         .eq('id', invoice_id)
@@ -324,14 +328,14 @@ export function useInvoices() {
       };
       if (newStatus === 'paid') updates.paid_at = new Date().toISOString();
 
-      const { error: updErr } = await supabase
+      const { error: updErr } = await orgClient
         .from('invoices' as any)
         .update(updates)
         .eq('id', invoice_id);
       if (updErr) throw updErr;
 
       // Auto-decrement product inventory
-      const { data: invItems } = await supabase
+      const { data: invItems } = await orgClient
         .from('invoice_items' as any)
         .select('product_id, quantity')
         .eq('invoice_id', invoice_id);
@@ -339,14 +343,14 @@ export function useInvoices() {
       if (newStatus === 'paid' && invItems) {
         for (const item of invItems as any[]) {
           if (item.product_id) {
-            const { data: prod } = await supabase
+            const { data: prod } = await orgClient
               .from('products')
               .select('quantity_available')
               .eq('id', item.product_id)
               .single();
 
             if (prod && prod.quantity_available !== null) {
-              await supabase
+              await orgClient
                 .from('products')
                 .update({
                   quantity_available: Math.max(0, (prod.quantity_available || 0) - item.quantity),
@@ -368,14 +372,14 @@ export function useInvoices() {
   });
 
   const fetchInvoiceWithItems = async (id: string): Promise<Invoice & { items: InvoiceItem[] }> => {
-    const { data: inv, error: invErr } = await supabase
+    const { data: inv, error: invErr } = await orgClient
       .from('invoices' as any)
       .select('*')
       .eq('id', id)
       .single();
     if (invErr) throw invErr;
 
-    const { data: items, error: itemErr } = await supabase
+    const { data: items, error: itemErr } = await orgClient
       .from('invoice_items' as any)
       .select('*')
       .eq('invoice_id', id)
@@ -386,7 +390,7 @@ export function useInvoices() {
   };
 
   const fetchPayments = async (invoiceId: string): Promise<InvoicePayment[]> => {
-    const { data, error } = await supabase
+    const { data, error } = await orgClient
       .from('invoice_payments' as any)
       .select('*')
       .eq('invoice_id', invoiceId)

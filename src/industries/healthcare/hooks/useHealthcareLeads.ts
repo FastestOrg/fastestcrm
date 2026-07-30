@@ -2,7 +2,10 @@ import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useCompany } from '@/hooks/useCompany';
+import { useOrgClient } from '@/hooks/useOrgClient';
 import type { HealthcareLead } from '../components/HealthcareLeadsTable';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Database } from '@/integrations/supabase/types';
 
 interface UseHealthcareLeadsOptions {
   search?: string;
@@ -17,6 +20,7 @@ interface UseHealthcareLeadsOptions {
 }
 
 async function fetchHealthcareLeadsData({
+  client,
   companyId,
   search,
   statusFilter,
@@ -28,6 +32,7 @@ async function fetchHealthcareLeadsData({
   accessibleUserIds,
   canViewAll
 }: {
+  client?: SupabaseClient<Database>;
   companyId: string;
   search?: string;
   statusFilter?: string | string[];
@@ -39,9 +44,10 @@ async function fetchHealthcareLeadsData({
   accessibleUserIds: string[];
   canViewAll: boolean;
 }): Promise<{ leads: HealthcareLead[]; count: number }> {
-  let query = supabase
+  const dbClient = client || supabase;
+  let query = dbClient
     .from('leads_healthcare' as any)
-    .select('*, sales_owner:profiles!leads_healthcare_sales_owner_id_fkey(full_name)', { count: 'exact' })
+    .select('*', { count: 'exact' })
     .eq('company_id', companyId)
     .order('created_at', { ascending: false });
 
@@ -98,10 +104,11 @@ export function useHealthcareLeads({
   canViewAll = true,
 }: UseHealthcareLeadsOptions = {}) {
   const { company, loading: companyLoading } = useCompany();
+  const { orgClient, isBYOSLoading } = useOrgClient();
   const queryClient = useQueryClient();
 
   const queryKey = [
-    'healthcare-leads', search, statusFilter, ownerFilter,
+    'healthcare-leads', (orgClient as any)?.supabaseUrl || 'default', search, statusFilter, ownerFilter,
     departmentFilter, genderFilter, page, pageSize,
     company?.id, accessibleUserIds, canViewAll,
   ];
@@ -109,6 +116,7 @@ export function useHealthcareLeads({
   const query = useQuery({
     queryKey,
     queryFn: () => fetchHealthcareLeadsData({
+      client: orgClient,
       companyId: company!.id,
       search,
       statusFilter,
@@ -120,7 +128,7 @@ export function useHealthcareLeads({
       accessibleUserIds,
       canViewAll
     }),
-    enabled: !companyLoading && !!company?.id,
+    enabled: !companyLoading && !!company?.id && !isBYOSLoading,
     placeholderData: (prev) => prev,
     retry: 2,
     staleTime: 60000,
@@ -139,6 +147,7 @@ export function useHealthcareLeads({
       queryClient.prefetchQuery({
         queryKey: nextQueryKey,
         queryFn: () => fetchHealthcareLeadsData({
+          client: orgClient,
           companyId: company.id,
           search,
           statusFilter,

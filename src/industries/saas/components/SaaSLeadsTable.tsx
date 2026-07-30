@@ -18,6 +18,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { useOrgClient } from '@/hooks/useOrgClient';
 import { useLeadStatuses } from '@/hooks/useLeadStatuses';
 import { StatusReminderDialog } from '@/components/leads/StatusReminderDialog';
 import { CompanyLeadStatus } from '@/hooks/useLeadStatuses';
@@ -105,11 +106,12 @@ export const SaaSLeadsTable = memo(function SaaSLeadsTable({
   const [reminderDialogOpen, setReminderDialogOpen] = useState(false);
   const [viewingHistoryLead, setViewingHistoryLead] = useState<SaaSLead | null>(null);
   const [notesBuffer, setNotesBuffer] = useState<Record<string, string>>({});
+  const { orgClient } = useOrgClient();
   const queryClient = useQueryClient();
 
   const handleUpdateField = async (leadId: string, field: string, value: any) => {
     try {
-      const { error } = await supabase
+      const { error } = await orgClient
         .from('leads_saas' as any)
         .update({ [field]: value })
         .eq('id', leadId);
@@ -135,7 +137,7 @@ export const SaaSLeadsTable = memo(function SaaSLeadsTable({
   const handleReminderConfirm = async (date: Date | null) => {
     if (pendingStatus) {
       try {
-        const { error } = await supabase
+        const { error } = await orgClient
           .from('leads_saas' as any)
           .update({
             status: pendingStatus.status.value,

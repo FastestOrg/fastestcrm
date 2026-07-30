@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useOrgClient } from '@/hooks/useOrgClient';
 import { toast } from 'sonner';
 import { requestWebNotificationPermission, sendWebNotification } from '@/lib/webNotificationHelper';
 import { subscribeToPush } from '@/lib/pushSubscription';
@@ -17,6 +18,7 @@ export interface Notification {
 
 export function useNotifications() {
     const { session } = useAuth();
+    const { orgClient } = useOrgClient();
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [unreadCount, setUnreadCount] = useState(0);
     const [loading, setLoading] = useState(true);
@@ -25,7 +27,7 @@ export function useNotifications() {
         if (!session?.user?.id) return;
 
         try {
-            const { data, error } = await supabase
+            const { data, error } = await orgClient
                 .from('notifications' as any)
                 .select('*')
                 .eq('user_id', session.user.id)
@@ -44,7 +46,7 @@ export function useNotifications() {
 
     const markAsRead = async (id: string) => {
         try {
-            const { error } = await supabase
+            const { error } = await orgClient
                 .from('notifications' as any)
                 .update({ read: true })
                 .eq('id', id);
@@ -65,7 +67,7 @@ export function useNotifications() {
     const markAllAsRead = async () => {
         if (!session?.user?.id) return;
         try {
-            const { error } = await supabase
+            const { error } = await orgClient
                 .from('notifications' as any)
                 .update({ read: true })
                 .eq('user_id', session.user.id)
@@ -128,7 +130,7 @@ export function useNotifications() {
         }
 
         // Subscribe to real-time changes (ALWAYS, regardless of permission status)
-        const channel = supabase
+        const channel = orgClient
             .channel(`public:notifications:${session.user.id}`)
             .on(
                 'postgres_changes',
@@ -187,9 +189,9 @@ export function useNotifications() {
 
         return () => {
             if (permissionTimer) clearTimeout(permissionTimer);
-            supabase.removeChannel(channel);
+            orgClient.removeChannel(channel);
         };
-    }, [session?.user?.id]);
+    }, [session?.user?.id, orgClient]);
 
     return {
         notifications,

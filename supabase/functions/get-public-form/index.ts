@@ -39,13 +39,44 @@ serve(async (req) => {
             );
         }
 
-        const { data: form, error } = await supabaseAdmin
+        let { data: form, error } = await supabaseAdmin
             .from("forms")
             .select("*")
             .eq("id", formId)
             .single();
 
-        if (error) {
+        if (error || !form) {
+            // Check active BYOS connections if not found on platform DB
+            const { data: activeConnections } = await supabaseAdmin
+                .from("byos_connections")
+                .select("company_id, supabase_url, supabase_anon_key")
+                .eq("status", "active");
+
+            if (activeConnections && activeConnections.length > 0) {
+                for (const conn of activeConnections) {
+                    try {
+                        const byosRes = await fetch(`${conn.supabase_url}/rest/v1/forms?id=eq.${formId}&select=*`, {
+                            headers: {
+                                apikey: conn.supabase_anon_key,
+                                Authorization: `Bearer ${conn.supabase_anon_key}`,
+                            },
+                        });
+                        if (byosRes.ok) {
+                            const byosForms = await byosRes.json();
+                            if (byosForms && byosForms.length > 0) {
+                                form = byosForms[0];
+                                error = null;
+                                break;
+                            }
+                        }
+                    } catch (err) {
+                        console.warn(`BYOS form check failed for company ${conn.company_id}:`, err);
+                    }
+                }
+            }
+        }
+
+        if (error || !form) {
             console.error("Form fetch error:", error);
             return new Response(
                 JSON.stringify({ error: "Form not found" }),

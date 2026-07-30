@@ -424,11 +424,15 @@ export default function FormBuilder() {
 
         try {
             const formData = {
+                company_id: company?.id,
                 name: formName,
+                title: formName,
                 description,
                 fields: fields as any, // Cast to any for Json type compatibility
                 created_by_id: user.id,
-                status: 'active'
+                created_by: user.id,
+                status: 'active',
+                is_active: true
             };
 
             if (id) {

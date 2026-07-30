@@ -15,7 +15,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
+import { useOrgClient } from '@/hooks/useOrgClient';
 import { useAuth } from '@/hooks/useAuth';
 import { useCompany } from '@/hooks/useCompany';
 import { useLeadStatuses } from '@/hooks/useLeadStatuses';
@@ -57,6 +57,7 @@ export function SaaSAddLeadDialog({ open: controlledOpen, onOpenChange, trigger 
   const { user } = useAuth();
   const { company } = useCompany();
   const { statuses } = useLeadStatuses();
+  const { orgClient } = useOrgClient();
   const queryClient = useQueryClient();
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -78,7 +79,7 @@ export function SaaSAddLeadDialog({ open: controlledOpen, onOpenChange, trigger 
 
     setIsSubmitting(true);
     try {
-      const { error } = await supabase
+      const { error } = await orgClient
         .from('leads_saas' as any)
         .insert({
           name: values.name,
