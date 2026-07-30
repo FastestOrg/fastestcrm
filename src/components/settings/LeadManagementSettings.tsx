@@ -27,6 +27,7 @@ export default function LeadManagementSettings() {
     mergeDuplicates,
     isMerging,
     mergeResult,
+    progressMsg,
   } = useLeadDedup();
 
   const [showMergeDialog, setShowMergeDialog] = useState(false);
@@ -189,7 +190,14 @@ export default function LeadManagementSettings() {
                 </p>
               </div>
 
-              {mergeResult && (
+              {isMerging && progressMsg && (
+                <div className="flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                  <Loader2 className="h-4 w-4 animate-spin shrink-0" />
+                  <span>{progressMsg}</span>
+                </div>
+              )}
+
+              {!isMerging && mergeResult && (
                 <div className="flex gap-3 p-4 rounded-xl border border-green-500/20 bg-green-500/5">
                   <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0 mt-0.5" />
                   <div className="text-sm">
