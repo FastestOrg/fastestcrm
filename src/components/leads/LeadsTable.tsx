@@ -147,14 +147,23 @@ export const LeadsTable = memo(function LeadsTable({ leads, loading, selectedLea
     return label;
   };
 
-  const handleProductChange = async (leadId: string, productName: string) => {
-    // If clearing (if we support that)
+  const handleProductChange = async (leadId: string, productName: string, productCategory?: string) => {
+    // If clearing
     if (!productName || productName === 'none') {
-      // logic to clear if needed, for now assuming selection mandatory or switch
+      try {
+        await updateLead.mutateAsync({
+          id: leadId,
+          product_category: null,
+          product_purchased: null
+        });
+        toast.success('Product cleared successfully');
+      } catch (error) {
+        toast.error('Failed to clear product');
+      }
       return;
     }
 
-    const product = products?.find(p => p.name === productName);
+    const product = products?.find(p => p.name === productName && (!productCategory || p.category === productCategory));
     if (!product) {
       toast.error('Product not found in catalog');
       return;
@@ -327,6 +336,14 @@ export const LeadsTable = memo(function LeadsTable({ leads, loading, selectedLea
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-[200px]">
+            {lead.product_purchased && (
+              <DropdownMenuItem
+                onClick={() => handleProductChange(lead.id, 'none')}
+                className="cursor-pointer text-muted-foreground italic"
+              >
+                Clear Selection
+              </DropdownMenuItem>
+            )}
             {Array.from(new Set((products || []).map(p => p.category))).sort().map(category => (
               <DropdownMenuSub key={category}>
                 <DropdownMenuSubTrigger className="cursor-pointer">
@@ -338,7 +355,7 @@ export const LeadsTable = memo(function LeadsTable({ leads, loading, selectedLea
                     .map(product => (
                       <DropdownMenuItem
                         key={product.id}
-                        onClick={() => handleProductChange(lead.id, product.name)}
+                        onClick={() => handleProductChange(lead.id, product.name, product.category)}
                         className="cursor-pointer"
                       >
                         {product.name}

@@ -96,6 +96,14 @@ export function EditLeadDialog({ open, onOpenChange, lead }: EditLeadDialogProps
 
     useEffect(() => {
         if (lead) {
+            let initialCategory = (lead as any).product_category || '';
+            if (!initialCategory && lead.product_purchased && products?.length) {
+                const matchedProd = products.find(p => p.name === lead.product_purchased);
+                if (matchedProd) {
+                    initialCategory = matchedProd.category;
+                }
+            }
+
             form.reset({
                 name: lead.name,
                 email: lead.email || '',
@@ -103,7 +111,7 @@ export function EditLeadDialog({ open, onOpenChange, lead }: EditLeadDialogProps
                 college: lead.college || '',
                 status: lead.status,
                 lead_source: lead.lead_source || 'Others',
-                product_category: (lead as any).product_category || '', // Cast because type might not be updated yet
+                product_category: initialCategory,
                 product_purchased: lead.product_purchased || '',
                 notes: lead.notes || '',
             });
@@ -116,7 +124,7 @@ export function EditLeadDialog({ open, onOpenChange, lead }: EditLeadDialogProps
             });
             setCustomFieldValues(initialCustomValues);
         }
-    }, [lead, form, customColumns]);
+    }, [lead, form, customColumns, products]);
 
     const handleStatusChange = (newStatusValue: string) => {
         const newStatus = statuses?.find(s => s.value === newStatusValue);

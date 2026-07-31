@@ -347,7 +347,7 @@ function KanbanLeadCard({
 
           {lead.product_purchased && (
             <Badge variant="outline" className="text-xs mt-1">
-              {lead.product_purchased}
+              {(lead as any).product_category ? `${(lead as any).product_category} - ${lead.product_purchased}` : lead.product_purchased}
             </Badge>
           )}
         </div>

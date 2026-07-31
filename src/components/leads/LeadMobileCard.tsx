@@ -194,7 +194,7 @@ export function LeadMobileCard({
           )}
           {lead.product_purchased && (
             <Badge variant="secondary" className="text-xs">
-              {lead.product_purchased}
+              {(lead as any).product_category ? `${(lead as any).product_category} - ${lead.product_purchased}` : lead.product_purchased}
             </Badge>
           )}
           {lead.sales_owner?.full_name && (
