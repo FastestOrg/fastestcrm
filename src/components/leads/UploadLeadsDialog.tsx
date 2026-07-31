@@ -44,7 +44,7 @@ export function UploadLeadsDialog() {
     const { statuses } = useLeadStatuses();
     const queryClient = useQueryClient();
     const abortRef = useRef(false);
-    const { customColumns } = useCustomColumns();
+    const { customColumns } = useCustomColumns(tableName);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
@@ -54,9 +54,21 @@ export function UploadLeadsDialog() {
     };
 
     const handleDownloadFormat = () => {
-        let headers = ['Name', 'Email', 'Phone', 'College', 'Status', 'Lead Source', 'Lead Owner'];
-        let row1 = ['John Doe', 'john@example.com', '9876543210', 'Example University', 'new', 'Website', 'Jane Smith'];
-        let row2 = ['Jane Smith', 'jane@test.com', '9123456780', 'Tech Institute', 'interested', 'Referral', 'John Doe'];
+        let headers = [
+            'Name', 'Email', 'Phone', 'College', 'Status', 'Lead Source', 'Lead Owner',
+            'Graduating Year', 'Branch', 'Domain', 'CGPA', 'State', 'Preferred Language',
+            'Company', 'CA Name', 'Product Purchased', 'Batch Month', 'Notes'
+        ];
+        let row1 = [
+            'John Doe', 'john@example.com', '9876543210', 'Example University', 'new', 'Website', 'Jane Smith',
+            '2024', 'CS', 'Tech', '3.8', 'California', 'English',
+            'Acme Corp', 'CA John', 'Course A', 'Jan 2024', 'Interested in demo'
+        ];
+        let row2 = [
+            'Jane Smith', 'jane@test.com', '9123456780', 'Tech Institute', 'interested', 'Referral', 'John Doe',
+            '2023', 'IT', 'Software', '3.9', 'New York', 'English',
+            'Tech Inc', 'CA Jane', 'Course B', 'Feb 2024', 'Follow up next week'
+        ];
 
         if (customColumns && customColumns.length > 0) {
             customColumns.forEach(col => {
@@ -76,7 +88,7 @@ export function UploadLeadsDialog() {
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = 'CRM Data Upload.csv';
+        a.download = 'CRM Data Upload Format.csv';
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);

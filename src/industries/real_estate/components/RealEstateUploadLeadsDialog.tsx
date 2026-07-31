@@ -19,6 +19,7 @@ import Papa from 'papaparse';
 import { Progress } from '@/components/ui/progress';
 import { useQueryClient } from '@tanstack/react-query';
 import { REAL_ESTATE_STATUSES, REAL_ESTATE_PROPERTY_TYPES, REAL_ESTATE_PURPOSES } from '../config';
+import { useCustomColumns } from '@/hooks/useCustomColumns';
 
 const BATCH_SIZE = 100;
 
@@ -40,6 +41,7 @@ export function RealEstateUploadLeadsDialog() {
     const { orgClient } = useOrgClient();
     const queryClient = useQueryClient();
     const abortRef = useRef(false);
+    const { customColumns } = useCustomColumns('leads_real_estate');
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
@@ -49,10 +51,33 @@ export function RealEstateUploadLeadsDialog() {
     };
 
     const handleDownloadFormat = () => {
-        const csvContent =
-            'Name,Email,Phone,WhatsApp,Property Type,Budget Min,Budget Max,Preferred Location,Property Size,Purpose,Possession Timeline,Broker Name,Property Name,Unit Number,Status,Lead Source,Lead Owner\n' +
-            'John Doe,john@example.com,9876543210,9876543210,Apartment/Flat,5000000,8000000,Mumbai,1200 sq ft,buy,3-6 months,Agent Name,Green Valley,A-101,new,Website,Jane Smith\n' +
-            'Jane Smith,jane@test.com,9123456780,9123456780,Villa,10000000,15000000,Pune,2500 sq ft,invest,Ready to move,,Sunrise Heights,,contacted,Referral,John Doe';
+        let headers = [
+            'Name', 'Email', 'Phone', 'WhatsApp', 'Property Type', 'Budget Min', 'Budget Max',
+            'Preferred Location', 'Property Size', 'Purpose', 'Possession Timeline',
+            'Broker Name', 'Property Name', 'Unit Number', 'Status', 'Lead Source', 'Lead Owner'
+        ];
+        let row1 = [
+            'John Doe', 'john@example.com', '9876543210', '9876543210', 'Apartment/Flat', '5000000', '8000000',
+            'Mumbai', '1200 sq ft', 'buy', '3-6 months', 'Agent Name', 'Green Valley', 'A-101', 'new', 'Website', 'Jane Smith'
+        ];
+        let row2 = [
+            'Jane Smith', 'jane@test.com', '9123456780', '9123456780', 'Villa', '10000000', '15000000',
+            'Pune', '2500 sq ft', 'invest', 'Ready to move', '', 'Sunrise Heights', '', 'contacted', 'Referral', 'John Doe'
+        ];
+
+        if (customColumns && customColumns.length > 0) {
+            customColumns.forEach(col => {
+                headers.push(col.label);
+                row1.push('');
+                row2.push('');
+            });
+        }
+
+        const csvContent = [
+            headers.join(','),
+            row1.join(','),
+            row2.join(',')
+        ].join('\n');
 
         const blob = new Blob([csvContent], { type: 'text/csv' });
         const url = window.URL.createObjectURL(blob);

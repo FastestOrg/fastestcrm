@@ -72,14 +72,35 @@ export default function ManageLeadAttributes() {
     // Fetch dynamic columns
     const { orgClient, isBYOSLoading } = useOrgClient();
     const { data: dbColumns, refetch: refetchColumns, isLoading: columnsLoading } = useQuery({
-        queryKey: ['lead-columns', (orgClient as any)?.supabaseUrl || 'default', company?.id],
+        queryKey: ['lead-columns', (orgClient as any)?.supabaseUrl || 'default', company?.id, company?.custom_leads_table],
         queryFn: async () => {
             if (!company?.id) return [];
             try {
+                // Primary: Fetch schema columns directly from PostgreSQL via get_company_lead_columns RPC
+                let { data: rpcData, error: rpcError } = await (orgClient as any).rpc('get_company_lead_columns', {
+                    input_company_id: company.id
+                });
+
+                // Fallback to main Supabase client if orgClient (BYOS) fails or misses the function
+                if ((rpcError || !rpcData || !Array.isArray(rpcData) || rpcData.length === 0) && orgClient !== supabase) {
+                    const mainRes = await supabase.rpc('get_company_lead_columns' as any, {
+                        input_company_id: company.id
+                    });
+                    if (!mainRes.error && mainRes.data && Array.isArray(mainRes.data) && mainRes.data.length > 0) {
+                        rpcData = mainRes.data;
+                        rpcError = null;
+                    }
+                }
+
+                if (!rpcError && rpcData && Array.isArray(rpcData) && rpcData.length > 0) {
+                    return rpcData as ColumnDef[];
+                }
+
+                // Fallback: Query target custom_leads_table or 'leads' if RPC yields no results
+                const targetTable = company.custom_leads_table || 'leads';
                 const { data, error } = await orgClient
-                    .from('leads' as any)
+                    .from(targetTable as any)
                     .select('*')
-                    .eq('company_id', company.id)
                     .limit(5);
 
                 if (!error && data && data.length > 0) {
@@ -100,6 +121,7 @@ export default function ManageLeadAttributes() {
 
                 return [];
             } catch (e) {
+                console.error('Error fetching lead columns:', e);
                 return [];
             }
         },
@@ -108,7 +130,13 @@ export default function ManageLeadAttributes() {
 
     // System columns we want to hide or show specifically
     const hiddenColumns = ['id', 'company_id', 'created_by_id', 'pre_sales_owner_id', 'sales_owner_id', 'post_sales_owner_id', 'embedding'];
-    const systemColumns = ['id', 'created_at', 'updated_at', 'company_id', 'created_by_id', 'name', 'email', 'phone', 'status', 'sales_owner_id', 'notes', 'lead_source', 'next_follow_up', 'lead_score', 'custom_data', 'archived', 'payment_link'];
+    const systemColumns = [
+        'id', 'created_at', 'updated_at', 'company_id', 'created_by_id', 'name', 'email', 'phone', 
+        'status', 'sales_owner_id', 'pre_sales_owner_id', 'post_sales_owner_id', 'notes', 'lead_source', 
+        'next_follow_up', 'lead_score', 'custom_data', 'archived', 'payment_link', 'whatsapp', 'college', 
+        'graduating_year', 'branch', 'domain', 'cgpa', 'state', 'preferred_language', 'company', 'ca_name', 
+        'revenue_received', 'revenue_projected', 'total_recovered', 'product_purchased', 'batch_month'
+    ];
 
     const handleUnlock = async () => {
         if (!company) return;
@@ -312,42 +340,56 @@ export default function ManageLeadAttributes() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {attributesList.map((attr) => {
-                                    const isUnique = uniqueConstraints?.includes(attr.name) || false;
-                                    return (
-                                        <TableRow key={attr.name}>
-                                            <TableCell className="font-medium">{attr.label}</TableCell>
-                                            <TableCell><Badge variant="outline">{attr.type}</Badge></TableCell>
-                                            <TableCell>
-                                                {attr.system ? <Badge variant="secondary">System</Badge> : <Badge>Custom</Badge>}
-                                            </TableCell>
-                                            <TableCell>
-                                                {attr.canUnique ? (
-                                                    <div className="flex items-center gap-2">
-                                                        <Switch
-                                                            checked={isUnique}
-                                                            onCheckedChange={() => handleToggleUnique(attr.name, isUnique)}
-                                                            disabled={constraintsLoading}
-                                                        />
-                                                        {isUnique && <span className="text-xs text-green-600 flex gap-1"><Fingerprint className="h-3 w-3" /> Unique</span>}
-                                                    </div>
-                                                ) : <span className="text-muted-foreground text-xs">Not applicable</span>}
-                                            </TableCell>
-                                            <TableCell className="text-right">
-                                                {!attr.system && (
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="text-destructive hover:bg-destructive/10"
-                                                        onClick={() => handleDeleteAttribute(attr.name)}
-                                                    >
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
-                                                )}
-                                            </TableCell>
-                                        </TableRow>
-                                    );
-                                })}
+                                {columnsLoading ? (
+                                    <TableRow>
+                                        <TableCell colSpan={5} className="text-center py-6">
+                                            <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
+                                        </TableCell>
+                                    </TableRow>
+                                ) : attributesList.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell colSpan={5} className="text-center py-6 text-muted-foreground">
+                                            No attributes found for table {company.custom_leads_table || 'leads'}.
+                                        </TableCell>
+                                    </TableRow>
+                                ) : (
+                                    attributesList.map((attr) => {
+                                        const isUnique = uniqueConstraints?.includes(attr.name) || false;
+                                        return (
+                                            <TableRow key={attr.name}>
+                                                <TableCell className="font-medium">{attr.label}</TableCell>
+                                                <TableCell><Badge variant="outline">{attr.type}</Badge></TableCell>
+                                                <TableCell>
+                                                    {attr.system ? <Badge variant="secondary">System</Badge> : <Badge>Custom</Badge>}
+                                                </TableCell>
+                                                <TableCell>
+                                                    {attr.canUnique ? (
+                                                        <div className="flex items-center gap-2">
+                                                            <Switch
+                                                                checked={isUnique}
+                                                                onCheckedChange={() => handleToggleUnique(attr.name, isUnique)}
+                                                                disabled={constraintsLoading}
+                                                            />
+                                                            {isUnique && <span className="text-xs text-green-600 flex gap-1"><Fingerprint className="h-3 w-3" /> Unique</span>}
+                                                        </div>
+                                                    ) : <span className="text-muted-foreground text-xs">Not applicable</span>}
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                    {!attr.system && (
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="text-destructive hover:bg-destructive/10"
+                                                            onClick={() => handleDeleteAttribute(attr.name)}
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </Button>
+                                                    )}
+                                                </TableCell>
+                                            </TableRow>
+                                        );
+                                    })
+                                )}
                             </TableBody>
                         </Table>
                     </CardContent>
