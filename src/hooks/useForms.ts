@@ -98,7 +98,7 @@ export function useCreateForm() {
 
   return useMutation({
     mutationFn: async (newForm: any) => {
-      // Tier 1: Platform standard schema (name, created_by_id, status)
+      // Tier 1: Platform standard schema (name, created_by_id, status) without company_id column
       const p1: any = {
         name: newForm.name || newForm.title,
         description: newForm.description,
@@ -106,7 +106,6 @@ export function useCreateForm() {
         created_by_id: newForm.created_by_id || newForm.created_by,
         status: newForm.status || 'active',
       };
-      if (newForm.company_id) p1.company_id = newForm.company_id;
 
       const { data: d1, error: e1 } = await orgClient
         .from('forms')
@@ -116,14 +115,8 @@ export function useCreateForm() {
 
       if (!e1 && d1) return d1;
 
-      // Tier 2: BYOS legacy schema (title, created_by, is_active)
-      const p2: any = {
-        title: newForm.name || newForm.title,
-        description: newForm.description,
-        fields: newForm.fields,
-        created_by: newForm.created_by_id || newForm.created_by,
-        is_active: newForm.is_active !== undefined ? newForm.is_active : true,
-      };
+      // Tier 2: Platform standard schema WITH company_id (for custom schemas that include company_id)
+      const p2: any = { ...p1 };
       if (newForm.company_id) p2.company_id = newForm.company_id;
 
       const { data: d2, error: e2 } = await orgClient
@@ -134,12 +127,13 @@ export function useCreateForm() {
 
       if (!e2 && d2) return d2;
 
-      // Tier 3: Minimal fallback (name, created_by)
+      // Tier 3: BYOS legacy schema (title, created_by, is_active, company_id)
       const p3: any = {
-        name: newForm.name || newForm.title,
+        title: newForm.name || newForm.title,
         description: newForm.description,
         fields: newForm.fields,
         created_by: newForm.created_by_id || newForm.created_by,
+        is_active: newForm.is_active !== undefined ? newForm.is_active : true,
       };
       if (newForm.company_id) p3.company_id = newForm.company_id;
 
@@ -151,8 +145,41 @@ export function useCreateForm() {
 
       if (!e3 && d3) return d3;
 
+      // Tier 4: BYOS legacy schema WITHOUT company_id
+      const p4: any = {
+        title: newForm.name || newForm.title,
+        description: newForm.description,
+        fields: newForm.fields,
+        created_by: newForm.created_by_id || newForm.created_by,
+        is_active: newForm.is_active !== undefined ? newForm.is_active : true,
+      };
+
+      const { data: d4, error: e4 } = await orgClient
+        .from('forms')
+        .insert(p4)
+        .select()
+        .single();
+
+      if (!e4 && d4) return d4;
+
+      // Tier 5: Minimal fallback (name, created_by)
+      const p5: any = {
+        name: newForm.name || newForm.title,
+        description: newForm.description,
+        fields: newForm.fields,
+        created_by: newForm.created_by_id || newForm.created_by,
+      };
+
+      const { data: d5, error: e5 } = await orgClient
+        .from('forms')
+        .insert(p5)
+        .select()
+        .single();
+
+      if (!e5 && d5) return d5;
+
       // Throw clearest error
-      throw e1 || e2 || e3;
+      throw e1 || e2 || e3 || e4 || e5;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['forms'] });
