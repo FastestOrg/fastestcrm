@@ -55,6 +55,7 @@ interface MobileLeadsHeaderProps {
   canDelete?: boolean;
   onEditLayout?: () => void;
   activeFilters?: ActiveFilter[];
+  onResetFilters?: () => void;
 }
 
 export function MobileLeadsHeader({
@@ -78,7 +79,8 @@ export function MobileLeadsHeader({
   uploadButton,
   canDelete = false,
   onEditLayout,
-  activeFilters
+  activeFilters,
+  onResetFilters
 }: MobileLeadsHeaderProps) {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [localSearch, setLocalSearch] = useState(searchValue);
@@ -104,6 +106,10 @@ export function MobileLeadsHeader({
        selectedPropertyTypes.size > 0);
 
   const clearAllFilters = () => {
+    if (onResetFilters) {
+      onResetFilters();
+      return;
+    }
     if (activeFilters) {
       activeFilters.forEach(f => f.onSelectionChange(new Set()));
     } else {

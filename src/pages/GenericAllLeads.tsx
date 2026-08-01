@@ -484,6 +484,22 @@ export default function GenericAllLeads() {
         return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
     }).map(col => ({ ...col, visible: true }));
 
+    const handleResetFilters = () => {
+        setSearchParams(prev => {
+            const newParams = new URLSearchParams(prev);
+            newParams.delete('owner');
+            newParams.delete('status');
+            newParams.delete('product');
+            Array.from(newParams.keys()).forEach(key => {
+                if (key !== 'q' && key !== 'page' && key !== 'pageSize' && key !== 'tab') {
+                    newParams.delete(key);
+                }
+            });
+            newParams.set('page', '1');
+            return newParams;
+        });
+    };
+
     return (
         <>
             <div className="space-y-4 md:space-y-6 pb-20 md:pb-0">
@@ -492,6 +508,7 @@ export default function GenericAllLeads() {
                     searchValue={localSearch}
                     onSearchChange={setLocalSearch}
                     activeFilters={activeFilters}
+                    onResetFilters={handleResetFilters}
                     selectedCount={selectedLeads.size}
                     onDelete={handleDeleteLeads}
                     onAssign={() => setAssignDialogOpen(true)}
