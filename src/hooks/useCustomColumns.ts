@@ -98,7 +98,9 @@ export function useCustomColumns(tableName: string = 'leads') {
         return [];
       }
     },
-    enabled: !!company?.id && !isBYOSLoading
+    enabled: !!company?.id && !isBYOSLoading,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
   });
 
   const customColumns = useMemo(() => {

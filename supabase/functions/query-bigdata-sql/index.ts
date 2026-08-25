@@ -59,25 +59,30 @@ serve(async (req) => {
             throw new Error("Unauthorized");
         }
 
-        // Verify user is company admin
-        const { data: profile } = await supabaseAuth
-            .from('profiles')
-            .select('company_id')
-            .eq('id', user.id)
-            .single();
+        // Verify user role & company permissions
+        const [profileRes, roleRes] = await Promise.all([
+            supabaseAuth.from('profiles').select('company_id').eq('id', user.id).maybeSingle(),
+            supabaseAuth.from('user_roles').select('role').eq('user_id', user.id).maybeSingle()
+        ]);
 
-        if (!profile?.company_id) {
-            throw new Error("User not associated with a company");
-        }
+        const userRole = roleRes.data?.role;
+        const isPlatformAdmin = userRole === 'platform_admin';
 
-        const { data: company } = await supabaseAuth
-            .from('companies')
-            .select('admin_id')
-            .eq('id', profile.company_id)
-            .single();
+        if (!isPlatformAdmin) {
+            if (!profileRes.data?.company_id) {
+                throw new Error("User not associated with a company");
+            }
 
-        if (!company || company.admin_id !== user.id) {
-            throw new Error("Access denied: Only company admins can access Bigdata SQL");
+            const { data: company } = await supabaseAuth
+                .from('companies')
+                .select('admin_id')
+                .eq('id', profileRes.data.company_id)
+                .single();
+
+            const isCompanyAdmin = company?.admin_id === user.id || userRole === 'company' || userRole === 'company_subadmin';
+            if (!isCompanyAdmin) {
+                throw new Error("Access denied: Only company admins can access Bigdata SQL");
+            }
         }
 
         // Parse request body
@@ -246,12 +251,10 @@ serve(async (req) => {
         console.error("Query bigdata SQL error:", error);
         return new Response(
             JSON.stringify({
-                error: error.message || "Internal server error",
-                details: error.toString(),
-                stack: error.stack
+                error: error.message || "Internal server error"
             }),
             {
-                status: 200,
+                status: 400,
                 headers: { ...corsHeaders, "Content-Type": "application/json" }
             }
         );

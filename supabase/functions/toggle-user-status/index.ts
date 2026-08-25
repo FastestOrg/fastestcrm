@@ -43,6 +43,7 @@ serve(async (req) => {
 
     // ── Permission check (same as delete-team-member) ──
     const ROLE_LEVELS: Record<string, number> = {
+      platform_admin: 0,
       company: 1, company_subadmin: 2,
       level_3: 3, level_4: 4, level_5: 5, level_6: 6, level_7: 7,
       level_8: 8, level_9: 9, level_10: 10, level_11: 11, level_12: 12,
@@ -52,12 +53,24 @@ serve(async (req) => {
       bde: 10, intern: 11, ca: 12,
     };
 
-    const [requesterRoleResult, targetRoleResult] = await Promise.all([
+    const [requesterRoleResult, requesterProfileResult, targetRoleResult, targetProfileResult] = await Promise.all([
       supabaseAdmin.from("user_roles").select("role").eq("user_id", requester.id).maybeSingle(),
+      supabaseAdmin.from("profiles").select("company_id").eq("id", requester.id).maybeSingle(),
       supabaseAdmin.from("user_roles").select("role").eq("user_id", targetUserId).maybeSingle(),
+      supabaseAdmin.from("profiles").select("company_id").eq("id", targetUserId).maybeSingle(),
     ]);
 
-    const requesterLevel = ROLE_LEVELS[requesterRoleResult.data?.role || ""] ?? 99;
+    const requesterRole = requesterRoleResult.data?.role;
+    const requesterCompanyId = requesterProfileResult.data?.company_id;
+    const targetCompanyId = targetProfileResult.data?.company_id;
+
+    if (requesterRole !== "platform_admin") {
+      if (!requesterCompanyId || !targetCompanyId || requesterCompanyId !== targetCompanyId) {
+        throw new Error("You can only deactivate/reactivate team members within your company");
+      }
+    }
+
+    const requesterLevel = ROLE_LEVELS[requesterRole || ""] ?? 99;
     const targetLevel = ROLE_LEVELS[targetRoleResult.data?.role || ""] ?? 99;
 
     if (requesterLevel >= targetLevel) {

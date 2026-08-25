@@ -48,20 +48,43 @@ serve(async (req) => {
     }
 
     // Fetch requester info and target info in parallel
-    const [requesterRoleResult, targetProfileResult] = await Promise.all([
+    const [requesterRoleResult, requesterProfileResult, targetProfileResult] = await Promise.all([
       supabaseAdmin.from("user_roles").select("role").eq("user_id", requester.id).maybeSingle(),
+      supabaseAdmin.from("profiles").select("company_id").eq("id", requester.id).maybeSingle(),
       supabaseAdmin.from("profiles").select("id, company_id, manager_id").eq("id", targetUserId).maybeSingle()
     ]);
 
     const requesterRole = requesterRoleResult.data?.role;
+    const requesterCompanyId = requesterProfileResult.data?.company_id;
     const targetProfile = targetProfileResult.data;
 
     if (!targetProfile) {
       throw new Error("Target user not found");
     }
 
+    // Enforce company boundary check unless platform_admin
+    if (requesterRole !== "platform_admin") {
+      if (!requesterCompanyId || !targetProfile.company_id || requesterCompanyId !== targetProfile.company_id) {
+        throw new Error("You can only delete team members within your company");
+      }
+    }
+
+    // If reassignToId is provided, verify reassignTo user belongs to the same company
+    if (reassignToId) {
+      const { data: reassignProfile } = await supabaseAdmin
+        .from("profiles")
+        .select("company_id")
+        .eq("id", reassignToId)
+        .maybeSingle();
+
+      if (!reassignProfile || reassignProfile.company_id !== targetProfile.company_id) {
+        throw new Error("Reassigned user must belong to the same company");
+      }
+    }
+
     // Check if requester is company admin or in hierarchy above target
     const ROLE_LEVELS: Record<string, number> = {
+      platform_admin: 0,
       company: 1, company_subadmin: 2, level_3: 3, level_4: 4, level_5: 5,
       level_6: 6, level_7: 7, level_8: 8, level_9: 9, level_10: 10,
       level_11: 11, level_12: 12, level_13: 13, level_14: 14, level_15: 15,

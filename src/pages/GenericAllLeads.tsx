@@ -31,6 +31,7 @@ import { StatusReminderDialog } from '@/components/leads/StatusReminderDialog';
 import { useLeadStatuses, CompanyLeadStatus } from '@/hooks/useLeadStatuses';
 import { LeadsKanbanBoard } from '@/components/leads/LeadsKanbanBoard';
 import { useCustomColumns } from '@/hooks/useCustomColumns';
+import { executeInChunks } from '@/lib/batchUtils';
 
 import { useSearchParams } from 'react-router-dom';
 
@@ -389,10 +390,13 @@ export default function GenericAllLeads() {
         }
 
         try {
-            const { error } = await supabase
-                .from(tableName as any)
-                .delete()
-                .in('id', Array.from(selectedLeads));
+            const leadIds = Array.from(selectedLeads);
+            const { error } = await executeInChunks(leadIds, (chunk) =>
+                supabase
+                    .from(tableName as any)
+                    .delete()
+                    .in('id', chunk)
+            );
 
             if (error) throw error;
 
@@ -613,7 +617,7 @@ export default function GenericAllLeads() {
                                     <SelectValue placeholder={pageSize.toString()} />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {[25, 50, 100, 250, 500, 1000, 5000].map(size => (
+                                    {[25, 50, 100, 250, 500, 1000].map(size => (
                                         <SelectItem key={size} value={size.toString()}>
                                             {size}
                                         </SelectItem>

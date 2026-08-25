@@ -28,6 +28,7 @@ import { FloatingAddButton } from '@/components/leads/FloatingAddButton';
 import { ColumnConfigDialog } from '@/components/leads/ColumnConfigDialog';
 import { LeadsKanbanBoard } from '@/components/leads/LeadsKanbanBoard';
 import { useLeadStatuses } from '@/hooks/useLeadStatuses';
+import { executeInChunks } from '@/lib/batchUtils';
 export default function RealEstateAllLeads() {
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearchQuery = useDebounce(searchQuery, 500);
@@ -188,10 +189,13 @@ export default function RealEstateAllLeads() {
     }
 
     try {
-      const { error } = await supabase
-        .from('leads_real_estate')
-        .delete()
-        .in('id', Array.from(selectedLeads));
+      const leadIds = Array.from(selectedLeads);
+      const { error } = await executeInChunks(leadIds, (chunk) =>
+        supabase
+          .from('leads_real_estate')
+          .delete()
+          .in('id', chunk)
+      );
 
       if (error) throw error;
 
@@ -366,7 +370,7 @@ export default function RealEstateAllLeads() {
                   <SelectValue placeholder={pageSize.toString()} />
                 </SelectTrigger>
                 <SelectContent>
-                  {[25, 50, 100, 250, 500, 1000, 5000].map(size => (
+                  {[25, 50, 100, 250, 500, 1000].map(size => (
                     <SelectItem key={size} value={size.toString()}>
                       {size}
                     </SelectItem>

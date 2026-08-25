@@ -13,7 +13,7 @@ export default async function handler(req, res) {
         return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const SUPABASE_URL = 'https://uykdyqdeyilpulaqlqip.supabase.co';
+    const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || 'https://uykdyqdeyilpulaqlqip.supabase.co';
     const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
     if (!SERVICE_ROLE_KEY) {

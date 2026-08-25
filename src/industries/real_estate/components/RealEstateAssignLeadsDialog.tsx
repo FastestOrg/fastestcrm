@@ -23,6 +23,7 @@ import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCompany } from '@/hooks/useCompany';
 import { notificationService } from '@/services/notificationService';
+import { executeInChunks } from '@/lib/batchUtils';
 
 interface RealEstateAssignLeadsDialogProps {
   open: boolean;
@@ -126,10 +127,12 @@ export function RealEstateAssignLeadsDialog({
         updateData.post_sales_owner_id = postSalesUserId;
       }
 
-      const { error } = await orgClient
-        .from('leads_real_estate')
-        .update(updateData)
-        .in('id', selectedLeadIds);
+      const { error } = await executeInChunks(selectedLeadIds, (chunk) =>
+        orgClient
+          .from('leads_real_estate')
+          .update(updateData)
+          .in('id', chunk)
+      );
 
       if (error) throw error;
 

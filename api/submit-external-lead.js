@@ -13,9 +13,12 @@ export default async function handler(req, res) {
         return res.status(405).json({ error: 'Method not allowed' });
     }
 
-    const SUPABASE_URL = 'https://uykdyqdeyilpulaqlqip.supabase.co';
-    const ANON_KEY = process.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5a2R5cWRleWlscHVsYXFscWlwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ3ODgzOTksImV4cCI6MjA4MDM2NDM5OX0.JAcwAdJWnKod0jdc5BSenPOiJw77eTa49bA7inBWMoY';
+    const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || 'https://uykdyqdeyilpulaqlqip.supabase.co';
+    const ANON_KEY = process.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY;
+
+    if (!ANON_KEY) {
+        return res.status(500).json({ error: 'Missing Supabase publishable/anon key in environment variables' });
+    }
 
     try {
         const response = await fetch(

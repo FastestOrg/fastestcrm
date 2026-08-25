@@ -10,6 +10,7 @@ import { useLeadsTable } from '@/hooks/useLeadsTable';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCompany } from '@/hooks/useCompany';
 import { notificationService } from '@/services/notificationService';
+import { executeInChunks } from '@/lib/batchUtils';
 
 interface AssignLeadsDialogProps {
     open: boolean;
@@ -90,10 +91,12 @@ export function AssignLeadsDialog({ open, onOpenChange, selectedLeadIds, onSucce
 
         setLoading(true);
         try {
-            const { error } = await orgClient
-                .from(tableName as any)
-                .update({ sales_owner_id: selectedUserId })
-                .in('id', selectedLeadIds);
+            const { error } = await executeInChunks(selectedLeadIds, (chunk) =>
+                orgClient
+                    .from(tableName as any)
+                    .update({ sales_owner_id: selectedUserId })
+                    .in('id', chunk)
+            );
 
             if (error) throw error;
 

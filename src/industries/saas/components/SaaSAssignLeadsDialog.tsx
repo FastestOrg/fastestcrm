@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCompany } from '@/hooks/useCompany';
 import { notificationService } from '@/services/notificationService';
+import { executeInChunks } from '@/lib/batchUtils';
 
 interface SaaSAssignLeadsDialogProps {
   open: boolean;
@@ -68,7 +69,9 @@ export function SaaSAssignLeadsDialog({ open, onOpenChange, selectedLeadIds, onS
       if (updateSales && salesUserId) updateData.sales_owner_id = salesUserId;
       if (updatePostSales && postSalesUserId) updateData.post_sales_owner_id = postSalesUserId;
 
-      const { error } = await orgClient.from('leads_saas' as any).update(updateData).in('id', selectedLeadIds);
+      const { error } = await executeInChunks(selectedLeadIds, (chunk) =>
+        orgClient.from('leads_saas' as any).update(updateData).in('id', chunk)
+      );
       if (error) throw error;
 
       const notifs = [];

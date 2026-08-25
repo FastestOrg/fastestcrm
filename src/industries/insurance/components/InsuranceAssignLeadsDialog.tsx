@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCompany } from '@/hooks/useCompany';
 import { notificationService } from '@/services/notificationService';
+import { executeInChunks } from '@/lib/batchUtils';
 
 interface Props {
   open: boolean;
@@ -55,7 +56,9 @@ export function InsuranceAssignLeadsDialog({ open, onOpenChange, selectedLeadIds
       if (updatePreSales && preSalesUserId) updateData.pre_sales_owner_id = preSalesUserId;
       if (updateSales && salesUserId) updateData.sales_owner_id = salesUserId;
       if (updatePostSales && postSalesUserId) updateData.post_sales_owner_id = postSalesUserId;
-      const { error } = await orgClient.from('leads_insurance' as any).update(updateData).in('id', selectedLeadIds);
+      const { error } = await executeInChunks(selectedLeadIds, (chunk) =>
+        orgClient.from('leads_insurance' as any).update(updateData).in('id', chunk)
+      );
       if (error) throw error;
       const notifs = [];
       if (updatePreSales && preSalesUserId && preSalesUserId !== user?.id) notifs.push({ userId: preSalesUserId, role: 'Pre-Sales' });

@@ -69,19 +69,20 @@ async function connectToImap(account: any) {
 
     try {
         await client.connect();
-        let lock = await client.getMailboxLock('INBOX');
-
+        const lock = await client.getMailboxLock('INBOX');
         console.log(`IMAP connected for ${account.email_address}`);
+        lock.release();
 
         // Handle incoming emails (IDLE)
         client.on('exists', async () => {
             try {
-                for await (let msg of client.fetch('*:*', { source: true, envelope: true })) {
+                for await (const msg of client.fetch('*:*', { source: true, envelope: true })) {
                     // Only process unseen messages
-                    if (msg.flags.has('\\Seen')) continue;
+                    if (!msg.flags || msg.flags.has('\\Seen')) continue;
+                    if (!msg.source) continue;
 
                     const parsed = await simpleParser(msg.source);
-                    let fromEmail = parsed.from?.value[0]?.address;
+                    const fromEmail = parsed.from?.value[0]?.address;
                     if (!fromEmail) continue;
 
                     console.log(`New email from ${fromEmail} to ${account.email_address}`);
@@ -167,8 +168,8 @@ async function refreshGoogleToken(account: any) {
         }),
     });
 
-    const data = await res.json();
-    if (!res.ok) return null;
+    const data = (await res.json()) as { access_token?: string; expires_in?: number };
+    if (!res.ok || !data.access_token) return null;
 
     const expiresAt = new Date(Date.now() + (data.expires_in || 3599) * 1000).toISOString();
 

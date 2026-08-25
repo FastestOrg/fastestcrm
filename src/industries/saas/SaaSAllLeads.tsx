@@ -26,6 +26,7 @@ import { FloatingAddButton } from '@/components/leads/FloatingAddButton';
 import { ColumnConfigDialog } from '@/components/leads/ColumnConfigDialog';
 import { LeadsKanbanBoard } from '@/components/leads/LeadsKanbanBoard';
 import { useLeadStatuses } from '@/hooks/useLeadStatuses';
+import { executeInChunks } from '@/lib/batchUtils';
 
 export default function SaaSAllLeads() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -145,7 +146,10 @@ export default function SaaSAllLeads() {
   const handleDeleteLeads = async () => {
     if (!confirm('Delete selected leads? This cannot be undone.')) return;
     try {
-      const { error } = await orgClient.from('leads_saas' as any).delete().in('id', Array.from(selectedLeads));
+      const leadIds = Array.from(selectedLeads);
+      const { error } = await executeInChunks(leadIds, (chunk) =>
+        orgClient.from('leads_saas' as any).delete().in('id', chunk)
+      );
       if (error) throw error;
       toast.success(`Deleted ${selectedLeads.size} leads`);
       setSelectedLeads(new Set());
@@ -280,7 +284,7 @@ export default function SaaSAllLeads() {
                     <SelectValue placeholder={pageSize.toString()} />
                   </SelectTrigger>
                   <SelectContent>
-                    {[25, 50, 100, 250, 500, 1000, 5000].map(size => (
+                    {[25, 50, 100, 250, 500, 1000].map(size => (
                       <SelectItem key={size} value={size.toString()}>
                         {size}
                       </SelectItem>

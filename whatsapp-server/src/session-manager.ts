@@ -84,6 +84,7 @@ class SessionManager extends EventEmitter {
 
         // If no stored creds, generate fresh ones via Baileys helper
         if (!creds) {
+            // eslint-disable-next-line react-hooks/rules-of-hooks
             const { state } = await useMultiFileAuthState(`/tmp/wa-temp-${sessionId}`);
             creds = state.creds;
         }
@@ -135,13 +136,19 @@ class SessionManager extends EventEmitter {
      * Create a new session — generates QR code for scanning.
      */
     async createSession(sessionId: string, companyId: string): Promise<string | null> {
-        // If session already exists, return its QR or status
+        // If session already exists, check status and clean up old listeners if reconnecting
         if (this.sessions.has(sessionId)) {
             const existing = this.sessions.get(sessionId)!;
             if (existing.status === 'connected') {
                 return null; // Already connected
             }
-            return existing.qrCode;
+            try {
+                existing.socket.ev.removeAllListeners('messages.upsert');
+                existing.socket.ev.removeAllListeners('connection.update');
+                existing.socket.ev.removeAllListeners('creds.update');
+                existing.socket.end(undefined);
+            } catch (_) { /* ignore cleanup error */ }
+            this.sessions.delete(sessionId);
         }
 
         const { state, saveCreds } = await this.createSupabaseAuthState(sessionId);
