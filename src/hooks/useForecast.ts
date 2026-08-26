@@ -1,4 +1,4 @@
-import { useLeads } from './useLeads';
+import { useLeads, Lead } from './useLeads';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useCompany } from './useCompany';
@@ -16,9 +16,70 @@ export const STATUS_PROBABILITIES: Record<string, number> = {
     'closed_lost': 0,
 };
 
-export function useForecast() {
+export interface ForecastResult {
+    totalPotential: number;
+    expectedRevenue: number;
+    closedRevenue: number;
+    pipelineByStatus: Array<{
+        name: string;
+        total: number;
+        expected: number;
+    }>;
+    conversionRate: number;
+}
+
+export function calculateForecast(
+    leads: Lead[] = [],
+    products: Array<{ name: string; price: number }> = []
+): ForecastResult {
+    const productsMap = new Map(products.map(p => [p.name, p.price]));
+
+    let totalPotential = 0;
+    let expectedRevenue = 0;
+    let closedRevenue = 0;
+
+    const pipelineByStatus: Record<string, { total: number; expected: number }> = {};
+
+    leads.forEach(lead => {
+        const price = productsMap.get(lead.product_purchased || '') || 0;
+        const probability = STATUS_PROBABILITIES[lead.status?.toLowerCase() || 'new'] || 0.1;
+
+        const leadPotential = price || lead.revenue_received || 0;
+        const leadExpected = leadPotential * probability;
+
+        totalPotential += leadPotential;
+        expectedRevenue += leadExpected;
+        
+        if (lead.status === 'paid') {
+            closedRevenue += (lead.revenue_received || price || 0);
+        }
+
+        const status = lead.status || 'unknown';
+        if (!pipelineByStatus[status]) {
+            pipelineByStatus[status] = { total: 0, expected: 0 };
+        }
+        pipelineByStatus[status].total += leadPotential;
+        pipelineByStatus[status].expected += leadExpected;
+    });
+
+    return {
+        totalPotential,
+        expectedRevenue,
+        closedRevenue,
+        pipelineByStatus: Object.entries(pipelineByStatus).map(([name, data]) => ({
+            name: name.replace(/_/g, ' ').toUpperCase(),
+            ...data
+        })).sort((a, b) => b.total - a.total),
+        conversionRate: leads.length > 0 ? (leads.filter(l => l.status === 'paid').length / leads.length) * 100 : 0,
+    };
+}
+
+export function useForecast(passedLeads?: Lead[], limit: number = 1000) {
     const { company } = useCompany();
-    const { data: leadsData, isLoading: leadsLoading } = useLeads({ fetchAll: true });
+    const shouldFetch = !passedLeads;
+    const { data: leadsData, isLoading: leadsLoading } = useLeads(
+        shouldFetch ? { fetchAll: true, limit } : { fetchAll: false, limit: 1 }
+    );
     
     const { data: productsData, isLoading: productsLoading } = useQuery({
         queryKey: ['products-forecast', company?.id],
@@ -33,53 +94,10 @@ export function useForecast() {
         enabled: !!company?.id,
     });
 
-    const isLoading = leadsLoading || productsLoading;
+    const isLoading = (shouldFetch && leadsLoading) || productsLoading;
+    const activeLeads = passedLeads || leadsData?.leads || [];
 
-    const forecast = (() => {
-        if (!leadsData?.leads || !productsData) return null;
-
-        const leads = leadsData.leads;
-        const productsMap = new Map(productsData.map(p => [p.name, p.price]));
-
-        let totalPotential = 0;
-        let expectedRevenue = 0;
-        let closedRevenue = 0;
-
-        const pipelineByStatus: Record<string, { total: number; expected: number }> = {};
-
-        leads.forEach(lead => {
-            const price = productsMap.get(lead.product_purchased || '') || 0;
-            const probability = STATUS_PROBABILITIES[lead.status?.toLowerCase() || 'new'] || 0.1;
-
-            const leadPotential = price || lead.revenue_received || 0;
-            const leadExpected = leadPotential * probability;
-
-            totalPotential += leadPotential;
-            expectedRevenue += leadExpected;
-            
-            if (lead.status === 'paid') {
-                closedRevenue += (lead.revenue_received || price || 0);
-            }
-
-            const status = lead.status || 'unknown';
-            if (!pipelineByStatus[status]) {
-                pipelineByStatus[status] = { total: 0, expected: 0 };
-            }
-            pipelineByStatus[status].total += leadPotential;
-            pipelineByStatus[status].expected += leadExpected;
-        });
-
-        return {
-            totalPotential,
-            expectedRevenue,
-            closedRevenue,
-            pipelineByStatus: Object.entries(pipelineByStatus).map(([name, data]) => ({
-                name: name.replace(/_/g, ' ').toUpperCase(),
-                ...data
-            })).sort((a, b) => b.total - a.total),
-            conversionRate: leads.length > 0 ? (leads.filter(l => l.status === 'paid').length / leads.length) * 100 : 0,
-        };
-    })();
+    const forecast = activeLeads && productsData ? calculateForecast(activeLeads, productsData) : null;
 
     return {
         data: forecast,

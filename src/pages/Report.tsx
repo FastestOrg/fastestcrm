@@ -7,7 +7,7 @@ import { useLeadStatuses, CompanyLeadStatus } from '@/hooks/useLeadStatuses';
 import { useCustomColumns } from '@/hooks/useCustomColumns';
 import { useCompany } from '@/hooks/useCompany';
 import { useAuth } from '@/hooks/useAuth';
-import { useForecast } from '@/hooks/useForecast';
+import { calculateForecast } from '@/hooks/useForecast';
 import {
   BarChart,
   Bar,
@@ -83,11 +83,11 @@ const CHART_COLORS = [
 ];
 
 export default function Report() {
-  const [reportLimit, setReportLimit] = useState<number>(0); // 0 means All Leads (unlimited)
+  const [reportLimit, setReportLimit] = useState<number>(1000); // Default to 1,000 for instant load
   const [isExportingPDF, setIsExportingPDF] = useState(false);
   const printableRef = useRef<HTMLDivElement>(null);
 
-  // Queries - fetch all leads with optional user-specified cap
+  // Queries - fetch leads with user-specified cap
   const effectiveLimit = reportLimit > 0 ? reportLimit : undefined;
   const { data: leadsData, isLoading: leadsLoading, isFetching: leadsFetching } = useLeads({
     fetchAll: true,
@@ -99,10 +99,9 @@ export default function Report() {
   const { customColumns, loading: customColumnsLoading } = useCustomColumns('leads');
   const { company } = useCompany();
   const { user } = useAuth();
-  const { data: forecastData, isLoading: forecastLoading } = useForecast();
 
   const allLeads = useMemo(() => leadsData?.leads || [], [leadsData]);
-  const isLoading = leadsLoading || teamLoading || statusesLoading;
+  const isInitialLoading = allLeads.length === 0 && (leadsLoading || teamLoading || statusesLoading);
 
   // Currency symbol
   const currencySymbol = company?.default_currency === 'USD' ? '$' : '₹';
@@ -318,6 +317,11 @@ export default function Report() {
       return true;
     });
   }, [allLeads, filters]);
+
+  // ─── AI Revenue Forecast Calculation (In-Memory from active leads) ───────────
+  const forecastData = useMemo(() => {
+    return calculateForecast(filteredLeads, products || []);
+  }, [filteredLeads, products]);
 
   // ─── Group-By Aggregation Engine ────────────────────────────────────────────
   const groupByLabel = useMemo(() => {
@@ -550,7 +554,7 @@ export default function Report() {
     }
   };
 
-  if (isLoading) {
+  if (isInitialLoading) {
     return (
       <div className="flex h-screen items-center justify-center">
         <div className="flex flex-col items-center gap-3">
