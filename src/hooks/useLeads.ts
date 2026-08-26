@@ -157,7 +157,11 @@ async function fetchLeadsData({
     let allLeads: Lead[] = [];
     let hasMore = true;
     const CHUNK_SIZE = 1000;
-    while (hasMore) {
+    const MAX_CHUNKS = 500; // Safety cap: up to 500,000 leads
+    let chunkIndex = 0;
+
+    while (hasMore && chunkIndex < MAX_CHUNKS) {
+      chunkIndex++;
       const from = allLeads.length;
       let fetchSize = CHUNK_SIZE;
 
@@ -174,10 +178,12 @@ async function fetchLeadsData({
 
       let chunkQuery = dbClient
         .from(tableName as any)
-        .select(selectQuery, { count: 'exact' });
+        .select(selectQuery);
 
       // Re-apply filters to chunkQuery
-      chunkQuery = chunkQuery.eq('company_id', companyId);
+      if (!isBYOSHost) {
+        chunkQuery = chunkQuery.eq('company_id', companyId);
+      }
       if (statusFilter) {
         if (Array.isArray(statusFilter)) {
           if (statusFilter.length > 0) chunkQuery = chunkQuery.in('status', statusFilter);
@@ -229,7 +235,7 @@ async function fetchLeadsData({
         throw chunkError;
       }
 
-      if (chunkData) {
+      if (chunkData && Array.isArray(chunkData)) {
         const fetched = chunkData as unknown as Lead[];
         allLeads = [...allLeads, ...fetched];
         if (fetched.length < fetchSize || (limit && limit > 0 && allLeads.length >= limit)) {
