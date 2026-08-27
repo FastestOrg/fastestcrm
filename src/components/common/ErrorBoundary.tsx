@@ -22,6 +22,24 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    const errorMessage = error?.message || '';
+    const isChunkError =
+      errorMessage.includes('Failed to fetch dynamically imported module') ||
+      errorMessage.includes('Importing a module script failed') ||
+      errorMessage.includes('Strict MIME type checking') ||
+      errorMessage.includes('error loading dynamically imported module') ||
+      error?.name === 'ChunkLoadError';
+
+    if (isChunkError) {
+      const reloadKey = 'fcrm-common-chunk-reloaded';
+      if (!sessionStorage.getItem(reloadKey)) {
+        sessionStorage.setItem(reloadKey, 'true');
+        console.warn('[ErrorBoundary] Detected chunk mismatch. Auto-refreshing...');
+        window.location.reload();
+        return;
+      }
+    }
+
     logger.error('React ErrorBoundary caught an exception', {
       details: {
         errorName: error.name,
@@ -39,6 +57,14 @@ export class ErrorBoundary extends Component<Props, State> {
 
   public render() {
     if (this.state.hasError) {
+      const errorMessage = this.state.error?.message || '';
+      const isChunkError =
+        errorMessage.includes('Failed to fetch dynamically imported module') ||
+        errorMessage.includes('Importing a module script failed') ||
+        errorMessage.includes('Strict MIME type checking') ||
+        errorMessage.includes('error loading dynamically imported module') ||
+        this.state.error?.name === 'ChunkLoadError';
+
       return (
         <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4 text-center">
           <div className="mx-auto max-w-md space-y-6 rounded-2xl border border-destructive/20 bg-card p-8 shadow-2xl backdrop-blur-md">
@@ -48,10 +74,12 @@ export class ErrorBoundary extends Component<Props, State> {
 
             <div className="space-y-2">
               <h1 className="text-2xl font-bold tracking-tight text-foreground">
-                Something went wrong
+                {isChunkError ? 'New Version Available' : 'Something went wrong'}
               </h1>
               <p className="text-sm text-muted-foreground">
-                An unexpected error occurred in the application. The issue has been automatically logged, and we are working to resolve it.
+                {isChunkError
+                  ? 'Fastest CRM has been updated with new features and improvements. Please refresh to load the latest version.'
+                  : 'An unexpected error occurred in the application. The issue has been automatically logged, and we are working to resolve it.'}
               </p>
             </div>
 
@@ -67,7 +95,7 @@ export class ErrorBoundary extends Component<Props, State> {
                 className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               >
                 <RotateCcw className="mr-2 h-4 w-4" />
-                Reload Application
+                {isChunkError ? 'Update & Refresh' : 'Reload Application'}
               </button>
               <a
                 href="/"

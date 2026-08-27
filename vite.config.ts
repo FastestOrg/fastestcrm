@@ -40,6 +40,10 @@ export default defineConfig(({ mode }) => {
         includeAssets: ['favicon.ico', 'fastestcrmlogo.png'],
         workbox: {
           maximumFileSizeToCacheInBytes: 5000000, // 5MB limit for large production bundles
+          cleanupOutdatedCaches: true,
+          skipWaiting: true,
+          clientsClaim: true,
+          navigateFallbackDenylist: [/^\/assets\//, /^\/api\//, /^\/rest\//, /^\/auth\//, /^\/functions\//],
         },
         manifest: {
           name: 'Fastest CRM',
