@@ -294,7 +294,9 @@ export default function GenericAllLeads() {
             };
         },
         enabled: !!company?.id && !!tableName,
-        staleTime: 1000 * 60 * 5, // Cache filter options for 5 minutes
+        staleTime: 1000 * 60 * 30, // Cache filter options for 30 minutes
+        gcTime: 1000 * 60 * 60, // Keep in cache for 1 hour
+        refetchOnWindowFocus: false, // Prevent re-running 10 parallel RPC calls on tab switch
     });
 
     const isPredefinedFilter = (id: string) => id === 'owner' || id === 'status' || id === 'product_purchased';

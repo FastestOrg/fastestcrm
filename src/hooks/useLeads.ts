@@ -75,19 +75,10 @@ async function fetchLeadsData({
     ? '*, sales_owner:profiles!leads_sales_owner_id_fkey(full_name)'
     : '*';
 
-  // Determine count strategy: Use 'planned' for unfiltered default view to prevent 300K row scans & timeouts, 'exact' when filters are applied
-  const hasFilters = !!(
-    search ||
-    (statusFilter && statusFilter !== 'all') ||
-    (ownerFilter && ownerFilter.length > 0) ||
-    (productFilter && productFilter.length > 0) ||
-    pendingPaymentOnly ||
-    (dynamicFilters && Object.keys(dynamicFilters).length > 0)
-  );
-
+  // Always use 'planned' count to prevent 300K+ row scans and 8s statement timeouts
   let query = dbClient
     .from(tableName as any)
-    .select(selectQuery, { count: hasFilters ? 'exact' : 'planned' })
+    .select(selectQuery, { count: 'planned' })
     .order('created_at', { ascending: false })
     .order('id', { ascending: false });
 
@@ -137,7 +128,9 @@ async function fetchLeadsData({
 
   if (dynamicFilters) {
     Object.entries(dynamicFilters).forEach(([colId, values]) => {
-      if (values && values.length > 0) {
+      if (values && values.length === 1) {
+        query = query.eq(colId, values[0]);
+      } else if (values && values.length > 1) {
         query = query.in(colId, values);
       }
     });
@@ -300,10 +293,12 @@ export function useLeads({ search, statusFilter, ownerFilter, activeOwnerIds, pr
   // Prefetch both next and previous pages for instant 0ms pagination
   useEffect(() => {
     if (!fetchAll && query.data && companyId && tableName) {
+      const orgUrl = (orgClient as any)?.supabaseUrl || 'default';
+
       // Prefetch Next Page
       if (query.data.count > page * pageSize) {
         const nextPage = page + 1;
-        const nextQueryKey = ['leads', search, statusFilter, ownerFilter, activeOwnerIds, productFilter, pendingPaymentOnly, nextPage, pageSize, fetchAll, limit, tableName, companyId, JSON.stringify(dynamicFilters)];
+        const nextQueryKey = ['leads', orgUrl, search, statusFilter, ownerFilter, activeOwnerIds, productFilter, pendingPaymentOnly, nextPage, pageSize, fetchAll, limit, tableName, companyId, JSON.stringify(dynamicFilters)];
         queryClient.prefetchQuery({
           queryKey: nextQueryKey,
           queryFn: () => fetchLeadsData({
@@ -329,7 +324,7 @@ export function useLeads({ search, statusFilter, ownerFilter, activeOwnerIds, pr
       // Prefetch Previous Page
       if (page > 1) {
         const prevPage = page - 1;
-        const prevQueryKey = ['leads', search, statusFilter, ownerFilter, activeOwnerIds, productFilter, pendingPaymentOnly, prevPage, pageSize, fetchAll, limit, tableName, companyId, JSON.stringify(dynamicFilters)];
+        const prevQueryKey = ['leads', orgUrl, search, statusFilter, ownerFilter, activeOwnerIds, productFilter, pendingPaymentOnly, prevPage, pageSize, fetchAll, limit, tableName, companyId, JSON.stringify(dynamicFilters)];
         queryClient.prefetchQuery({
           queryKey: prevQueryKey,
           queryFn: () => fetchLeadsData({
@@ -352,7 +347,7 @@ export function useLeads({ search, statusFilter, ownerFilter, activeOwnerIds, pr
         });
       }
     }
-  }, [query.data, page, pageSize, fetchAll, search, statusFilter, ownerFilter, activeOwnerIds, productFilter, pendingPaymentOnly, tableName, companyId, queryClient, JSON.stringify(dynamicFilters)]);
+  }, [query.data, page, pageSize, fetchAll, search, statusFilter, ownerFilter, activeOwnerIds, productFilter, pendingPaymentOnly, tableName, companyId, queryClient, orgClient, JSON.stringify(dynamicFilters)]);
 
   return {
     ...query,
