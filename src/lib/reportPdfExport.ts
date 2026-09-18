@@ -1,6 +1,3 @@
-import { jsPDF } from 'jspdf';
-import html2canvas from 'html2canvas';
-
 export interface PDFExportOptions {
   elementId: string;
   filename: string;
@@ -14,6 +11,7 @@ export interface PDFExportOptions {
 
 /**
  * Downloads a DOM element as a high-quality multi-page or single-page PDF.
+ * Uses dynamic imports so html2canvas and jspdf are only loaded when requested.
  */
 export async function exportReportToPDF(options: PDFExportOptions): Promise<void> {
   const {
@@ -26,6 +24,12 @@ export async function exportReportToPDF(options: PDFExportOptions): Promise<void
   if (!element) {
     throw new Error(`Report element with ID "${elementId}" not found.`);
   }
+
+  // Dynamically load html2canvas and jsPDF on demand
+  const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+    import('html2canvas'),
+    import('jspdf')
+  ]);
 
   // Ensure all images, fonts, and SVGs are loaded before capturing
   const canvas = await html2canvas(element, {

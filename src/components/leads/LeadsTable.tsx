@@ -10,7 +10,8 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Phone, Mail, MoreHorizontal, ChevronDown } from 'lucide-react';
+import { Phone, Mail, MoreHorizontal, ChevronDown, MessageSquare, Check } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -39,6 +40,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { EditLeadDialog } from './EditLeadDialog';
 import { LeadDetailsDialog } from './LeadDetailsDialog';
 import { LeadHistoryDialog } from './LeadHistoryDialog';
+import { OmnichannelLeadDrawer } from './OmnichannelLeadDrawer';
 import { useLeadStatuses, CompanyLeadStatus } from '@/hooks/useLeadStatuses';
 import { StatusReminderDialog } from './StatusReminderDialog';
 import { MaskedValue } from '@/components/ui/MaskedValue';
@@ -76,6 +78,7 @@ export const LeadsTable = memo(function LeadsTable({ leads, loading, selectedLea
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
   const [viewingLead, setViewingLead] = useState<Lead | null>(null);
   const [viewingHistoryLead, setViewingHistoryLead] = useState<Lead | null>(null);
+  const [chatLead, setChatLead] = useState<Lead | null>(null);
   const { statuses, getStatusColor } = useLeadStatuses();
   const [pendingStatus, setPendingStatus] = useState<{ leadId: string; status: CompanyLeadStatus } | null>(null);
   const [reminderDialogOpen, setReminderDialogOpen] = useState(false);
@@ -300,15 +303,30 @@ export const LeadsTable = memo(function LeadsTable({ leads, loading, selectedLea
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent>
-            {statuses.map((status) => (
-              <DropdownMenuItem
-                key={status.id}
-                onClick={() => handleStatusChange(lead.id, status.value)}
-                className="capitalize cursor-pointer"
-              >
-                {status.label}
-              </DropdownMenuItem>
-            ))}
+            {statuses.map((status) => {
+              const isSelected = lead.status === status.value;
+              const statusColor = status.color || getStatusColor(status.value);
+              return (
+                <DropdownMenuItem
+                  key={status.id}
+                  onClick={() => handleStatusChange(lead.id, status.value)}
+                  className={cn(
+                    "capitalize cursor-pointer flex items-center justify-between gap-2 transition-colors",
+                    isSelected && "font-semibold text-white focus:text-white"
+                  )}
+                  style={isSelected ? { backgroundColor: statusColor, color: '#ffffff' } : undefined}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div
+                      className={cn("w-2 h-2 rounded-full shrink-0", isSelected && "ring-1 ring-white/40")}
+                      style={{ backgroundColor: isSelected ? '#ffffff' : statusColor }}
+                    />
+                    <span className="truncate">{status.label}</span>
+                  </div>
+                  {isSelected && <Check className="h-4 w-4 shrink-0 text-white ml-auto" />}
+                </DropdownMenuItem>
+              );
+            })}
           </DropdownMenuContent>
         </DropdownMenu>
       )
@@ -545,50 +563,85 @@ export const LeadsTable = memo(function LeadsTable({ leads, loading, selectedLea
                 ))}
 
                 <TableCell>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="bg-popover border-border">
-                      <DropdownMenuItem onClick={() => setViewingLead(lead)}>
-                        View Details
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setViewingHistoryLead(lead)}>
-                        View History
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setEditingLead(lead)}>
-                        Edit Lead
-                      </DropdownMenuItem>
-                      <DropdownMenuSub>
-                        <DropdownMenuSubTrigger>Change Status</DropdownMenuSubTrigger>
-                        <DropdownMenuSubContent>
-                          {statuses.map((status) => (
-                            <DropdownMenuItem
-                              key={status.id}
-                              onClick={() => handleStatusChange(lead.id, status.value)}
-                              className="capitalize cursor-pointer"
-                            >
-                              <div className="flex items-center gap-2">
-                                {lead.status === status.value && <div className="w-1.5 h-1.5 rounded-full bg-primary" />}
-                                <span className={lead.status === status.value ? "font-medium" : ""}>{status.label}</span>
-                              </div>
-                            </DropdownMenuItem>
-                          ))}
-                        </DropdownMenuSubContent>
-                      </DropdownMenuSub>
-                      <DropdownMenuItem onClick={() => handleCreatePaymentLink(lead)}>
-                        Create Payment Link
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  <div className="flex items-center justify-end gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 opacity-70 group-hover:opacity-100 transition-opacity"
+                      onClick={() => setChatLead(lead)}
+                      title="Open WhatsApp & Email Inbox"
+                    >
+                      <MessageSquare className="h-4 w-4" />
+                    </Button>
+
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="bg-popover border-border">
+                        <DropdownMenuItem onClick={() => setChatLead(lead)} className="text-emerald-600 dark:text-emerald-400 font-medium">
+                          <MessageSquare className="mr-2 h-4 w-4" />
+                          Open Inbox / Chat
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setViewingLead(lead)}>
+                          View Details
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setViewingHistoryLead(lead)}>
+                          View History
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setEditingLead(lead)}>
+                          Edit Lead
+                        </DropdownMenuItem>
+                        <DropdownMenuSub>
+                          <DropdownMenuSubTrigger>Change Status</DropdownMenuSubTrigger>
+                          <DropdownMenuSubContent>
+                            {statuses.map((status) => {
+                              const isSelected = lead.status === status.value;
+                              const statusColor = status.color || getStatusColor(status.value);
+                              return (
+                                <DropdownMenuItem
+                                  key={status.id}
+                                  onClick={() => handleStatusChange(lead.id, status.value)}
+                                  className={cn(
+                                    "capitalize cursor-pointer flex items-center justify-between gap-2 transition-colors",
+                                    isSelected && "font-semibold text-white focus:text-white"
+                                  )}
+                                  style={isSelected ? { backgroundColor: statusColor, color: '#ffffff' } : undefined}
+                                >
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <div
+                                      className={cn("w-2 h-2 rounded-full shrink-0", isSelected && "ring-1 ring-white/40")}
+                                      style={{ backgroundColor: isSelected ? '#ffffff' : statusColor }}
+                                    />
+                                    <span className="truncate">{status.label}</span>
+                                  </div>
+                                  {isSelected && <Check className="h-4 w-4 shrink-0 text-white ml-auto" />}
+                                </DropdownMenuItem>
+                              );
+                            })}
+                          </DropdownMenuSubContent>
+                        </DropdownMenuSub>
+                        <DropdownMenuItem onClick={() => handleCreatePaymentLink(lead)}>
+                          Create Payment Link
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       </div>
+
+      <OmnichannelLeadDrawer
+        open={!!chatLead}
+        onOpenChange={(open) => !open && setChatLead(null)}
+        lead={chatLead}
+        onViewDetails={(lead) => setViewingLead(lead)}
+      />
 
       <EditLeadDialog
         open={!!editingLead}

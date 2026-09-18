@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 // DashboardLayout removed
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,9 +7,11 @@ import { Workflow, Plus, Zap, ArrowRight, Mail, Phone, UserPlus, Loader2, Trash2
 import { Switch } from "@/components/ui/switch";
 import { automationService, Automation } from '@/services/automationService';
 import { CreateAutomationDialog } from '@/components/automations/CreateAutomationDialog';
-import { WorkflowCanvas } from '@/components/automations/WorkflowCanvas';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
+
+// Lazy-load heavy ReactFlow canvas
+const WorkflowCanvas = lazy(() => import('@/components/automations/WorkflowCanvas').then(m => ({ default: m.WorkflowCanvas })));
 
 const EXAMPLE_AUTOMATIONS = [
     {
@@ -224,13 +226,20 @@ export default function Automations() {
                                 </Card>
                             ))
                         ) : (
-                          <WorkflowCanvas 
-                            automations={automations} 
-                            onNodeClick={(auto) => {
-                                setEditingAutomation(auto);
-                                setIsCreateOpen(true);
-                            }} 
-                          />
+                          <Suspense fallback={
+                            <div className="h-[500px] flex flex-col items-center justify-center border border-border/50 rounded-xl bg-card/30">
+                              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                              <p className="text-muted-foreground mt-3 text-xs">Loading Workflow Canvas...</p>
+                            </div>
+                          }>
+                            <WorkflowCanvas 
+                              automations={automations} 
+                              onNodeClick={(auto) => {
+                                  setEditingAutomation(auto);
+                                  setIsCreateOpen(true);
+                              }} 
+                            />
+                          </Suspense>
                         )}
                     </div>
                 )}

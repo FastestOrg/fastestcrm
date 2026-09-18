@@ -1,8 +1,6 @@
-import { jsPDF } from 'jspdf';
-import html2canvas from 'html2canvas';
-
 /**
  * Downloads a DOM element as a high-quality PDF.
+ * Uses dynamic imports so html2canvas and jspdf are only loaded when requested.
  * @param elementId The HTML element ID to print.
  * @param filename The name of the downloaded PDF file.
  */
@@ -11,6 +9,12 @@ export async function downloadDocumentAsPDF(elementId: string, filename: string)
   if (!element) {
     throw new Error(`Element with ID "${elementId}" not found.`);
   }
+
+  // Dynamically load html2canvas and jsPDF on demand
+  const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+    import('html2canvas'),
+    import('jspdf')
+  ]);
 
   // Preserve styles and load fonts/images via CORS
   const canvas = await html2canvas(element, {
@@ -37,3 +41,4 @@ export async function downloadDocumentAsPDF(elementId: string, filename: string)
   pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
   pdf.save(filename.endsWith('.pdf') ? filename : `${filename}.pdf`);
 }
+

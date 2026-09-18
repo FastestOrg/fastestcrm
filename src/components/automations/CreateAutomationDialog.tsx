@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -8,8 +7,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { Switch } from '@/components/ui/switch';
-import { Loader2, Check, ChevronsUpDown, X } from 'lucide-react';
-import { automationService, TriggerType, ActionType } from '@/services/automationService';
+import { Loader2, Check, ChevronsUpDown, X, PhoneCall, Bot, Sparkles, MessageSquare, Mail, Clock, GitBranch, Plus, Trash2 } from 'lucide-react';
+import { automationService, TriggerType, ActionType, WorkflowStep, Automation } from '@/services/automationService';
 import { useTeam } from '@/hooks/useTeam';
 import { useForms } from '@/hooks/useForms';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -17,7 +16,6 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { useAICallerAgents } from '@/hooks/useAICallerAgents';
-import { PhoneCall, Bot } from 'lucide-react';
 
 interface CreateAutomationDialogProps {
     isOpen: boolean;
@@ -29,8 +27,12 @@ interface CreateAutomationDialogProps {
 export function CreateAutomationDialog({ isOpen, onOpenChange, onSuccess, automation }: CreateAutomationDialogProps) {
     const [name, setName] = useState('');
     const [triggerType, setTriggerType] = useState<TriggerType>('lead_created');
-    const [actionType, setActionType] = useState<ActionType>('send_email');
+    const [actionType, setActionType] = useState<ActionType>('send_whatsapp');
     const [loading, setLoading] = useState(false);
+
+    // Sequence Mode Toggle
+    const [isSequenceMode, setIsSequenceMode] = useState(false);
+    const [sequenceSteps, setSequenceSteps] = useState<WorkflowStep[]>([]);
 
     // Trigger Config State
     const [triggerConfig, setTriggerConfig] = useState<any>({});
@@ -51,21 +53,97 @@ export function CreateAutomationDialog({ isOpen, onOpenChange, onSuccess, automa
             setActionType(automation.action_type);
             setTriggerConfig(automation.trigger_config || {});
             setActionConfig(automation.action_config || {});
+
+            const steps = automation.sequence_steps || automation.action_config?.sequence_steps;
+            if (steps && steps.length > 0) {
+                setIsSequenceMode(true);
+                setSequenceSteps(steps);
+            } else {
+                setIsSequenceMode(false);
+                setSequenceSteps([]);
+            }
         } else {
             setName('');
             setTriggerType('lead_created');
-            setActionType('send_email');
+            setActionType('send_whatsapp');
             setTriggerConfig({});
             setActionConfig({});
+            setIsSequenceMode(false);
+            setSequenceSteps([]);
         }
     }, [automation, isOpen]);
 
-    // Reset config when action type changes
-    useEffect(() => {
-        if (!automation) {
-            setActionConfig({});
+    // Apply Standard Drip Template
+    const applyDripTemplate = () => {
+        setName('Lead Welcome & Drip Follow-up');
+        setTriggerType('lead_created');
+        setIsSequenceMode(true);
+        setSequenceSteps([
+            {
+                id: 'step-1',
+                step_type: 'action',
+                name: 'Send WhatsApp Welcome',
+                action_type: 'send_whatsapp',
+                action_config: {
+                    message: 'Hi {{name}}, welcome to our platform! Thank you for reaching out. A specialist will be in touch shortly.'
+                }
+            },
+            {
+                id: 'step-2',
+                step_type: 'delay',
+                name: 'Wait 2 Days',
+                delay: {
+                    amount: 2,
+                    unit: 'days'
+                }
+            },
+            {
+                id: 'step-3',
+                step_type: 'condition',
+                name: 'Check If Status Is Still New',
+                condition: {
+                    field: 'status',
+                    operator: 'equals',
+                    value: 'new'
+                }
+            },
+            {
+                id: 'step-4',
+                step_type: 'action',
+                name: 'Send Email Reminder',
+                action_type: 'send_email',
+                action_config: {
+                    subject: 'Following up on your inquiry, {{name}}',
+                    body: '<p>Hi {{name}},</p><p>We wanted to follow up and see if you had any questions regarding your inquiry.</p><p>Best regards,<br/>Sales Team</p>'
+                }
+            }
+        ]);
+        toast({ title: 'Drip Template Loaded', description: 'WhatsApp → Wait 2 Days → Check Status → Email Reminder sequence loaded.' });
+    };
+
+    const addSequenceStep = (type: 'action' | 'delay' | 'condition') => {
+        const id = `step-${Date.now()}`;
+        if (type === 'delay') {
+            setSequenceSteps(prev => [
+                ...prev,
+                { id, step_type: 'delay', name: 'Wait Delay', delay: { amount: 2, unit: 'days' } }
+            ]);
+        } else if (type === 'condition') {
+            setSequenceSteps(prev => [
+                ...prev,
+                { id, step_type: 'condition', name: 'Condition Check', condition: { field: 'status', operator: 'equals', value: 'new' } }
+            ]);
+        } else {
+            setSequenceSteps(prev => [
+                ...prev,
+                { id, step_type: 'action', name: 'WhatsApp Message', action_type: 'send_whatsapp', action_config: { message: 'Hello {{name}}!' } }
+            ]);
         }
-    }, [actionType, automation]);
+    };
+
+    const removeSequenceStep = (index: number) => {
+        setSequenceSteps(prev => prev.filter((_, i) => i !== index));
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -73,13 +151,19 @@ export function CreateAutomationDialog({ isOpen, onOpenChange, onSuccess, automa
 
         setLoading(true);
         try {
+            const finalActionConfig = {
+                ...actionConfig,
+                sequence_steps: isSequenceMode ? sequenceSteps : undefined,
+            };
+
             if (automation?.id) {
                 await automationService.updateAutomation(automation.id, {
                     name,
                     trigger_type: triggerType,
                     trigger_config: triggerConfig,
-                    action_type: actionType,
-                    action_config: actionConfig
+                    action_type: isSequenceMode && sequenceSteps.length > 0 ? (sequenceSteps[0].action_type || actionType) : actionType,
+                    action_config: finalActionConfig,
+                    sequence_steps: isSequenceMode ? sequenceSteps : undefined,
                 });
                 toast({ title: 'Success', description: 'Automation updated successfully' });
             } else {
@@ -87,19 +171,15 @@ export function CreateAutomationDialog({ isOpen, onOpenChange, onSuccess, automa
                     name,
                     trigger_type: triggerType,
                     trigger_config: triggerConfig,
-                    action_type: actionType,
-                    action_config: actionConfig
+                    action_type: isSequenceMode && sequenceSteps.length > 0 ? (sequenceSteps[0].action_type || actionType) : actionType,
+                    action_config: finalActionConfig,
+                    sequence_steps: isSequenceMode ? sequenceSteps : undefined,
                 });
                 toast({ title: 'Success', description: 'Automation created successfully' });
             }
 
             onSuccess();
             onOpenChange(false);
-            if (!automation) {
-                setName('');
-                setTriggerConfig({});
-                setActionConfig({});
-            }
         } catch (error: any) {
             toast({
                 title: 'Error',
@@ -111,40 +191,58 @@ export function CreateAutomationDialog({ isOpen, onOpenChange, onSuccess, automa
         }
     };
 
-    const toggleUserSelection = (userId: string) => {
-        const currentUsers = actionConfig.target_users || [];
-        let newUsers;
-        if (currentUsers.includes(userId)) {
-            newUsers = currentUsers.filter((id: string) => id !== userId);
-        } else {
-            newUsers = [...currentUsers, userId];
-        }
-        setActionConfig({ ...actionConfig, target_users: newUsers });
-    };
-
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
-                    <DialogTitle>{automation ? 'Edit Automation' : 'Create New Automation'}</DialogTitle>
+                    <div className="flex items-center justify-between pr-6">
+                        <DialogTitle>{automation ? 'Edit Automation' : 'Create New Automation'}</DialogTitle>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={applyDripTemplate}
+                            className="text-xs gap-1.5 bg-gradient-to-r from-amber-500/10 to-primary/10 border-primary/20 hover:bg-primary/20"
+                        >
+                            <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+                            Use Drip Sequence Template
+                        </Button>
+                    </div>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-6 py-4">
                     <div className="space-y-2">
                         <Label>Automation Name</Label>
                         <Input
-                            placeholder="Name your Workflow"
+                            placeholder="e.g. Lead Welcome & 2-Day Drip Sequence"
                             value={name}
                             onChange={(e) => setName(e.target.value)}
                             required
                         />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-6">
+                    {/* Multi-Step Mode Switch */}
+                    <div className="flex items-center justify-between p-3.5 rounded-xl border bg-muted/30">
+                        <div>
+                            <p className="text-sm font-semibold flex items-center gap-2">
+                                <Clock className="h-4 w-4 text-amber-500" />
+                                Multi-Step Time-Delayed Drip Sequence
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                                Chain triggers with timed delays (e.g. Wait 2 days) and conditional status checks.
+                            </p>
+                        </div>
+                        <Switch
+                            checked={isSequenceMode}
+                            onCheckedChange={setIsSequenceMode}
+                        />
+                    </div>
+
+                    <div className="space-y-4">
                         {/* Trigger Section */}
-                        <div className="space-y-4 p-4 border rounded-lg bg-muted/20">
-                            <h3 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">When this happens...</h3>
+                        <div className="space-y-4 p-4 border rounded-xl bg-muted/20">
+                            <h3 className="font-semibold text-xs uppercase tracking-wider text-primary">When this happens... (Trigger)</h3>
                             <div className="space-y-2">
-                                <Label>Trigger</Label>
+                                <Label>Trigger Type</Label>
                                 <Select
                                     value={triggerType}
                                     onValueChange={(val) => setTriggerType(val as TriggerType)}
@@ -159,107 +257,6 @@ export function CreateAutomationDialog({ isOpen, onOpenChange, onSuccess, automa
                                     </SelectContent>
                                 </Select>
                             </div>
-
-                            {triggerType === 'form_submitted' && (
-                                <div className="space-y-4">
-                                    <div className="space-y-2">
-                                        <Label>Select Form</Label>
-                                        <Select
-                                            value={triggerConfig.form_id || ''}
-                                            onValueChange={(val) => setTriggerConfig({ ...triggerConfig, form_id: val })}
-                                        >
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select a form" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {isLoadingForms ? (
-                                                    <SelectItem value="loading" disabled>Loading forms...</SelectItem>
-                                                ) : (
-                                                    forms?.map(form => (
-                                                        <SelectItem key={form.id} value={form.id}>{form.name}</SelectItem>
-                                                    ))
-                                                )}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <Label className="flex justify-between items-center">
-                                            Conditions
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => {
-                                                    const currentConditions = triggerConfig.conditions || [];
-                                                    setTriggerConfig({
-                                                        ...triggerConfig,
-                                                        conditions: [...currentConditions, { field: '', operator: 'equals', value: '' }]
-                                                    });
-                                                }}
-                                            >
-                                                + Add
-                                            </Button>
-                                        </Label>
-
-                                        {triggerConfig.conditions?.map((idx: number, index: number) => (
-                                            <div key={index} className="flex gap-2 items-center">
-                                                <Input
-                                                    placeholder="Field (e.g. city)"
-                                                    className="flex-1"
-                                                    value={triggerConfig.conditions[index].field}
-                                                    onChange={(e) => {
-                                                        const newConditions = [...triggerConfig.conditions];
-                                                        newConditions[index].field = e.target.value;
-                                                        setTriggerConfig({ ...triggerConfig, conditions: newConditions });
-                                                    }}
-                                                />
-                                                <Select
-                                                    value={triggerConfig.conditions[index].operator}
-                                                    onValueChange={(val) => {
-                                                        const newConditions = [...triggerConfig.conditions];
-                                                        newConditions[index].operator = val;
-                                                        setTriggerConfig({ ...triggerConfig, conditions: newConditions });
-                                                    }}
-                                                >
-                                                    <SelectTrigger className="w-[110px]">
-                                                        <SelectValue />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem value="equals">=</SelectItem>
-                                                        <SelectItem value="not_equals">!=</SelectItem>
-                                                        <SelectItem value="contains">contains</SelectItem>
-                                                        <SelectItem value="greater_than">&gt;</SelectItem>
-                                                        <SelectItem value="less_than">&lt;</SelectItem>
-                                                    </SelectContent>
-                                                </Select>
-                                                <Input
-                                                    placeholder="Value"
-                                                    className="flex-1"
-                                                    value={triggerConfig.conditions[index].value}
-                                                    onChange={(e) => {
-                                                        const newConditions = [...triggerConfig.conditions];
-                                                        newConditions[index].value = e.target.value;
-                                                        setTriggerConfig({ ...triggerConfig, conditions: newConditions });
-                                                    }}
-                                                />
-                                                <Button
-                                                    type="button"
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="h-8 w-8 text-destructive"
-                                                    onClick={() => {
-                                                        const newConditions = triggerConfig.conditions.filter((_: any, i: number) => i !== index);
-                                                        setTriggerConfig({ ...triggerConfig, conditions: newConditions });
-                                                    }}
-                                                >
-                                                    <X className="h-4 w-4" />
-                                                </Button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
 
                             {triggerType === 'status_changed' && (
                                 <div className="space-y-2">
@@ -283,229 +280,338 @@ export function CreateAutomationDialog({ isOpen, onOpenChange, onSuccess, automa
                             )}
                         </div>
 
-                        {/* Action Section */}
-                        <div className="space-y-4 p-4 border rounded-lg bg-muted/20">
-                            <h3 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">...Do this</h3>
-                            <div className="space-y-2">
-                                <Label>Action</Label>
-                                <Select
-                                    value={actionType}
-                                    onValueChange={(val) => setActionType(val as ActionType)}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="send_email">Send Email</SelectItem>
-                                        <SelectItem value="ai_personalized_followup">AI Personalized Follow-up</SelectItem>
-                                        <SelectItem value="ai_call">
-                                            <div className="flex items-center gap-2">
-                                                <PhoneCall className="h-3.5 w-3.5 text-primary" />
-                                                AI Phone Call
-                                            </div>
-                                        </SelectItem>
-                                        <SelectItem value="webhook">Call Webhook</SelectItem>
-                                        <SelectItem value="assign_lead">Assign Lead</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-
-                            {actionType === 'ai_call' && (
-                                <div className="space-y-3">
-                                    <div className="p-3 bg-primary/5 rounded-lg border border-primary/10 mb-2 flex items-start gap-2">
-                                        <PhoneCall className="h-4 w-4 text-primary mt-0.5 shrink-0" />
-                                        <div>
-                                            <p className="text-[11px] text-primary font-medium">AI CALLER MODE</p>
-                                            <p className="text-[10px] text-muted-foreground mt-0.5">
-                                                An AI agent will call the lead using FastAI STS Latest via Vobiz telephony.
-                                                Calls are queued and processed sequentially.
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label>AI Caller Agent</Label>
-                                        <Select
-                                            value={actionConfig.agent_id || ''}
-                                            onValueChange={(val) => setActionConfig({ ...actionConfig, agent_id: val })}
+                        {/* Sequence Builder Mode */}
+                        {isSequenceMode ? (
+                            <div className="space-y-4 p-4 border rounded-xl bg-muted/20">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="font-semibold text-xs uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                                        Automated Sequence Steps ({sequenceSteps.length})
+                                    </h3>
+                                    <div className="flex items-center gap-1.5">
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-7 text-xs gap-1"
+                                            onClick={() => addSequenceStep('action')}
                                         >
-                                            <SelectTrigger>
-                                                <SelectValue placeholder={isLoadingAgents ? 'Loading agents...' : 'Select an AI agent'} />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {aiAgents.length === 0 ? (
-                                                    <SelectItem value="none" disabled>
-                                                        No agents — create one in FastEngage → AI Caller
-                                                    </SelectItem>
-                                                ) : (
-                                                    aiAgents.filter(a => a.is_active).map(agent => (
-                                                        <SelectItem key={agent.id} value={agent.id}>
-                                                            <div className="flex items-center gap-2">
-                                                                <Bot className="h-3.5 w-3.5 text-primary" />
-                                                                {agent.name}
-                                                            </div>
-                                                        </SelectItem>
-                                                    ))
-                                                )}
-                                            </SelectContent>
-                                        </Select>
-                                        {aiAgents.length === 0 && !isLoadingAgents && (
-                                            <p className="text-xs text-orange-500">
-                                                ⚠ No active agents found.{' '}
-                                                <a href="/dashboard/ai-caller" className="underline">Create an AI agent first →</a>
-                                            </p>
-                                        )}
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label>Custom Call Instructions <span className="text-muted-foreground font-normal">(optional)</span></Label>
-                                        <Textarea
-                                            placeholder="Override agent prompt for this specific automation, e.g. 'Start the call by asking about their budget range'"
-                                            value={actionConfig.custom_instructions || ''}
-                                            onChange={(e) => setActionConfig({ ...actionConfig, custom_instructions: e.target.value })}
-                                            className="min-h-[80px]"
-                                        />
-                                    </div>
-                                </div>
-                            )}
-
-                            {actionType === 'ai_personalized_followup' && (
-                                <div className="space-y-3">
-                                    <div className="p-3 bg-primary/5 rounded-lg border border-primary/10 mb-2">
-                                        <p className="text-[11px] text-primary font-medium flex items-center gap-1">
-                                            <Loader2 className="h-3 w-3 animate-pulse" /> 
-                                            AGENTIC MODE ENABLED
-                                        </p>
-                                        <p className="text-[10px] text-muted-foreground mt-1">
-                                            The AI will analyze the lead profile and recent history to craft a unique message.
-                                        </p>
-                                    </div>
-                                    <Label>Instructions for AI Agent</Label>
-                                    <Textarea
-                                        placeholder="e.g. Ask them if they're still looking for a 2BHK in Mumbai. Mention our 15% discount for this month."
-                                        value={actionConfig.instructions || ''}
-                                        onChange={(e) => setActionConfig({ ...actionConfig, instructions: e.target.value })}
-                                        className="min-h-[100px]"
-                                    />
-                                    <div className="flex items-center space-x-2 pt-2">
-                                        <Switch 
-                                            id="auto-send" 
-                                            checked={actionConfig.auto_send || false} 
-                                            onCheckedChange={(val) => setActionConfig({ ...actionConfig, auto_send: val })}
-                                        />
-                                        <Label htmlFor="auto-send" className="text-xs cursor-pointer">Auto-send without review</Label>
-                                    </div>
-                                </div>
-                            )}
-
-                            {actionType === 'send_email' && (
-                                <div className="space-y-2">
-                                    <Label>Subject</Label>
-                                    <Input
-                                        placeholder="Email Subject"
-                                        value={actionConfig.subject || ''}
-                                        onChange={(e) => setActionConfig({ ...actionConfig, subject: e.target.value })}
-                                    />
-                                    <Label>Message Body</Label>
-                                    <Input
-                                        placeholder="Hello {{name}}, ..."
-                                        value={actionConfig.body || ''}
-                                        onChange={(e) => setActionConfig({ ...actionConfig, body: e.target.value })}
-                                    />
-                                </div>
-                            )}
-
-                            {actionType === 'webhook' && (
-                                <div className="space-y-2">
-                                    <Label>Webhook URL</Label>
-                                    <Input
-                                        placeholder="https://api.example.com/webhook"
-                                        value={actionConfig.url || ''}
-                                        onChange={(e) => setActionConfig({ ...actionConfig, url: e.target.value })}
-                                    />
-                                </div>
-                            )}
-
-                            {actionType === 'assign_lead' && (
-                                <div className="space-y-4">
-                                    <div className="space-y-2">
-                                        <Label>Distribution Logic</Label>
-                                        <Select
-                                            value={actionConfig.distribution_logic || ''}
-                                            onValueChange={(val) => setActionConfig({ ...actionConfig, distribution_logic: val })}
+                                            <Plus className="h-3 w-3" /> Action
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-7 text-xs gap-1 text-amber-600 dark:text-amber-400 border-amber-500/30"
+                                            onClick={() => addSequenceStep('delay')}
                                         >
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select Logic" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="round_robin">Round Robin</SelectItem>
-                                                <SelectItem value="random">Random</SelectItem>
-                                            </SelectContent>
-                                        </Select>
+                                            <Clock className="h-3 w-3" /> Delay
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-7 text-xs gap-1 text-purple-600 dark:text-purple-400 border-purple-500/30"
+                                            onClick={() => addSequenceStep('condition')}
+                                        >
+                                            <GitBranch className="h-3 w-3" /> Condition
+                                        </Button>
                                     </div>
+                                </div>
 
-                                    <div className="space-y-2">
-                                        <Label>Select Users</Label>
-                                        <Popover>
-                                            <PopoverTrigger asChild>
-                                                <Button
-                                                    variant="outline"
-                                                    role="combobox"
-                                                    className="w-full justify-between h-auto min-h-[40px]"
-                                                >
-                                                    <span className="truncate">
-                                                        {actionConfig.target_users && actionConfig.target_users.length > 0
-                                                            ? `${actionConfig.target_users.length} users selected`
-                                                            : "Select users..."}
+                                <div className="space-y-3">
+                                    {sequenceSteps.map((step, idx) => (
+                                        <div key={step.id || idx} className="p-3.5 bg-background rounded-lg border shadow-sm relative space-y-3">
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="w-5 h-5 rounded-full bg-primary/10 text-primary text-[10px] font-bold flex items-center justify-center">
+                                                        {idx + 1}
                                                     </span>
-                                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                                    {step.step_type === 'delay' && (
+                                                        <Badge variant="outline" className="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30">
+                                                            <Clock className="h-3 w-3 mr-1" /> Time Delay
+                                                        </Badge>
+                                                    )}
+                                                    {step.step_type === 'condition' && (
+                                                        <Badge variant="outline" className="bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/30">
+                                                            <GitBranch className="h-3 w-3 mr-1" /> Condition Check
+                                                        </Badge>
+                                                    )}
+                                                    {(step.step_type === 'action' || !step.step_type) && (
+                                                        <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30">
+                                                            Action
+                                                        </Badge>
+                                                    )}
+                                                </div>
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-6 w-6 text-destructive"
+                                                    onClick={() => removeSequenceStep(idx)}
+                                                >
+                                                    <Trash2 className="h-3.5 w-3.5" />
                                                 </Button>
-                                            </PopoverTrigger>
-                                            <PopoverContent className="w-[300px] p-0" align="start">
-                                                <Command>
-                                                    <CommandInput placeholder="Search users..." />
-                                                    <CommandList>
-                                                        <CommandEmpty>No user found.</CommandEmpty>
-                                                        <CommandGroup className="max-h-[200px] overflow-y-auto">
-                                                            {members.map((member) => (
-                                                                <CommandItem
-                                                                    key={member.id}
-                                                                    value={member.full_name || member.email || member.id}
-                                                                    onSelect={() => toggleUserSelection(member.id)}
-                                                                >
-                                                                    <div
-                                                                        className={cn(
-                                                                            "mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-primary",
-                                                                            actionConfig.target_users?.includes(member.id)
-                                                                                ? "bg-primary text-primary-foreground"
-                                                                                : "opacity-50 [&_svg]:invisible"
-                                                                        )}
-                                                                    >
-                                                                        <Check className={cn("h-4 w-4")} />
-                                                                    </div>
-                                                                    <span>{member.full_name || member.email}</span>
-                                                                    <Badge variant="secondary" className="ml-auto text-xs">
-                                                                        {member.role}
-                                                                    </Badge>
-                                                                </CommandItem>
-                                                            ))}
-                                                        </CommandGroup>
-                                                    </CommandList>
-                                                </Command>
-                                            </PopoverContent>
-                                        </Popover>
-                                        <p className="text-xs text-muted-foreground mt-1">
-                                            Selected users will receive leads based on the chosen logic.
-                                        </p>
-                                    </div>
+                                            </div>
+
+                                            {/* Delay Config */}
+                                            {step.step_type === 'delay' && (
+                                                <div className="flex items-center gap-3">
+                                                    <span className="text-xs font-medium">Wait for</span>
+                                                    <Input
+                                                        type="number"
+                                                        className="w-20 h-8 text-xs"
+                                                        value={step.delay?.amount || 2}
+                                                        onChange={(e) => {
+                                                            const updated = [...sequenceSteps];
+                                                            updated[idx].delay = {
+                                                                amount: parseInt(e.target.value) || 1,
+                                                                unit: updated[idx].delay?.unit || 'days',
+                                                            };
+                                                            setSequenceSteps(updated);
+                                                        }}
+                                                    />
+                                                    <Select
+                                                        value={step.delay?.unit || 'days'}
+                                                        onValueChange={(val: any) => {
+                                                            const updated = [...sequenceSteps];
+                                                            updated[idx].delay = {
+                                                                amount: updated[idx].delay?.amount || 2,
+                                                                unit: val,
+                                                            };
+                                                            setSequenceSteps(updated);
+                                                        }}
+                                                    >
+                                                        <SelectTrigger className="w-[120px] h-8 text-xs">
+                                                            <SelectValue />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="minutes">Minutes</SelectItem>
+                                                            <SelectItem value="hours">Hours</SelectItem>
+                                                            <SelectItem value="days">Days</SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
+                                            )}
+
+                                            {/* Condition Config */}
+                                            {step.step_type === 'condition' && (
+                                                <div className="grid grid-cols-3 gap-2">
+                                                    <div>
+                                                        <Label className="text-[10px]">Field</Label>
+                                                        <Input
+                                                            className="h-8 text-xs font-mono"
+                                                            value={step.condition?.field || 'status'}
+                                                            onChange={(e) => {
+                                                                const updated = [...sequenceSteps];
+                                                                updated[idx].condition = {
+                                                                    ...updated[idx].condition!,
+                                                                    field: e.target.value,
+                                                                };
+                                                                setSequenceSteps(updated);
+                                                            }}
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <Label className="text-[10px]">Operator</Label>
+                                                        <Select
+                                                            value={step.condition?.operator || 'equals'}
+                                                            onValueChange={(val: any) => {
+                                                                const updated = [...sequenceSteps];
+                                                                updated[idx].condition = {
+                                                                    ...updated[idx].condition!,
+                                                                    operator: val,
+                                                                };
+                                                                setSequenceSteps(updated);
+                                                            }}
+                                                        >
+                                                            <SelectTrigger className="h-8 text-xs">
+                                                                <SelectValue />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                <SelectItem value="equals">Equals (==)</SelectItem>
+                                                                <SelectItem value="not_equals">Not Equals (!=)</SelectItem>
+                                                                <SelectItem value="contains">Contains</SelectItem>
+                                                            </SelectContent>
+                                                        </Select>
+                                                    </div>
+                                                    <div>
+                                                        <Label className="text-[10px]">Value</Label>
+                                                        <Input
+                                                            className="h-8 text-xs"
+                                                            placeholder="e.g. new"
+                                                            value={step.condition?.value || ''}
+                                                            onChange={(e) => {
+                                                                const updated = [...sequenceSteps];
+                                                                updated[idx].condition = {
+                                                                    ...updated[idx].condition!,
+                                                                    value: e.target.value,
+                                                                };
+                                                                setSequenceSteps(updated);
+                                                            }}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Action Config */}
+                                            {(step.step_type === 'action' || !step.step_type) && (
+                                                <div className="space-y-2">
+                                                    <div className="flex items-center gap-2">
+                                                        <Label className="text-[11px]">Action Type</Label>
+                                                        <Select
+                                                            value={step.action_type || 'send_whatsapp'}
+                                                            onValueChange={(val: any) => {
+                                                                const updated = [...sequenceSteps];
+                                                                updated[idx].action_type = val;
+                                                                setSequenceSteps(updated);
+                                                            }}
+                                                        >
+                                                            <SelectTrigger className="h-8 text-xs w-[180px]">
+                                                                <SelectValue />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                <SelectItem value="send_whatsapp">Send WhatsApp</SelectItem>
+                                                                <SelectItem value="send_email">Send Email</SelectItem>
+                                                                <SelectItem value="ai_personalized_followup">AI Custom Follow-up</SelectItem>
+                                                                <SelectItem value="ai_call">Trigger AI Voice Call</SelectItem>
+                                                                <SelectItem value="update_status">Update Status</SelectItem>
+                                                            </SelectContent>
+                                                        </Select>
+                                                    </div>
+
+                                                    {(step.action_type === 'send_whatsapp' || !step.action_type) && (
+                                                        <Textarea
+                                                            placeholder="WhatsApp message... (Use {{name}} placeholder)"
+                                                            className="text-xs min-h-[60px]"
+                                                            value={step.action_config?.message || ''}
+                                                            onChange={(e) => {
+                                                                const updated = [...sequenceSteps];
+                                                                updated[idx].action_config = {
+                                                                    ...updated[idx].action_config,
+                                                                    message: e.target.value,
+                                                                };
+                                                                setSequenceSteps(updated);
+                                                            }}
+                                                        />
+                                                    )}
+
+                                                    {step.action_type === 'send_email' && (
+                                                        <div className="space-y-1.5">
+                                                            <Input
+                                                                placeholder="Subject..."
+                                                                className="h-8 text-xs"
+                                                                value={step.action_config?.subject || ''}
+                                                                onChange={(e) => {
+                                                                    const updated = [...sequenceSteps];
+                                                                    updated[idx].action_config = {
+                                                                        ...updated[idx].action_config,
+                                                                        subject: e.target.value,
+                                                                    };
+                                                                    setSequenceSteps(updated);
+                                                                }}
+                                                            />
+                                                            <Textarea
+                                                                placeholder="HTML / Text Email Body..."
+                                                                className="text-xs min-h-[60px]"
+                                                                value={step.action_config?.body || ''}
+                                                                onChange={(e) => {
+                                                                    const updated = [...sequenceSteps];
+                                                                    updated[idx].action_config = {
+                                                                        ...updated[idx].action_config,
+                                                                        body: e.target.value,
+                                                                    };
+                                                                    setSequenceSteps(updated);
+                                                                }}
+                                                            />
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
                                 </div>
-                            )}
-                        </div>
+                            </div>
+                        ) : (
+                            /* Standard Single Action Section */
+                            <div className="space-y-4 p-4 border rounded-xl bg-muted/20">
+                                <h3 className="font-semibold text-xs uppercase tracking-wider text-emerald-600 dark:text-emerald-400">...Do this (Action)</h3>
+                                <div className="space-y-2">
+                                    <Label>Action Type</Label>
+                                    <Select
+                                        value={actionType}
+                                        onValueChange={(val) => setActionType(val as ActionType)}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="send_whatsapp">Send WhatsApp Message</SelectItem>
+                                            <SelectItem value="send_email">Send Email</SelectItem>
+                                            <SelectItem value="ai_personalized_followup">AI Personalized Follow-up</SelectItem>
+                                            <SelectItem value="ai_call">
+                                                <div className="flex items-center gap-2">
+                                                    <PhoneCall className="h-3.5 w-3.5 text-primary" />
+                                                    AI Phone Call
+                                                </div>
+                                            </SelectItem>
+                                            <SelectItem value="webhook">Call Webhook</SelectItem>
+                                            <SelectItem value="assign_lead">Assign Lead</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                {actionType === 'send_whatsapp' && (
+                                    <div className="space-y-2">
+                                        <Label>WhatsApp Message</Label>
+                                        <Textarea
+                                            placeholder="Hello {{name}}, thank you for your interest..."
+                                            value={actionConfig.message || actionConfig.template || ''}
+                                            onChange={(e) => setActionConfig({ ...actionConfig, message: e.target.value })}
+                                            className="min-h-[80px] text-xs"
+                                        />
+                                    </div>
+                                )}
+
+                                {actionType === 'send_email' && (
+                                    <div className="space-y-2">
+                                        <Label>Subject</Label>
+                                        <Input
+                                            placeholder="Email Subject"
+                                            value={actionConfig.subject || ''}
+                                            onChange={(e) => setActionConfig({ ...actionConfig, subject: e.target.value })}
+                                        />
+                                        <Label>Message Body</Label>
+                                        <Textarea
+                                            placeholder="Hello {{name}}, ..."
+                                            value={actionConfig.body || ''}
+                                            onChange={(e) => setActionConfig({ ...actionConfig, body: e.target.value })}
+                                            className="min-h-[80px] text-xs"
+                                        />
+                                    </div>
+                                )}
+
+                                {actionType === 'ai_personalized_followup' && (
+                                    <div className="space-y-2">
+                                        <Label>Instructions for AI Agent</Label>
+                                        <Textarea
+                                            placeholder="e.g. Ask them if they're still looking for a 2BHK in Mumbai..."
+                                            value={actionConfig.instructions || ''}
+                                            onChange={(e) => setActionConfig({ ...actionConfig, instructions: e.target.value })}
+                                            className="min-h-[80px] text-xs"
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
 
                     <DialogFooter>
-                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                            Cancel
+                        </Button>
                         <Button type="submit" disabled={loading}>
-                            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Create Automation
+                            {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                            {automation ? 'Save Changes' : 'Create Automation'}
                         </Button>
                     </DialogFooter>
                 </form>

@@ -22,55 +22,54 @@ interface Company {
 }
 
 async function fetchCompanyData(userId: string): Promise<Company | null> {
-  // Step 1: Get company_id from profile
+  // Step 1: Get company joined with profile in a single network round-trip
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
-    .select('company_id')
+    .select('company_id, company:companies(*)')
     .eq('id', userId)
     .single();
 
   if (profileError) return null;
 
-  let companyId = profile?.company_id;
+  let company = (profile as any)?.company as Company | null;
 
-  // Fallback for platform_admin if no company is assigned
-  if (!companyId) {
-    const { data: isPrivileged } = await supabase
-      .from('platform_admins')
-      .select('id')
-      .eq('user_id', userId)
-      .maybeSingle();
+  // Fallback for platform_admin or unjoined company
+  if (!company) {
+    const companyId = profile?.company_id;
 
-    if (isPrivileged) {
-      // Find the 'fastestcrm' company to default to
-      const { data: defaultCompany } = await supabase
-        .from('companies')
+    if (!companyId) {
+      const { data: isPrivileged } = await supabase
+        .from('platform_admins')
         .select('id')
-        .eq('slug', 'fastestcrm')
+        .eq('user_id', userId)
         .maybeSingle();
 
-      if (defaultCompany) {
-        companyId = defaultCompany.id;
-        console.log('[useCompany] Super admin detected without company. Defaulting to FastestCRM company:', companyId);
+      if (isPrivileged) {
+        // Find the 'fastestcrm' company to default to
+        const { data: defaultCompany } = await supabase
+          .from('companies')
+          .select('*')
+          .eq('slug', 'fastestcrm')
+          .maybeSingle();
+
+        if (defaultCompany) {
+          company = defaultCompany as Company;
+        }
+      }
+    } else {
+      // Direct fetch if relational join was empty due to specific RLS
+      const { data: directCompany, error: companyError } = await supabase
+        .from('companies')
+        .select('*')
+        .eq('id', companyId)
+        .single();
+
+      if (!companyError && directCompany) {
+        company = directCompany as Company;
       }
     }
   }
 
-  if (!companyId) return null;
-
-  // Step 2: Get company details
-  const { data: companyData, error: companyError } = await supabase
-    .from('companies')
-    .select('*')
-    .eq('id', profile.company_id)
-    .single();
-
-  if (companyError) {
-    console.error('[useCompany] Error fetching company:', companyError);
-    return null;
-  }
-
-  const company = companyData as Company;
   if (company) {
     company.logo_url = proxifySupabaseUrl(company.logo_url);
   }

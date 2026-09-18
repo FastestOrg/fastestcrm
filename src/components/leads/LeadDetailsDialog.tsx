@@ -8,7 +8,7 @@ import {
 import { Tables } from '@/integrations/supabase/types';
 import { format } from 'date-fns';
 import { useState, useEffect } from 'react';
-import { Mail, Phone, Building, Calendar, User, CreditCard, Link, MapPin, Home, DollarSign, Megaphone, Globe, Layers, CalendarClock, Pencil, Save, Shield, Brain } from 'lucide-react';
+import { Mail, Phone, Building, Calendar, User, CreditCard, Link, MapPin, Home, DollarSign, Megaphone, Globe, Layers, CalendarClock, Pencil, Save, Shield, Brain, MessageSquare } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { MaskedValue } from '@/components/ui/MaskedValue';
@@ -28,6 +28,7 @@ import {
     TabsTrigger,
 } from '@/components/ui/tabs';
 import { LeadTimeline } from './LeadTimeline';
+import { OmnichannelLeadChat } from './OmnichannelLeadChat';
 import { useUpdateLead } from '@/hooks/useLeads';
 import { useLeadStatuses, CompanyLeadStatus } from '@/hooks/useLeadStatuses';
 import { StatusReminderDialog } from './StatusReminderDialog';
@@ -193,9 +194,12 @@ export function LeadDetailsDialog({ open, onOpenChange, lead, owners, maskLeads 
                     </div>
                 </DialogHeader>
                 <Tabs defaultValue="details" className="w-full">
-                    <TabsList className="grid w-full grid-cols-4 mb-4">
+                    <TabsList className="grid w-full grid-cols-5 mb-4">
                         <TabsTrigger value="details">Lead Details</TabsTrigger>
                         <TabsTrigger value="timeline">Activity Feed</TabsTrigger>
+                        <TabsTrigger value="conversations" className="gap-2">
+                            <MessageSquare className="h-3.5 w-3.5" /> Conversations
+                        </TabsTrigger>
                         <TabsTrigger value="competitor" className="gap-2">
                             <Shield className="h-3.5 w-3.5" /> Competitive Edge
                         </TabsTrigger>
@@ -490,6 +494,12 @@ export function LeadDetailsDialog({ open, onOpenChange, lead, owners, maskLeads 
                             email={lead.email} 
                             phone={lead.phone} 
                             leadHistory={lead.lead_history || []} 
+                        />
+                    </TabsContent>
+
+                    <TabsContent value="conversations" className="py-2">
+                        <OmnichannelLeadChat 
+                            lead={lead} 
                         />
                     </TabsContent>
 

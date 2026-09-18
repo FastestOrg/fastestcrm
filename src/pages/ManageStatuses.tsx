@@ -421,7 +421,20 @@ NOTIFY pgrst, 'reload schema';
                 }
             }
 
-            toast.success(editingStatus ? 'Status updated' : 'Status created');
+            if (company?.byos_enabled) {
+                try {
+                    await supabase.functions.invoke('byos-manage', {
+                        body: {
+                            action: 'sync-statuses',
+                            company_id: company.id
+                        }
+                    });
+                } catch (byosErr) {
+                    console.warn('[BYOS Sync] Status sync warning:', byosErr);
+                }
+            }
+
+            toast.success((editingStatus ? 'Status updated' : 'Status created') + (company?.byos_enabled ? ' (Synced to BYOS)' : ''));
             setIsAddDialogOpen(false);
             setIsTableMissing(false);
             refetch();
@@ -449,7 +462,21 @@ NOTIFY pgrst, 'reload schema';
                 const { error: fbErr } = await orgClient.from('company_lead_statuses' as any).delete().eq('id', id);
                 if (fbErr) throw error;
             }
-            toast.success('Status deleted');
+
+            if (company?.byos_enabled) {
+                try {
+                    await supabase.functions.invoke('byos-manage', {
+                        body: {
+                            action: 'sync-statuses',
+                            company_id: company.id
+                        }
+                    });
+                } catch (byosErr) {
+                    console.warn('[BYOS Sync] Status delete sync warning:', byosErr);
+                }
+            }
+
+            toast.success('Status deleted' + (company?.byos_enabled ? ' (Synced to BYOS)' : ''));
             refetch();
         } catch (error: any) {
             toast.error('Error: ' + error.message);

@@ -9,6 +9,7 @@ export function useReminderPolling() {
         if (!session?.user?.id) return;
 
         const checkReminders = async () => {
+            if (typeof document !== 'undefined' && document.hidden) return;
             try {
                 await supabase.functions.invoke('process-reminders');
             } catch (error) {
@@ -19,9 +20,20 @@ export function useReminderPolling() {
         // Initial check
         checkReminders();
 
-        // Poll every 60 seconds
-        const interval = setInterval(checkReminders, 60 * 1000);
+        // Check when tab becomes visible again
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                checkReminders();
+            }
+        };
+        document.addEventListener('visibilitychange', handleVisibilityChange);
 
-        return () => clearInterval(interval);
+        // Poll every 120 seconds while active
+        const interval = setInterval(checkReminders, 120 * 1000);
+
+        return () => {
+            clearInterval(interval);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
     }, [session?.user?.id]);
 }

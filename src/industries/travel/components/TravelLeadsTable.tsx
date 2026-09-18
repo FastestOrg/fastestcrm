@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Phone, Mail, MoreHorizontal, Plane, ChevronDown } from 'lucide-react';
+import { Phone, Mail, MoreHorizontal, Plane, ChevronDown, Check } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
@@ -201,18 +202,30 @@ export function TravelLeadsTable({
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent>
-                      {statuses.map((s) => (
-                        <DropdownMenuItem
-                          key={s.id}
-                          onClick={() => handleStatusChange(lead.id, s.value)}
-                          className="capitalize cursor-pointer"
-                        >
-                          <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: s.color }} />
-                            {s.label}
-                          </div>
-                        </DropdownMenuItem>
-                      ))}
+                      {statuses.map((s) => {
+                        const isSelected = lead.status === s.value;
+                        const statusColor = s.color || getStatusColor(s.value);
+                        return (
+                          <DropdownMenuItem
+                            key={s.id}
+                            onClick={() => handleStatusChange(lead.id, s.value)}
+                            className={cn(
+                              "capitalize cursor-pointer flex items-center justify-between gap-2 transition-colors",
+                              isSelected && "font-semibold text-white focus:text-white"
+                            )}
+                            style={isSelected ? { backgroundColor: statusColor, color: '#ffffff' } : undefined}
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div
+                                className={cn("w-2 h-2 rounded-full shrink-0", isSelected && "ring-1 ring-white/40")}
+                                style={{ backgroundColor: isSelected ? '#ffffff' : statusColor }}
+                              />
+                              <span className="truncate">{s.label}</span>
+                            </div>
+                            {isSelected && <Check className="h-4 w-4 shrink-0 text-white ml-auto" />}
+                          </DropdownMenuItem>
+                        );
+                      })}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </TableCell>

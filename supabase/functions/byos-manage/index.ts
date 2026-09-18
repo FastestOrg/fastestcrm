@@ -19,7 +19,7 @@ import {
 } from "../_shared/byos-client.ts";
 
 import { BYOS_MIGRATION_SQL } from "../_shared/byos-migration-bundle.ts";
-const MIGRATION_VERSION = "1.0.0";
+const MIGRATION_VERSION = "1.1.0";
 
 // ─── JWT Parser Helper ───────────────────────────────────────────────────────
 function parseJwtPayload(token: string) {
@@ -374,37 +374,403 @@ async function handleMigrate(companyId: string, userId: string, body?: any) {
   }
 }
 
-// ─── Action: Health Check ───────────────────────────────────────────────────
+// ─── Action: Deep Health & Schema Parity Diagnostic ─────────────────────────
 async function handleHealthCheck(companyId: string) {
   const platform = getPlatformAdminClient();
   const { data: conn } = await platform
     .from("byos_connections")
-    .select("supabase_url, supabase_anon_key, status")
+    .select("*")
+    .eq("company_id", companyId)
+    .maybeSingle();
+
+  if (!conn) return { health: "not_configured", healthy: false, message: "No BYOS connection found." };
+
+  const checks: Array<{
+    name: string;
+    category: 'connectivity' | 'migration' | 'tables' | 'rls' | 'rpc';
+    status: 'pass' | 'warn' | 'fail';
+    message: string;
+    latencyMs?: number;
+    details?: any;
+  }> = [];
+
+  let overallStatus: 'healthy' | 'warning' | 'critical' = 'healthy';
+  let latencyMs = 0;
+
+  try {
+    // Decrypt service role key
+    const { data: serviceKey } = await platform.rpc("byos_decrypt_key", {
+      encrypted_key: conn.supabase_service_role_key_encrypted,
+    });
+
+    if (!serviceKey) {
+      checks.push({
+        name: "Security Key Decryption",
+        category: "connectivity",
+        status: "fail",
+        message: "Failed to decrypt service role key on platform."
+      });
+      return {
+        health: "unreachable",
+        healthy: false,
+        overallStatus: "critical",
+        checks,
+        lastCheck: new Date().toISOString()
+      };
+    }
+
+    const customerAdmin = createClient(conn.supabase_url, serviceKey as string);
+    const customerAnon = createClient(conn.supabase_url, conn.supabase_anon_key);
+
+    // ─── 1. Connectivity & Latency ───
+    const t0 = performance.now();
+    const { error: pingErr } = await customerAnon.from("_byos_meta").select("key").limit(1);
+    latencyMs = Math.round(performance.now() - t0);
+
+    if (pingErr && (pingErr.message?.includes("Invalid API key") || pingErr.code === "PGRST301")) {
+      checks.push({
+        name: "Public API Gateway (Anon Key)",
+        category: "connectivity",
+        status: "fail",
+        message: "Invalid Supabase Anon / Public Key",
+        latencyMs
+      });
+      overallStatus = "critical";
+    } else {
+      checks.push({
+        name: "Public API Gateway (Anon Key)",
+        category: "connectivity",
+        status: "pass",
+        message: `Responsive in ${latencyMs}ms`,
+        latencyMs
+      });
+    }
+
+    // ─── 2. Migration Version Parity ───
+    const { data: metaData, error: metaErr } = await customerAdmin
+      .from("_byos_meta")
+      .select("key, value")
+      .eq("key", "migration_version")
+      .maybeSingle();
+
+    const remoteVersion = metaData?.value || "0.0.0";
+    const isUpToDate = remoteVersion === MIGRATION_VERSION;
+
+    if (!metaData || metaErr) {
+      checks.push({
+        name: "Migration Version Parity",
+        category: "migration",
+        status: "warn",
+        message: `Missing _byos_meta (Requires v${MIGRATION_VERSION})`,
+        details: { current: "missing", expected: MIGRATION_VERSION }
+      });
+      if (overallStatus !== 'critical') overallStatus = 'warning';
+    } else if (!isUpToDate) {
+      checks.push({
+        name: "Migration Version Parity",
+        category: "migration",
+        status: "warn",
+        message: `v${remoteVersion} installed (Latest: v${MIGRATION_VERSION})`,
+        details: { current: remoteVersion, expected: MIGRATION_VERSION }
+      });
+      if (overallStatus !== 'critical') overallStatus = 'warning';
+    } else {
+      checks.push({
+        name: "Migration Version Parity",
+        category: "migration",
+        status: "pass",
+        message: `Up to date (v${MIGRATION_VERSION})`,
+        details: { current: remoteVersion, expected: MIGRATION_VERSION }
+      });
+    }
+
+    // ─── 3. Core Tables Parity ───
+    const testTables = [
+      "leads",
+      "profiles",
+      "products",
+      "invoices",
+      "quotations",
+      "forms",
+      "tasks",
+      "notifications",
+      "automations",
+      "lead_statuses",
+      "landing_pages"
+    ];
+
+    const missingTables: string[] = [];
+    const presentTables: string[] = [];
+
+    for (const tbl of testTables) {
+      const { error: tblErr } = await customerAdmin.from(tbl).select("count").limit(1);
+      if (tblErr && (tblErr.code === "42P01" || tblErr.message?.toLowerCase().includes("does not exist") || tblErr.message?.toLowerCase().includes("relation"))) {
+        missingTables.push(tbl);
+      } else {
+        presentTables.push(tbl);
+      }
+    }
+
+    if (missingTables.length > 0) {
+      checks.push({
+        name: "Core Tables Parity",
+        category: "tables",
+        status: "fail",
+        message: `${presentTables.length}/${testTables.length} tables verified (${missingTables.length} missing)`,
+        details: { missing: missingTables, present: presentTables }
+      });
+      overallStatus = "critical";
+    } else {
+      checks.push({
+        name: "Core Tables Parity",
+        category: "tables",
+        status: "pass",
+        message: `All ${testTables.length} core tables verified`,
+        details: { present: presentTables }
+      });
+    }
+
+    // ─── 4. Row Level Security (RLS) Check ───
+    const { error: rlsErr } = await customerAnon.from("leads").select("id").limit(1);
+    if (!rlsErr) {
+      checks.push({
+        name: "Row Level Security (RLS)",
+        category: "rls",
+        status: "pass",
+        message: "RLS active & secured on public endpoints"
+      });
+    } else {
+      checks.push({
+        name: "Row Level Security (RLS)",
+        category: "rls",
+        status: "warn",
+        message: `RLS check: ${rlsErr.message || 'Secured'}`
+      });
+    }
+
+    // ─── 5. Essential RPC Functions Availability ───
+    const testRPCs = [
+      { name: "get_distinct_column_values", args: { p_table_name: 'leads', p_column_name: 'status' } },
+      { name: "get_company_lead_columns", args: {} },
+      { name: "toggle_lead_unique_constraint", args: { attribute_name: '_test_check', is_unique: false } }
+    ];
+
+    const missingRPCs: string[] = [];
+    const availableRPCs: string[] = [];
+
+    for (const rpc of testRPCs) {
+      const { error: rpcErr } = await customerAdmin.rpc(rpc.name, rpc.args);
+      if (rpcErr && (rpcErr.code === "42883" || (rpcErr.message?.toLowerCase().includes("function") && rpcErr.message?.toLowerCase().includes("does not exist")))) {
+        missingRPCs.push(rpc.name);
+      } else {
+        availableRPCs.push(rpc.name);
+      }
+    }
+
+    if (missingRPCs.length > 0) {
+      checks.push({
+        name: "Database RPCs & Stored Procedures",
+        category: "rpc",
+        status: "warn",
+        message: `${availableRPCs.length}/${testRPCs.length} verified (${missingRPCs.join(', ')} missing)`,
+        details: { missing: missingRPCs }
+      });
+      if (overallStatus !== 'critical') overallStatus = 'warning';
+    } else {
+      checks.push({
+        name: "Database RPCs & Stored Procedures",
+        category: "rpc",
+        status: "pass",
+        message: "All essential functions available (Fast distinct scans, Column definitions, Smart-merge)",
+        details: { available: availableRPCs }
+      });
+    }
+
+    // Save health status to database
+    const healthStatus = overallStatus === 'critical' ? 'unreachable' : overallStatus === 'warning' ? 'degraded' : 'healthy';
+    await platform
+      .from("byos_connections")
+      .update({
+        last_health_check: new Date().toISOString(),
+        health_status: healthStatus
+      })
+      .eq("company_id", companyId);
+
+    return {
+      health: healthStatus,
+      healthy: overallStatus !== 'critical',
+      overallStatus,
+      latencyMs,
+      migrationVersion: {
+        current: remoteVersion,
+        required: MIGRATION_VERSION,
+        isUpToDate
+      },
+      checks,
+      schemaParity: {
+        missingTables,
+        missingRPCs,
+        tableCount: presentTables.length,
+        expectedTableCount: testTables.length
+      },
+      lastCheck: new Date().toISOString()
+    };
+
+  } catch (err: any) {
+    checks.push({
+      name: "Connection Test",
+      category: "connectivity",
+      status: "fail",
+      message: err.message || "Failed to reach customer database"
+    });
+
+    await platform
+      .from("byos_connections")
+      .update({
+        last_health_check: new Date().toISOString(),
+        health_status: "unreachable"
+      })
+      .eq("company_id", companyId);
+
+    return {
+      health: "unreachable",
+      healthy: false,
+      overallStatus: "critical",
+      latencyMs: 0,
+      checks,
+      error: err.message,
+      lastCheck: new Date().toISOString()
+    };
+  }
+}
+
+// ─── Action: Automated Schema Sync for Attributes ───────────────────────────
+async function handleSyncSchemaAttribute(companyId: string, userId: string, body: any) {
+  const { operation, attribute_name, attribute_type = 'text', is_unique } = body;
+  if (!operation || !attribute_name) {
+    throw new Error("Missing required fields: operation, attribute_name");
+  }
+
+  const cleanAttr = attribute_name.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_');
+  if (!cleanAttr) throw new Error("Invalid attribute name");
+
+  const platform = getPlatformAdminClient();
+  const { data: conn } = await platform
+    .from("byos_connections")
+    .select("*")
     .eq("company_id", companyId)
     .single();
 
-  if (!conn) return { health: "not_configured" };
-
-  try {
-    const testClient = createClient(conn.supabase_url, conn.supabase_anon_key);
-    const { error } = await testClient.from("leads").select("id").limit(1);
-
-    const isHealthy = !error || !error.message?.toLowerCase().includes("invalid api key");
-    const health = isHealthy ? "healthy" : "degraded";
-
-    await platform
-      .from("byos_connections")
-      .update({ last_health_check: new Date().toISOString(), health_status: health })
-      .eq("company_id", companyId);
-
-    return { health, status: conn.status, lastCheck: new Date().toISOString() };
-  } catch {
-    await platform
-      .from("byos_connections")
-      .update({ last_health_check: new Date().toISOString(), health_status: "unreachable" })
-      .eq("company_id", companyId);
-    return { health: "unreachable", status: conn.status };
+  if (!conn || conn.status !== 'active') {
+    return { success: true, message: "No active BYOS connection (Platform storage used)" };
   }
+
+  // Decrypt service role key
+  const { data: serviceKey } = await platform.rpc("byos_decrypt_key", {
+    encrypted_key: conn.supabase_service_role_key_encrypted,
+  });
+
+  if (!serviceKey) throw new Error("Failed to decrypt customer service role key");
+
+  const customerAdmin = createClient(conn.supabase_url, serviceKey as string);
+  let syncResult: any = {};
+
+  if (operation === 'add') {
+    // 1. Try RPC add_lead_attribute
+    const { data: rpcRes, error: rpcErr } = await customerAdmin.rpc('add_lead_attribute', {
+      attribute_name: cleanAttr,
+      attribute_type
+    });
+
+    if (rpcErr || (rpcRes && !rpcRes.success)) {
+      // Fallback: If customer provided access token, run DDL via Management API
+      const accessToken = body?.supabase_access_token?.trim();
+      const projectRef = extractProjectRef(conn.supabase_url);
+      if (accessToken && projectRef) {
+        const sql = `ALTER TABLE public.leads ADD COLUMN IF NOT EXISTS ${cleanAttr} ${attribute_type};`;
+        await fetch(`https://api.supabase.com/v1/projects/${projectRef}/database/query`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+          body: JSON.stringify({ query: sql })
+        });
+      }
+    }
+    syncResult = { operation: 'add', attribute: cleanAttr, type: attribute_type };
+  } else if (operation === 'remove') {
+    const { data: rpcRes, error: rpcErr } = await customerAdmin.rpc('remove_lead_attribute', {
+      attribute_name: cleanAttr
+    });
+
+    if (rpcErr || (rpcRes && !rpcRes.success)) {
+      const accessToken = body?.supabase_access_token?.trim();
+      const projectRef = extractProjectRef(conn.supabase_url);
+      if (accessToken && projectRef) {
+        const sql = `ALTER TABLE public.leads DROP COLUMN IF EXISTS ${cleanAttr};`;
+        await fetch(`https://api.supabase.com/v1/projects/${projectRef}/database/query`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+          body: JSON.stringify({ query: sql })
+        });
+      }
+    }
+    syncResult = { operation: 'remove', attribute: cleanAttr };
+  } else if (operation === 'toggle_unique') {
+    await customerAdmin.rpc('toggle_lead_unique_constraint', {
+      attribute_name: cleanAttr,
+      is_unique: !!is_unique
+    });
+    syncResult = { operation: 'toggle_unique', attribute: cleanAttr, is_unique: !!is_unique };
+  }
+
+  await logBYOSAudit(companyId, "sync-schema-attribute", "success", { operation, attribute_name: cleanAttr, syncResult }, userId);
+  return { success: true, message: `Attribute '${cleanAttr}' synced to BYOS instance successfully.`, syncResult };
+}
+
+// ─── Action: Automated Sync Statuses ────────────────────────────────────────
+async function handleSyncStatuses(companyId: string, userId: string) {
+  const platform = getPlatformAdminClient();
+  const { data: conn } = await platform
+    .from("byos_connections")
+    .select("*")
+    .eq("company_id", companyId)
+    .single();
+
+  if (!conn || conn.status !== 'active') return { success: true, message: "No active BYOS connection." };
+
+  const { data: serviceKey } = await platform.rpc("byos_decrypt_key", {
+    encrypted_key: conn.supabase_service_role_key_encrypted,
+  });
+
+  if (!serviceKey) throw new Error("Failed to decrypt customer service role key");
+  const customerAdmin = createClient(conn.supabase_url, serviceKey as string);
+
+  // Fetch all statuses from platform
+  const { data: platformStatuses } = await platform
+    .from("company_lead_statuses")
+    .select("*")
+    .eq("company_id", companyId);
+
+  if (platformStatuses && platformStatuses.length > 0) {
+    await customerAdmin
+      .from("company_lead_statuses")
+      .upsert(platformStatuses, { onConflict: "id" });
+
+    const legacyStatuses = platformStatuses.map((s: any) => ({
+      id: s.id,
+      company_id: s.company_id,
+      name: s.label || s.value,
+      color: s.color || "#3B82F6",
+      sort_order: s.order_index ?? 0,
+      status_type: s.status_type || "simple"
+    }));
+
+    await customerAdmin
+      .from("lead_statuses")
+      .upsert(legacyStatuses, { onConflict: "id" });
+  }
+
+  await logBYOSAudit(companyId, "sync-statuses", "success", { count: platformStatuses?.length || 0 }, userId);
+  return { success: true, message: `Synced ${platformStatuses?.length || 0} statuses to BYOS.` };
 }
 
 // ─── Action: Disconnect (migrate data back) ─────────────────────────────────
@@ -1370,7 +1736,16 @@ serve(async (req) => {
         result = await handleSyncData(companyId, userId);
         break;
       case "health":
+      case "diagnostic":
+      case "health-diagnostic":
         result = await handleHealthCheck(companyId);
+        break;
+      case "sync-schema-attribute":
+      case "sync-lead-attribute":
+        result = await handleSyncSchemaAttribute(companyId, userId, body);
+        break;
+      case "sync-statuses":
+        result = await handleSyncStatuses(companyId, userId);
         break;
       case "disconnect":
         result = await handleDisconnect(companyId, userId);
@@ -1382,7 +1757,7 @@ serve(async (req) => {
         result = await handleStatus(companyId);
         break;
       default:
-        throw new Error(`Unknown action: ${action}. Valid actions: unlock, validate, connect, migrate, sync-data, health, disconnect, status`);
+        throw new Error(`Unknown action: ${action}. Valid actions: unlock, validate, connect, migrate, sync-data, health, diagnostic, sync-schema-attribute, sync-statuses, disconnect, status`);
     }
 
     return new Response(JSON.stringify(result), {

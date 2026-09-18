@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Tables, TablesInsert, Database } from '@/integrations/supabase/types';
 import { useLeadsTable } from './useLeadsTable';
 import { useOrgClient } from './useOrgClient';
+import { useHierarchy } from './useHierarchy';
 import { automationService } from '@/services/automationService';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
@@ -29,6 +30,9 @@ interface UseLeadsOptions {
   limit?: number;
   pendingPaymentOnly?: boolean;
   dynamicFilters?: Record<string, string[]>;
+  excludeHistory?: boolean;
+  accessibleUserIds?: string[];
+  canViewAll?: boolean;
 }
 
 async function fetchLeadsData({
@@ -45,7 +49,10 @@ async function fetchLeadsData({
   pageSize,
   fetchAll,
   limit,
-  dynamicFilters
+  dynamicFilters,
+  excludeHistory,
+  accessibleUserIds,
+  canViewAll,
 }: {
   client?: SupabaseClient<Database>;
   tableName: string;
@@ -61,6 +68,9 @@ async function fetchLeadsData({
   fetchAll: boolean;
   limit?: number;
   dynamicFilters?: Record<string, string[]>;
+  excludeHistory?: boolean;
+  accessibleUserIds?: string[];
+  canViewAll?: boolean;
 }): Promise<{ leads: Lead[]; count: number }> {
   // Early exit if no company context
   if (!companyId) {
@@ -68,11 +78,53 @@ async function fetchLeadsData({
     return { leads: [], count: 0 };
   }
 
+const LEADS_NO_HISTORY_COLUMNS = [
+  'id',
+  'batch_month',
+  'branch',
+  'ca_name',
+  'cgpa',
+  'college',
+  'company',
+  'company_id',
+  'created_at',
+  'created_by_id',
+  'domain',
+  'email',
+  'form_id',
+  'graduating_year',
+  'last_notification_sent_at',
+  'lead_source',
+  'lg_link_id',
+  'name',
+  'notes',
+  'payment_link',
+  'phone',
+  'post_sales_owner_id',
+  'pre_sales_owner_id',
+  'preferred_language',
+  'product_category',
+  'product_purchased',
+  'reminder_at',
+  'revenue_projected',
+  'revenue_received',
+  'sales_owner_id',
+  'send_web_push',
+  'state',
+  'status',
+  'total_recovered',
+  'updated_at',
+  'utm_campaign',
+  'utm_medium',
+  'utm_source',
+  'whatsapp',
+  'sales_owner:profiles!leads_sales_owner_id_fkey(full_name)',
+].join(', ');
+
   const dbClient = client || supabase;
 
-  // Build select query with dynamic foreign key reference
   const selectQuery = tableName === 'leads'
-    ? '*, sales_owner:profiles!leads_sales_owner_id_fkey(full_name)'
+    ? (excludeHistory ? LEADS_NO_HISTORY_COLUMNS : '*, sales_owner:profiles!leads_sales_owner_id_fkey(full_name)')
     : '*';
 
   // Always use 'planned' count to prevent 300K+ row scans and 8s statement timeouts
@@ -87,6 +139,21 @@ async function fetchLeadsData({
   const isBYOSHost = (dbClient as any)?.supabaseUrl && !(dbClient as any).supabaseUrl.includes('api.fastestcrm.com') && !(dbClient as any).supabaseUrl.includes('uykdyqdeyilpulaqlqip');
   if (!isBYOSHost) {
     query = query.eq('company_id', companyId);
+  }
+
+  // Hierarchy scoping: when not an admin, restrict leads to accessible users
+  if (!canViewAll && accessibleUserIds && accessibleUserIds.length > 0) {
+    if (ownerFilter && ownerFilter.length > 0) {
+      // User explicitly selected owner(s) from dropdown — handled in ownerFilter block below
+    } else {
+      // Default view: scope query to user's hierarchy
+      // For sales reps (single ID), eq hits the composite index directly (7.4ms instead of 6,800ms)
+      if (accessibleUserIds.length === 1) {
+        query = query.eq('sales_owner_id', accessibleUserIds[0]);
+      } else {
+        query = query.in('sales_owner_id', accessibleUserIds);
+      }
+    }
   }
 
   if (statusFilter) {
@@ -219,6 +286,17 @@ async function fetchLeadsData({
         chunkQuery = chunkQuery.or(`name.ilike.%${search}%,email.ilike.%${search}%,phone.ilike.%${search}%,college.ilike.%${search}%`);
       }
 
+      // Hierarchy filtering: restrict non-admins to accessible users
+      if (!canViewAll && accessibleUserIds && accessibleUserIds.length > 0) {
+        if (!ownerFilter || ownerFilter.length === 0) {
+          if (accessibleUserIds.length === 1) {
+            chunkQuery = chunkQuery.eq('sales_owner_id', accessibleUserIds[0]);
+          } else {
+            chunkQuery = chunkQuery.in('sales_owner_id', accessibleUserIds);
+          }
+        }
+      }
+
       chunkQuery = chunkQuery.order('created_at', { ascending: false }).order('id', { ascending: false }).range(from, to);
 
       const { data: chunkData, error: chunkError } = await chunkQuery;
@@ -258,12 +336,50 @@ async function fetchLeadsData({
   return { leads: (data as unknown as Lead[]) || [], count: count || 0 };
 }
 
-export function useLeads({ search, statusFilter, ownerFilter, activeOwnerIds, productFilter, pendingPaymentOnly, page = 1, pageSize = 25, fetchAll = false, limit, dynamicFilters }: UseLeadsOptions = {}) {
+export function useLeads({
+  search,
+  statusFilter,
+  ownerFilter,
+  activeOwnerIds,
+  productFilter,
+  pendingPaymentOnly,
+  page = 1,
+  pageSize = 25,
+  fetchAll = false,
+  limit,
+  dynamicFilters,
+  excludeHistory,
+  accessibleUserIds: explicitAccessibleUserIds,
+  canViewAll: explicitCanViewAll,
+}: UseLeadsOptions = {}) {
   const queryClient = useQueryClient();
   const { tableName, companyId, loading: tableLoading } = useLeadsTable();
   const { orgClient, isBYOSLoading } = useOrgClient();
+  const { accessibleUserIds: hierarchyIds, canViewAll: hierarchyCanViewAll, loading: hierarchyLoading } = useHierarchy();
 
-  const queryKey = ['leads', (orgClient as any)?.supabaseUrl || 'default', search, statusFilter, ownerFilter, activeOwnerIds, productFilter, pendingPaymentOnly, page, pageSize, fetchAll, limit, tableName, companyId, JSON.stringify(dynamicFilters)];
+  const accessibleUserIds = explicitAccessibleUserIds !== undefined ? explicitAccessibleUserIds : hierarchyIds;
+  const canViewAll = explicitCanViewAll !== undefined ? explicitCanViewAll : hierarchyCanViewAll;
+
+  const queryKey = [
+    'leads',
+    (orgClient as any)?.supabaseUrl || 'default',
+    search,
+    statusFilter,
+    ownerFilter,
+    activeOwnerIds,
+    productFilter,
+    pendingPaymentOnly,
+    page,
+    pageSize,
+    fetchAll,
+    limit,
+    tableName,
+    companyId,
+    JSON.stringify(dynamicFilters),
+    excludeHistory,
+    canViewAll,
+    accessibleUserIds,
+  ];
 
   const query = useQuery({
     queryKey,
@@ -281,9 +397,12 @@ export function useLeads({ search, statusFilter, ownerFilter, activeOwnerIds, pr
       pageSize,
       fetchAll,
       limit,
-      dynamicFilters
+      dynamicFilters,
+      excludeHistory,
+      accessibleUserIds,
+      canViewAll,
     }),
-    enabled: !tableLoading && !!companyId && !isBYOSLoading,
+    enabled: !tableLoading && !!companyId && !isBYOSLoading && !hierarchyLoading,
     placeholderData: (previousData) => previousData,
     retry: 2,
     staleTime: 60000,
@@ -292,13 +411,32 @@ export function useLeads({ search, statusFilter, ownerFilter, activeOwnerIds, pr
 
   // Prefetch both next and previous pages for instant 0ms pagination
   useEffect(() => {
-    if (!fetchAll && query.data && companyId && tableName) {
+    if (!fetchAll && query.data && companyId && tableName && !hierarchyLoading) {
       const orgUrl = (orgClient as any)?.supabaseUrl || 'default';
 
       // Prefetch Next Page
       if (query.data.count > page * pageSize) {
         const nextPage = page + 1;
-        const nextQueryKey = ['leads', orgUrl, search, statusFilter, ownerFilter, activeOwnerIds, productFilter, pendingPaymentOnly, nextPage, pageSize, fetchAll, limit, tableName, companyId, JSON.stringify(dynamicFilters)];
+        const nextQueryKey = [
+          'leads',
+          orgUrl,
+          search,
+          statusFilter,
+          ownerFilter,
+          activeOwnerIds,
+          productFilter,
+          pendingPaymentOnly,
+          nextPage,
+          pageSize,
+          fetchAll,
+          limit,
+          tableName,
+          companyId,
+          JSON.stringify(dynamicFilters),
+          excludeHistory,
+          canViewAll,
+          accessibleUserIds,
+        ];
         queryClient.prefetchQuery({
           queryKey: nextQueryKey,
           queryFn: () => fetchLeadsData({
@@ -315,7 +453,10 @@ export function useLeads({ search, statusFilter, ownerFilter, activeOwnerIds, pr
             pageSize,
             fetchAll,
             limit,
-            dynamicFilters
+            dynamicFilters,
+            excludeHistory,
+            accessibleUserIds,
+            canViewAll,
           }),
           staleTime: 60000,
         });
@@ -324,7 +465,26 @@ export function useLeads({ search, statusFilter, ownerFilter, activeOwnerIds, pr
       // Prefetch Previous Page
       if (page > 1) {
         const prevPage = page - 1;
-        const prevQueryKey = ['leads', orgUrl, search, statusFilter, ownerFilter, activeOwnerIds, productFilter, pendingPaymentOnly, prevPage, pageSize, fetchAll, limit, tableName, companyId, JSON.stringify(dynamicFilters)];
+        const prevQueryKey = [
+          'leads',
+          orgUrl,
+          search,
+          statusFilter,
+          ownerFilter,
+          activeOwnerIds,
+          productFilter,
+          pendingPaymentOnly,
+          prevPage,
+          pageSize,
+          fetchAll,
+          limit,
+          tableName,
+          companyId,
+          JSON.stringify(dynamicFilters),
+          excludeHistory,
+          canViewAll,
+          accessibleUserIds,
+        ];
         queryClient.prefetchQuery({
           queryKey: prevQueryKey,
           queryFn: () => fetchLeadsData({
@@ -341,17 +501,20 @@ export function useLeads({ search, statusFilter, ownerFilter, activeOwnerIds, pr
             pageSize,
             fetchAll,
             limit,
-            dynamicFilters
+            dynamicFilters,
+            excludeHistory,
+            accessibleUserIds,
+            canViewAll,
           }),
           staleTime: 60000,
         });
       }
     }
-  }, [query.data, page, pageSize, fetchAll, search, statusFilter, ownerFilter, activeOwnerIds, productFilter, pendingPaymentOnly, tableName, companyId, queryClient, orgClient, JSON.stringify(dynamicFilters)]);
+  }, [query.data, page, pageSize, fetchAll, search, statusFilter, ownerFilter, activeOwnerIds, productFilter, pendingPaymentOnly, limit, dynamicFilters, tableName, companyId, queryClient, orgClient, excludeHistory, canViewAll, accessibleUserIds, hierarchyLoading]);
 
   return {
     ...query,
-    isLoading: query.isLoading || tableLoading
+    isLoading: query.isLoading || tableLoading || hierarchyLoading
   };
 }
 

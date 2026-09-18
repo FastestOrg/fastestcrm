@@ -16,11 +16,12 @@ import AppLayout from "@/components/layout/AppLayout";
 import { usePlatformAdmin } from "@/hooks/usePlatformAdmin";
 import { Loader2 } from "lucide-react";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { FullDashboardSkeleton } from "@/components/dashboard/DashboardSkeleton";
 
-// ─── Public Pages (Essential) ──────────────────────────────────────────────────
-import Landing from "./pages/Landing";
-import Auth from "./pages/Auth";
-import RegisterCompany from "./pages/RegisterCompany";
+// ─── Public & Auth Pages (Lazy Loaded with Auto-Retry) ────────────────────────
+const Landing = lazy(() => import("./pages/Landing"));
+const Auth = lazy(() => import("./pages/Auth"));
+const RegisterCompany = lazy(() => import("./pages/RegisterCompany"));
 
 // ─── Dashboard Pages (Lazy Loaded with Auto-Retry on New Deployments) ──────────
 const Dashboard = lazy(() => import("./pages/Dashboard"));
@@ -107,7 +108,6 @@ import { useCompany } from "@/hooks/useCompany";
 import { solutionsData } from "./data/solutions";
 import { comparisonsData } from "./data/comparisons";
 import { citiesData } from "./data/cities";
-import { glossaryTerms } from "./data/glossary";
 
 import { isAndroidWebView } from "@/lib/platform";
 
@@ -129,15 +129,39 @@ const queryClient = new QueryClient({
 
 // ─── Route Components ──────────────────────────────────────────────────────────
 
-const PageLoader = () => (
-  <div className="flex-1 flex flex-col items-center justify-center min-h-[400px]">
-    <div className="relative">
-      <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full scale-110 animate-pulse" />
-      <Loader2 className="h-10 w-10 animate-spin text-primary relative z-10" />
-    </div>
-    <p className="text-muted-foreground mt-4 text-sm font-medium animate-pulse">Initializing Interface...</p>
-  </div>
-);
+const RouteFallback = () => {
+  const location = useLocation();
+  const isPublicPage = location.pathname === '/' || 
+    location.pathname.startsWith('/blog') || 
+    location.pathname.startsWith('/vs/') || 
+    location.pathname.startsWith('/solutions/') || 
+    location.pathname.startsWith('/crm-for-') || 
+    location.pathname === '/about' || 
+    location.pathname === '/press' || 
+    location.pathname === '/tools' || 
+    location.pathname.startsWith('/glossary');
+
+  if (isPublicPage) {
+    return (
+      <div className="min-h-screen bg-background p-6 space-y-6 animate-pulse">
+        <div className="h-14 w-full border-b border-border/40 flex items-center justify-between">
+          <div className="h-8 w-32 bg-muted/40 rounded-lg" />
+          <div className="flex gap-3">
+            <div className="h-8 w-20 bg-muted/40 rounded-lg" />
+            <div className="h-8 w-24 bg-muted/40 rounded-lg" />
+          </div>
+        </div>
+        <div className="max-w-4xl mx-auto space-y-4 pt-12">
+          <div className="h-10 w-3/4 bg-muted/40 rounded-lg" />
+          <div className="h-4 w-1/2 bg-muted/40 rounded-md" />
+          <div className="h-64 w-full bg-muted/30 rounded-2xl mt-8" />
+        </div>
+      </div>
+    );
+  }
+
+  return <FullDashboardSkeleton />;
+};
 
 /** Redirect already-logged-in users. Redirect logic centrally managed here. */
 function AuthRoute() {
@@ -145,7 +169,7 @@ function AuthRoute() {
   const { data: isPlatformAdmin, isLoading: isCheckingAdmin } = usePlatformAdmin();
 
   if (user) {
-    if (isCheckingAdmin) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+    if (isCheckingAdmin) return <FullDashboardSkeleton />;
     return <Navigate to={isPlatformAdmin ? '/platform' : '/dashboard'} replace />;
   }
   return <Auth />;
@@ -189,7 +213,7 @@ function Protected({ children }: { children: React.ReactNode }) {
     return () => { cancelled = true; };
   }, [user]);
 
-  if (authLoading || checking) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+  if (authLoading || checking) return <FullDashboardSkeleton />;
   if (!user || deactivated) return <Navigate to="/auth" state={{ from: location }} replace />;
 
   return <>{children}</>;
@@ -208,7 +232,7 @@ function AppRoutes() {
   const isWebView = isAndroidWebView();
 
   return (
-    <Suspense fallback={<PageLoader />}>
+    <Suspense fallback={<RouteFallback />}>
       <Routes>
         {/* Home Path Logic */}
         {isMainDomain ? (

@@ -67,17 +67,23 @@
   <!-- Preload critical branding for Lighthouse LCP boost -->
   <link rel="preload" href="/fastestcrmlogo.png" as="image" type="image/png" />
 
+  <!-- Direct & Proxied API Resource Hints -->
+  <link rel="preconnect" href="https://api.fastestcrm.com" crossorigin />
+  <link rel="dns-prefetch" href="https://api.fastestcrm.com" />
   <link rel="preconnect" href="https://uykdyqdeyilpulaqlqip.supabase.co" />
   <link rel="dns-prefetch" href="https://uykdyqdeyilpulaqlqip.supabase.co" />
 
   <!-- PWA: Mobile First SEO & Installation -->
   <link rel="manifest" href="/manifest.webmanifest" />
 
-  <!-- Fonts: Plus Jakarta Sans (elite display & body) + Inter + JetBrains Mono -->
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,600&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <!-- Fonts: Non-render-blocking with print-media swap + fallback -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,600&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'" />
+  <noscript>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,600&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" />
+  </noscript>
 
-  <!-- Razorpay -->
-  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+  <!-- Razorpay (Deferred to prevent blocking initial FCP/LCP) -->
+  <script src="https://checkout.razorpay.com/v1/checkout.js" defer></script>
 </head>
 
 <body>

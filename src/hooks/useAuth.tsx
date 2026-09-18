@@ -74,6 +74,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<Profile | null>(null);
 
+  const lastProfileFetchIdRef = useRef<string | null>(null);
+  const isFetchingProfileRef = useRef(false);
+
   // ── Fetch Profile Helper ──────────────────────────────────────────────────
 
   const fetchProfile = useCallback(async (userId: string) => {
@@ -88,6 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.error('[Auth] Error fetching profile:', error);
         setProfile(null);
       } else {
+        lastProfileFetchIdRef.current = userId;
         setProfile(data);
       }
     } catch (err) {
@@ -112,6 +116,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(newUser);
 
       if (newUser) {
+        // Prevent concurrent duplicate profile fetches during initialization
+        if (lastProfileFetchIdRef.current === newUser.id && isFetchingProfileRef.current) {
+          if (active) setLoading(false);
+          return;
+        }
+        lastProfileFetchIdRef.current = newUser.id;
+        isFetchingProfileRef.current = true;
         try {
           const { data, error } = await supabase
             .from('profiles')
@@ -130,8 +141,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } catch (err) {
           console.error('[Auth] Error in handleAuthChange profile fetch:', err);
           if (active) setProfile(null);
+        } finally {
+          isFetchingProfileRef.current = false;
         }
       } else {
+        lastProfileFetchIdRef.current = null;
         if (active) setProfile(null);
       }
       

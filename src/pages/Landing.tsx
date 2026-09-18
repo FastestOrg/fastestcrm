@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -14,8 +14,8 @@ import FAQSection from '@/components/features/FAQSection';
 import AuthorityFooter from '@/components/layout/AuthorityFooter';
 import { isAndroidWebView } from '@/lib/platform';
 
-// ─── 3D & Interactive Components ──────────────────────────────────────────────
-import ThreeHeroScene from '@/components/landing/ThreeHeroScene';
+// ─── 3D & Interactive Components (Lazy-load heavy WebGL) ─────────────────────
+const ThreeHeroScene = lazy(() => import('@/components/landing/ThreeHeroScene'));
 import Card3D from '@/components/landing/Card3D';
 import InteractiveProductConsole from '@/components/landing/InteractiveProductConsole';
 import LiveDealTicker from '@/components/landing/LiveDealTicker';
@@ -243,8 +243,10 @@ export default function Landing() {
 
       {/* ── 3D Hero Section with AI-First Architecture ── */}
       <section className="relative pt-36 md:pt-44 pb-20 px-4 md:px-6 overflow-hidden" aria-labelledby="hero-heading">
-        {/* Three.js Interactive 3D WebGL Canvas */}
-        <ThreeHeroScene />
+        {/* Three.js Interactive 3D WebGL Canvas (Lazy Loaded) */}
+        <Suspense fallback={<div className="absolute inset-0 bg-transparent pointer-events-none" />}>
+          <ThreeHeroScene />
+        </Suspense>
 
         {/* Ambient Glow Orbs */}
         <div className="absolute top-20 left-1/2 -translate-x-1/2 -z-10 w-[700px] h-[400px] bg-primary/15 blur-[120px] rounded-full pointer-events-none" />

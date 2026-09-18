@@ -130,6 +130,30 @@ app.post('/api/sessions/:sessionId/disconnect', async (req, res) => {
     res.json({ ok: true });
 });
 
+// ─── Direct Message Route ───────────────────────────────────────────────────
+
+/**
+ * POST /api/messages/send
+ * Body: { sessionId, recipientPhone, message }
+ */
+app.post('/api/messages/send', async (req, res) => {
+    try {
+        const { sessionId, recipientPhone, message } = req.body;
+        if (!sessionId || !recipientPhone || !message) {
+            return res.status(400).json({ error: 'sessionId, recipientPhone, and message are required' });
+        }
+
+        const result = await sessionManager.sendMessage(sessionId, recipientPhone, message);
+        if (!result.success) {
+            return res.status(400).json({ error: result.error || 'Failed to send message' });
+        }
+
+        res.json({ ok: true, success: true, timestamp: new Date().toISOString() });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // ─── Campaign Routes ─────────────────────────────────────────────────────────
 
 /**

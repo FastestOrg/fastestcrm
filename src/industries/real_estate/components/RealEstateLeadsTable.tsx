@@ -10,7 +10,8 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Phone, Mail, MoreHorizontal, MapPin, Camera, ChevronDown } from 'lucide-react';
+import { Phone, Mail, MoreHorizontal, MapPin, Camera, ChevronDown, Check } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -420,15 +421,30 @@ export const RealEstateLeadsTable = memo(function RealEstateLeadsTable({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent>
-            {statuses.map((status) => (
-              <DropdownMenuItem
-                key={status.id}
-                onClick={() => handleStatusChange(lead.id, status.value)}
-                className="capitalize cursor-pointer"
-              >
-                {status.label}
-              </DropdownMenuItem>
-            ))}
+            {statuses.map((status) => {
+              const isSelected = lead.status === status.value;
+              const statusColor = status.color || getStatusColor(status.value);
+              return (
+                <DropdownMenuItem
+                  key={status.id}
+                  onClick={() => handleStatusChange(lead.id, status.value)}
+                  className={cn(
+                    "capitalize cursor-pointer flex items-center justify-between gap-2 transition-colors",
+                    isSelected && "font-semibold text-white focus:text-white"
+                  )}
+                  style={isSelected ? { backgroundColor: statusColor, color: '#ffffff' } : undefined}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div
+                      className={cn("w-2 h-2 rounded-full shrink-0", isSelected && "ring-1 ring-white/40")}
+                      style={{ backgroundColor: isSelected ? '#ffffff' : statusColor }}
+                    />
+                    <span className="truncate">{status.label}</span>
+                  </div>
+                  {isSelected && <Check className="h-4 w-4 shrink-0 text-white ml-auto" />}
+                </DropdownMenuItem>
+              );
+            })}
           </DropdownMenuContent>
         </DropdownMenu>
       )
@@ -767,18 +783,30 @@ export const RealEstateLeadsTable = memo(function RealEstateLeadsTable({
                       <DropdownMenuSub>
                         <DropdownMenuSubTrigger>Change Status</DropdownMenuSubTrigger>
                         <DropdownMenuSubContent>
-                          {statuses.map((status) => (
-                            <DropdownMenuItem
-                              key={status.id}
-                              onClick={() => handleStatusChange(lead.id, status.value)}
-                              className="capitalize cursor-pointer"
-                            >
-                              <div className="flex items-center gap-2">
-                                {lead.status === status.value && <div className="w-1.5 h-1.5 rounded-full bg-primary" />}
-                                <span className={lead.status === status.value ? "font-medium" : ""}>{status.label}</span>
-                              </div>
-                            </DropdownMenuItem>
-                          ))}
+                          {statuses.map((status) => {
+                            const isSelected = lead.status === status.value;
+                            const statusColor = status.color || getStatusColor(status.value);
+                            return (
+                              <DropdownMenuItem
+                                key={status.id}
+                                onClick={() => handleStatusChange(lead.id, status.value)}
+                                className={cn(
+                                  "capitalize cursor-pointer flex items-center justify-between gap-2 transition-colors",
+                                  isSelected && "font-semibold text-white focus:text-white"
+                                )}
+                                style={isSelected ? { backgroundColor: statusColor, color: '#ffffff' } : undefined}
+                              >
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <div
+                                    className={cn("w-2 h-2 rounded-full shrink-0", isSelected && "ring-1 ring-white/40")}
+                                    style={{ backgroundColor: isSelected ? '#ffffff' : statusColor }}
+                                  />
+                                  <span className="truncate">{status.label}</span>
+                                </div>
+                                {isSelected && <Check className="h-4 w-4 shrink-0 text-white ml-auto" />}
+                              </DropdownMenuItem>
+                            );
+                          })}
                         </DropdownMenuSubContent>
                       </DropdownMenuSub>
                     </DropdownMenuContent>

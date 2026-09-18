@@ -70,5 +70,63 @@ export default defineConfig(({ mode }) => {
         "@": path.resolve(__dirname, "./src"),
       },
     },
+    build: {
+      target: "esnext",
+      chunkSizeWarningLimit: 650,
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            const normalizedId = id.replace(/\\/g, '/');
+            if (normalizedId.includes('/node_modules/')) {
+              if (normalizedId.includes('/three/')) {
+                return 'vendor-three';
+              }
+              if (normalizedId.includes('/html2canvas/') || normalizedId.includes('/jspdf/')) {
+                return 'vendor-pdf';
+              }
+              if (normalizedId.includes('/reactflow/') || normalizedId.includes('/@reactflow/')) {
+                return 'vendor-flow';
+              }
+              if (
+                normalizedId.includes('/recharts/') ||
+                normalizedId.includes('/d3-') ||
+                normalizedId.includes('/victory-vendor/')
+              ) {
+                return 'vendor-charts';
+              }
+              if (normalizedId.includes('/framer-motion/')) {
+                return 'vendor-motion';
+              }
+              if (normalizedId.includes('/@supabase/')) {
+                return 'vendor-supabase';
+              }
+              if (normalizedId.includes('/@tanstack/')) {
+                return 'vendor-query';
+              }
+              if (normalizedId.includes('/@dnd-kit/')) {
+                return 'vendor-dnd';
+              }
+              if (normalizedId.includes('/papaparse/')) {
+                return 'vendor-papaparse';
+              }
+              if (normalizedId.includes('/@radix-ui/')) {
+                return 'vendor-radix';
+              }
+              if (normalizedId.includes('/lucide-react/')) {
+                return 'vendor-lucide';
+              }
+              if (
+                normalizedId.includes('/react/') ||
+                normalizedId.includes('/react-dom/') ||
+                normalizedId.includes('/react-router-dom/') ||
+                normalizedId.includes('/react-router/')
+              ) {
+                return 'vendor-react';
+              }
+            }
+          },
+        },
+      },
+    },
   };
 });

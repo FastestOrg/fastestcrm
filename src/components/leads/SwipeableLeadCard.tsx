@@ -1,5 +1,5 @@
 import { useState, useRef, TouchEvent } from 'react';
-import { Phone, Mail, MoreHorizontal, Building2, PhoneCall, ArrowRight } from 'lucide-react';
+import { Phone, Mail, MoreHorizontal, Building2, PhoneCall, ArrowRight, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -28,6 +28,7 @@ interface SwipeableLeadCardProps {
   onEdit: () => void;
   onStatusChange: (status: string) => void;
   onCall?: () => void;
+  onChat?: () => void;
   onCreatePaymentLink?: () => void;
   owners?: { label: string; value: string }[];
   variant?: 'education' | 'real_estate' | 'default';
@@ -226,44 +227,63 @@ export function SwipeableLeadCard({
               </p>
             </div>
           </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
-                <MoreHorizontal className="h-4 w-4" />
+          <div className="flex items-center gap-1 shrink-0">
+            {onChat && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10"
+                onClick={onChat}
+                title="Open WhatsApp & Email Inbox"
+              >
+                <MessageSquare className="h-4 w-4" />
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={onViewDetails}>View Details</DropdownMenuItem>
-              <DropdownMenuItem onClick={onEdit}>Edit Lead</DropdownMenuItem>
-              {lead.phone && (
-                <DropdownMenuItem onClick={() => window.location.href = `tel:${lead.phone}`}>
-                  <Phone className="h-4 w-4 mr-2" />
-                  Call Lead
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuSub>
-                <DropdownMenuSubTrigger>Change Status</DropdownMenuSubTrigger>
-                <DropdownMenuSubContent>
-                  <DropdownMenuRadioGroup value={lead.status} onValueChange={onStatusChange}>
-                    {statuses.map((status) => (
-                      <DropdownMenuRadioItem
-                        key={status.id}
-                        value={status.value}
-                        className="capitalize"
-                      >
-                        {status.label}
-                      </DropdownMenuRadioItem>
-                    ))}
-                  </DropdownMenuRadioGroup>
-                </DropdownMenuSubContent>
-              </DropdownMenuSub>
-              {onCreatePaymentLink && (
-                <DropdownMenuItem onClick={onCreatePaymentLink}>
-                  Create Payment Link
-                </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+            )}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {onChat && (
+                  <DropdownMenuItem onClick={onChat} className="text-emerald-600 dark:text-emerald-400 font-medium">
+                    <MessageSquare className="h-4 w-4 mr-2" />
+                    Open Inbox / Chat
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem onClick={onViewDetails}>View Details</DropdownMenuItem>
+                <DropdownMenuItem onClick={onEdit}>Edit Lead</DropdownMenuItem>
+                {lead.phone && (
+                  <DropdownMenuItem onClick={() => window.location.href = `tel:${lead.phone}`}>
+                    <Phone className="h-4 w-4 mr-2" />
+                    Call Lead
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger>Change Status</DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent>
+                    <DropdownMenuRadioGroup value={lead.status} onValueChange={onStatusChange}>
+                      {statuses.map((status) => (
+                        <DropdownMenuRadioItem
+                          key={status.id}
+                          value={status.value}
+                          className="capitalize"
+                        >
+                          {status.label}
+                        </DropdownMenuRadioItem>
+                      ))}
+                    </DropdownMenuRadioGroup>
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+                {onCreatePaymentLink && (
+                  <DropdownMenuItem onClick={onCreatePaymentLink}>
+                    Create Payment Link
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
 
         {/* Contact Info */}

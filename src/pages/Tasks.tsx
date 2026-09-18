@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { format, isToday, isPast, isFuture } from 'date-fns';
 import {
@@ -19,16 +19,18 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useTaskLeads, TaskLead, TaskBucket } from '@/hooks/useTaskLeads';
 import { useLeadStatuses } from '@/hooks/useLeadStatuses';
-import { LeadDetailsDialog } from '@/components/leads/LeadDetailsDialog';
-import { EditLeadDialog } from '@/components/leads/EditLeadDialog';
-import { RealEstateEditLeadDialog } from '@/industries/real_estate/components/RealEstateEditLeadDialog';
-import { AssignLeadsDialog } from '@/components/leads/AssignLeadsDialog';
-import { RealEstateAssignLeadsDialog } from '@/industries/real_estate/components/RealEstateAssignLeadsDialog';
-import { SaaSAssignLeadsDialog } from '@/industries/saas/components/SaaSAssignLeadsDialog';
-import { HealthcareAssignLeadsDialog } from '@/industries/healthcare/components/HealthcareAssignLeadsDialog';
-import { InsuranceAssignLeadsDialog } from '@/industries/insurance/components/InsuranceAssignLeadsDialog';
-import { TravelAssignLeadsDialog } from '@/industries/travel/components/TravelAssignLeadsDialog';
-import { RescheduleTaskDialog } from '@/components/leads/RescheduleTaskDialog';
+import { lazyWithRetry as lazy } from '@/lib/lazyWithRetry';
+
+const LeadDetailsDialog = lazy(() => import('@/components/leads/LeadDetailsDialog').then(m => ({ default: m.LeadDetailsDialog })));
+const EditLeadDialog = lazy(() => import('@/components/leads/EditLeadDialog').then(m => ({ default: m.EditLeadDialog })));
+const RealEstateEditLeadDialog = lazy(() => import('@/industries/real_estate/components/RealEstateEditLeadDialog').then(m => ({ default: m.RealEstateEditLeadDialog })));
+const AssignLeadsDialog = lazy(() => import('@/components/leads/AssignLeadsDialog').then(m => ({ default: m.AssignLeadsDialog })));
+const RealEstateAssignLeadsDialog = lazy(() => import('@/industries/real_estate/components/RealEstateAssignLeadsDialog').then(m => ({ default: m.RealEstateAssignLeadsDialog })));
+const SaaSAssignLeadsDialog = lazy(() => import('@/industries/saas/components/SaaSAssignLeadsDialog').then(m => ({ default: m.SaaSAssignLeadsDialog })));
+const HealthcareAssignLeadsDialog = lazy(() => import('@/industries/healthcare/components/HealthcareAssignLeadsDialog').then(m => ({ default: m.HealthcareAssignLeadsDialog })));
+const InsuranceAssignLeadsDialog = lazy(() => import('@/industries/insurance/components/InsuranceAssignLeadsDialog').then(m => ({ default: m.InsuranceAssignLeadsDialog })));
+const TravelAssignLeadsDialog = lazy(() => import('@/industries/travel/components/TravelAssignLeadsDialog').then(m => ({ default: m.TravelAssignLeadsDialog })));
+const RescheduleTaskDialog = lazy(() => import('@/components/leads/RescheduleTaskDialog').then(m => ({ default: m.RescheduleTaskDialog })));
 import { useCompany } from '@/hooks/useCompany';
 import { useLeadsTable } from '@/hooks/useLeadsTable';
 import { Tables } from '@/integrations/supabase/types';
@@ -439,6 +441,7 @@ export default function Tasks() {
             )}
 
             {/* Dialogs */}
+            <Suspense fallback={null}>
             {viewingLead && (
                 <LeadDetailsDialog
                     open={!!viewingLead}
@@ -558,6 +561,7 @@ export default function Tasks() {
                     }}
                 />
             )}
+            </Suspense>
         </div>
     );
 }

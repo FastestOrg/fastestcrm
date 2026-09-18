@@ -54,19 +54,24 @@ export default function Dashboard() {
   const [reportLimit, setReportLimit] = useState<number>(1000);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
-  const { data: leadsData, isLoading } = useLeads({ fetchAll: true, limit: reportLimit });
+  const { data: leadsData, isLoading } = useLeads({ fetchAll: true, limit: reportLimit, excludeHistory: true });
   const leads = leadsData?.leads || [];
 
-  // Fetch profiles to get their incentive percentages
+  // Fetch profiles to get their incentive percentages (scoped to company)
   const { data: profilesData } = useQuery({
-    queryKey: ['profiles-incentives'],
+    queryKey: ['profiles-incentives', profile?.company_id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let q = supabase
         .from('profiles')
         .select('id, incentive_percent');
+      if (profile?.company_id) {
+        q = q.eq('company_id', profile.company_id);
+      }
+      const { data, error } = await q;
       if (error) throw error;
       return data || [];
-    }
+    },
+    staleTime: 5 * 60 * 1000,
   });
 
   const greeting = React.useMemo(() => {
@@ -334,7 +339,16 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent className="h-72 pl-0">
               {isLoading ? (
-                <div className="w-full h-full flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-purple-400" /></div>
+                <div className="w-full h-full flex flex-col justify-end gap-2 p-6 pt-0">
+                  <div className="flex items-end gap-3 h-52 w-full justify-between pt-6">
+                    {[35, 60, 45, 80, 50, 95, 70, 85].map((heightPct, idx) => (
+                      <div key={idx} className="flex-1 flex flex-col items-center gap-2 h-full justify-end">
+                        <Skeleton className="w-full rounded-t-md opacity-80" style={{ height: `${heightPct}%` }} />
+                        <Skeleton className="h-2.5 w-6 rounded" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 10, bottom: 0 }}>
@@ -365,7 +379,17 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent className="h-72 flex items-center justify-center">
               {isLoading ? (
-                <div className="w-full h-full flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-teal-400" /></div>
+                <div className="w-full h-full flex flex-col justify-center gap-4 p-6 pt-0">
+                  {[85, 65, 45, 30, 20].map((widthPct, idx) => (
+                    <div key={idx} className="space-y-1.5">
+                      <div className="flex justify-between items-center">
+                        <Skeleton className="h-3 w-20 rounded" />
+                        <Skeleton className="h-3 w-8 rounded" />
+                      </div>
+                      <Skeleton className="h-2.5 rounded-full" style={{ width: `${widthPct}%` }} />
+                    </div>
+                  ))}
+                </div>
               ) : statusChartData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={statusChartData} layout="vertical" margin={{ top: 10, right: 30, left: 0, bottom: 10 }}>

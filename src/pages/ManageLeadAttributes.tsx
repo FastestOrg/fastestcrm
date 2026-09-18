@@ -181,7 +181,24 @@ export default function ManageLeadAttributes() {
             const res = data as any;
             if (!res.success) throw new Error(res.message);
 
-            toast.success(res.message);
+            // Automatically sync unique constraint to BYOS instance
+            if (company?.byos_enabled) {
+                try {
+                    await supabase.functions.invoke('byos-manage', {
+                        body: {
+                            action: 'sync-schema-attribute',
+                            company_id: company.id,
+                            operation: 'toggle_unique',
+                            attribute_name: attribute,
+                            is_unique: !currentValue
+                        }
+                    });
+                } catch (byosErr) {
+                    console.warn('[BYOS Sync] Toggle unique constraint warning:', byosErr);
+                }
+            }
+
+            toast.success(res.message + (company?.byos_enabled ? ' (Synced to BYOS)' : ''));
             refetchConstraints();
         } catch (error: any) {
             toast.error('Failed: ' + error.message);
@@ -205,7 +222,24 @@ export default function ManageLeadAttributes() {
             const res = data as any;
             if (!res.success) throw new Error(res.message);
 
-            toast.success(`Attribute '${formattedName}' added successfully`);
+            // Automatically sync new column to connected BYOS database
+            if (company?.byos_enabled) {
+                try {
+                    await supabase.functions.invoke('byos-manage', {
+                        body: {
+                            action: 'sync-schema-attribute',
+                            company_id: company.id,
+                            operation: 'add',
+                            attribute_name: formattedName,
+                            attribute_type: 'text'
+                        }
+                    });
+                } catch (byosErr) {
+                    console.warn('[BYOS Sync] Add attribute warning:', byosErr);
+                }
+            }
+
+            toast.success(`Attribute '${formattedName}' added successfully${company?.byos_enabled ? ' & synced to BYOS' : ''}`);
             setNewAttributeName('');
             setIsAddDialogOpen(false);
             refetchColumns();
@@ -229,7 +263,23 @@ export default function ManageLeadAttributes() {
             const res = data as any;
             if (!res.success) throw new Error(res.message);
 
-            toast.success(`Attribute '${attributeName}' removed`);
+            // Automatically sync column deletion to connected BYOS database
+            if (company?.byos_enabled) {
+                try {
+                    await supabase.functions.invoke('byos-manage', {
+                        body: {
+                            action: 'sync-schema-attribute',
+                            company_id: company.id,
+                            operation: 'remove',
+                            attribute_name: attributeName
+                        }
+                    });
+                } catch (byosErr) {
+                    console.warn('[BYOS Sync] Delete attribute warning:', byosErr);
+                }
+            }
+
+            toast.success(`Attribute '${attributeName}' removed${company?.byos_enabled ? ' (synced with BYOS)' : ''}`);
             refetchColumns();
             refetchConstraints(); // Might have removed a unique constraint
         } catch (error: any) {

@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
+import { lazyWithRetry as lazy } from '@/lib/lazyWithRetry';
 // DashboardLayout removed
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
@@ -12,9 +13,9 @@ import { useUserRole } from '@/hooks/useUserRole';
 import { toast } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
 import { useDebounce } from '@/hooks/useDebounce';
+import { useHierarchy } from '@/hooks/useHierarchy';
 import { Constants } from '@/integrations/supabase/types';
 import { AddLeadDialog } from '@/components/leads/AddLeadDialog';
-import { UploadLeadsDialog } from '@/components/leads/UploadLeadsDialog';
 import { AssignLeadsDialog } from '@/components/leads/AssignLeadsDialog';
 import { LeadsTable } from '@/components/leads/LeadsTable';
 import { SwipeableLeadCard } from '@/components/leads/SwipeableLeadCard';
@@ -26,18 +27,22 @@ import { useOrgClient } from '@/hooks/useOrgClient';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { EditLeadDialog } from '@/components/leads/EditLeadDialog';
 import { LeadDetailsDialog } from '@/components/leads/LeadDetailsDialog';
+import { OmnichannelLeadDrawer } from '@/components/leads/OmnichannelLeadDrawer';
 import { ColumnConfigDialog } from '@/components/leads/ColumnConfigDialog';
 import { StatusReminderDialog } from '@/components/leads/StatusReminderDialog';
 import { useLeadStatuses, CompanyLeadStatus } from '@/hooks/useLeadStatuses';
-import { LeadsKanbanBoard } from '@/components/leads/LeadsKanbanBoard';
 import { useCustomColumns } from '@/hooks/useCustomColumns';
 import { executeInChunks } from '@/lib/batchUtils';
+
+const LeadsKanbanBoard = lazy(() => import('@/components/leads/LeadsKanbanBoard').then(m => ({ default: m.LeadsKanbanBoard })));
+const UploadLeadsDialog = lazy(() => import('@/components/leads/UploadLeadsDialog').then(m => ({ default: m.UploadLeadsDialog })));
 
 import { useSearchParams } from 'react-router-dom';
 
 export default function GenericAllLeads() {
     const { company } = useCompany();
     const isMobile = useIsMobile();
+    const { accessibleUserIds, canViewAll, loading: hierarchyLoading } = useHierarchy();
     const [searchParams, setSearchParams] = useSearchParams();
     const [addDialogOpen, setAddDialogOpen] = useState(false);
 
@@ -57,6 +62,7 @@ export default function GenericAllLeads() {
     const [assignDialogOpen, setAssignDialogOpen] = useState(false);
     const [editingLead, setEditingLead] = useState<any>(null);
     const [viewingLead, setViewingLead] = useState<any>(null);
+    const [chatLead, setChatLead] = useState<any>(null);
     const { tableName } = useLeadsTable();
     const [configOpen, setConfigOpen] = useState(false);
     const { statuses } = useLeadStatuses();
@@ -161,7 +167,7 @@ export default function GenericAllLeads() {
 
     const { orgClient, isBYOSLoading } = useOrgClient();
     const { data: filterOptions } = useQuery({
-        queryKey: ['leadsFilterOptions', (orgClient as any)?.supabaseUrl || 'default', company?.id, tableName, JSON.stringify(columnConfig)],
+        queryKey: ['leadsFilterOptions', (orgClient as any)?.supabaseUrl || 'default', company?.id, tableName, JSON.stringify(columnConfig), canViewAll, canViewAll ? 'all' : accessibleUserIds.slice().sort().join(','), hierarchyLoading],
         queryFn: async () => {
             if (!company?.id || !tableName) return null;
 
@@ -256,6 +262,12 @@ export default function GenericAllLeads() {
                 activeOwners = activeOwners.filter(o => activeUserIds.has(o.id));
             }
 
+            // Scope owners dropdown to only users this user is allowed to see
+            if (!hierarchyLoading && !canViewAll && accessibleUserIds.length > 0) {
+                const accessibleSet = new Set(accessibleUserIds);
+                activeOwners = activeOwners.filter(o => accessibleSet.has(o.id));
+            }
+
             const products = productsResult.data;
             let statusesData = statusesResult.data as any[] | null;
 
@@ -285,7 +297,7 @@ export default function GenericAllLeads() {
 
             return {
                 owners: [
-                    { label: 'Unassigned', value: 'unassigned' },
+                    ...(canViewAll ? [{ label: 'Unassigned', value: 'unassigned' }] : []),
                     ...activeOwners.map(o => ({ label: o.full_name || 'Unknown', value: o.id })),
                 ],
                 products: Array.from(new Set(((products as any[]) || []).map(p => p.name))).map(name => ({ label: name, value: name })),
@@ -293,7 +305,7 @@ export default function GenericAllLeads() {
                 dynamic: dynamicOptionsMap
             };
         },
-        enabled: !!company?.id && !!tableName,
+        enabled: !!company?.id && !!tableName && !hierarchyLoading,
         staleTime: 1000 * 60 * 30, // Cache filter options for 30 minutes
         gcTime: 1000 * 60 * 60, // Keep in cache for 1 hour
         refetchOnWindowFocus: false, // Prevent re-running 10 parallel RPC calls on tab switch
@@ -378,7 +390,10 @@ export default function GenericAllLeads() {
         page,
         pageSize,
         dynamicFilters,
+        accessibleUserIds,
+        canViewAll,
     });
+    const isTableLoading = isLoading || hierarchyLoading;
     const leads = leadsData?.leads || [];
     const totalCount = leadsData?.count || 0;
 
@@ -519,7 +534,7 @@ export default function GenericAllLeads() {
                     onDelete={handleDeleteLeads}
                     onAssign={() => setAssignDialogOpen(true)}
                     canDelete={userRole === 'company' || userRole === 'company_subadmin'}
-                    uploadButton={<UploadLeadsDialog />}
+                    uploadButton={<Suspense fallback={null}><UploadLeadsDialog /></Suspense>}
                     addButton={!isMobile ? <AddLeadDialog /> : null}
                     onEditLayout={userRole === 'company' || userRole === 'company_subadmin' ? () => setConfigOpen(true) : undefined}
                 />
@@ -564,6 +579,7 @@ export default function GenericAllLeads() {
                                     onToggleSelect={() => toggleLead(lead.id)}
                                     onViewDetails={() => setViewingLead(lead)}
                                     onEdit={() => setEditingLead(lead)}
+                                    onChat={() => setChatLead(lead)}
                                     onStatusChange={(status) => handleStatusChange(lead.id, status)}
                                     owners={filterOptions?.owners}
                                     variant="education"
@@ -575,25 +591,33 @@ export default function GenericAllLeads() {
                     </div>
                 ) : viewMode === 'kanban' ? (
                     /* Kanban Board View */
-                    <LeadsKanbanBoard
-                        statuses={statuses}
-                        loading={isLoading}
-                        onStatusChange={(leadId, newStatus) => handleStatusChange(leadId, newStatus)}
-                        onLeadClick={(lead) => setViewingLead(lead)}
-                        owners={filterOptions?.owners}
-                        searchQuery={searchQuery}
-                        ownerFilter={Array.from(selectedOwners)}
-                        activeOwnerIds={activeOwnerIds}
-                        productFilter={Array.from(selectedProducts)}
-                        dynamicFilters={dynamicFilters}
-                    />
+                    <Suspense fallback={
+                        <div className="flex items-center justify-center min-h-[300px]">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+                        </div>
+                    }>
+                        <LeadsKanbanBoard
+                            statuses={statuses}
+                            loading={isTableLoading}
+                            onStatusChange={(leadId, newStatus) => handleStatusChange(leadId, newStatus)}
+                            onLeadClick={(lead) => setViewingLead(lead)}
+                            owners={filterOptions?.owners}
+                            searchQuery={searchQuery}
+                            ownerFilter={Array.from(selectedOwners)}
+                            activeOwnerIds={activeOwnerIds}
+                            productFilter={Array.from(selectedProducts)}
+                            dynamicFilters={dynamicFilters}
+                            maskLeads={company?.mask_leads}
+                            leads={leads}
+                        />
+                    </Suspense>
                 ) : (
                     /* Desktop Table View */
                     <Card>
                         <CardContent className="pt-6">
                             <LeadsTable
                                 leads={leads as any}
-                                loading={isLoading}
+                                loading={isTableLoading}
                                 selectedLeads={selectedLeads}
                                 onSelectionChange={setSelectedLeads}
                                 owners={filterOptions?.owners || []}
@@ -607,16 +631,19 @@ export default function GenericAllLeads() {
 
                 {/* Pagination (hide in kanban mode) */}
                 {viewMode === 'table' && (
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-1">
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                        <div className="text-sm text-muted-foreground">
-                            Showing {((page - 1) * pageSize) + 1} to {Math.min(page * pageSize, totalCount)} of {totalCount}
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4 px-2">
+                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                        <div>
+                            Showing {((page - 1) * pageSize) + 1} to {Math.min(page * pageSize, totalCount)} of {totalCount} leads
                         </div>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <span>Rows per page:</span>
-                            <Select value={pageSize.toString()} onValueChange={handlePageSizeChange}>
-                                <SelectTrigger className="h-8 w-[80px] bg-background border-input">
-                                    <SelectValue placeholder={pageSize.toString()} />
+                        <div className="flex items-center gap-2">
+                            <span>Per page:</span>
+                            <Select
+                                value={pageSize.toString()}
+                                onValueChange={handlePageSizeChange}
+                            >
+                                <SelectTrigger className="h-8 w-[70px]">
+                                    <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
                                     {[25, 50, 100, 250, 500, 1000].map(size => (
@@ -633,7 +660,7 @@ export default function GenericAllLeads() {
                             variant="outline"
                             size="sm"
                             onClick={() => handlePageChange(Math.max(1, page - 1))}
-                            disabled={page === 1 || isLoading}
+                            disabled={page === 1 || isTableLoading}
                         >
                             <ChevronLeft className="h-4 w-4" />
                             <span className="hidden sm:inline ml-1">Previous</span>
@@ -645,7 +672,7 @@ export default function GenericAllLeads() {
                             variant="outline"
                             size="sm"
                             onClick={() => handlePageChange(Math.min(totalPages, page + 1))}
-                            disabled={page === totalPages || isLoading}
+                            disabled={page === totalPages || isTableLoading}
                         >
                             <span className="hidden sm:inline mr-1">Next</span>
                             <ChevronRight className="h-4 w-4" />
@@ -654,6 +681,13 @@ export default function GenericAllLeads() {
                 </div>
                 )}
             </div>
+
+            <OmnichannelLeadDrawer
+                open={!!chatLead}
+                onOpenChange={(open) => !open && setChatLead(null)}
+                lead={chatLead}
+                onViewDetails={(lead) => setViewingLead(lead)}
+            />
 
             <AssignLeadsDialog
                 open={assignDialogOpen}

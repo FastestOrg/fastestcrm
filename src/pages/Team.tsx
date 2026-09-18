@@ -14,6 +14,7 @@ import { useCompany } from '@/hooks/useCompany';
 import { useNavigate } from 'react-router-dom';
 import { OrgChart } from '@/components/team/OrgChart';
 import { Switch } from '@/components/ui/switch';
+import { cn } from '@/lib/utils';
 
 // Validation schema for team member invitation
 const inviteSchema = z.object({
@@ -296,6 +297,12 @@ export default function Team() {
 
         return 99;
     }
+
+    const memberToManage = members.find(m => m.id === selectedMember);
+    const isSelectedDemotion = Boolean(
+        memberToManage && selectedRole &&
+        getRoleLevelNum(selectedRole as AppRole) > getRoleLevelNum(memberToManage.role)
+    );
 
     const handleInviteMember = async () => {
         // Validate inputs with Zod
@@ -750,9 +757,9 @@ export default function Team() {
                     <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
                         <DialogHeader>
                             <DialogTitle className="flex flex-col gap-1">
-                                <span>Manage {members.find(m => m.id === selectedMember)?.full_name}</span>
+                                <span>Manage {memberToManage?.full_name}</span>
                                 <span className="text-sm font-normal text-muted-foreground">
-                                    ({members.find(m => m.id === selectedMember)?.email})
+                                    ({memberToManage?.email})
                                 </span>
                             </DialogTitle>
                             <DialogDescription>
@@ -768,20 +775,34 @@ export default function Team() {
                                     value={selectedRole}
                                     onValueChange={(v) => setSelectedRole(v as AppRole)}
                                 >
-                                    <SelectTrigger>
+                                    <SelectTrigger className={cn(isSelectedDemotion && "text-red-600 dark:text-red-400 border-red-300 dark:border-red-800")}>
                                         <SelectValue placeholder="Select new role" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {selectedMember && assignableRoles
-                                            .filter(role => {
-                                                const member = members.find(m => m.id === selectedMember);
-                                                return member && role !== member.role && !!getRoleLabel(role);
-                                            })
+                                        {memberToManage && assignableRoles
+                                            .filter(role => role !== memberToManage.role && !!getRoleLabel(role))
                                             .map(role => {
                                                 const label = getRoleLabel(role);
+                                                const isDemotion = getRoleLevelNum(role) > getRoleLevelNum(memberToManage.role);
+
                                                 return (
-                                                    <SelectItem key={role} value={role}>
-                                                        {label}
+                                                    <SelectItem
+                                                        key={role}
+                                                        value={role}
+                                                        className={cn(
+                                                            isDemotion && "text-red-600 dark:text-red-400 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-950/40 dark:focus:text-red-300 font-medium"
+                                                        )}
+                                                    >
+                                                        <span className="flex items-center justify-between w-full gap-2">
+                                                            <span className={cn(isDemotion && "text-red-600 dark:text-red-400")}>
+                                                                {label}
+                                                            </span>
+                                                            {isDemotion && (
+                                                                <span className="text-[11px] font-medium text-red-500 dark:text-red-400 opacity-90">
+                                                                    (Demotion)
+                                                                </span>
+                                                            )}
+                                                        </span>
                                                     </SelectItem>
                                                 );
                                             })
@@ -814,11 +835,8 @@ export default function Team() {
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="no_manager">No Manager</SelectItem>
-                                        {selectedMember && potentialManagers
-                                            .filter(m => {
-                                                const member = members.find(mem => mem.id === selectedMember);
-                                                return member && m.id !== member.id && getRoleLevelNum(m.role) < getRoleLevelNum(member.role);
-                                            })
+                                        {memberToManage && potentialManagers
+                                            .filter(m => m.id !== memberToManage.id && getRoleLevelNum(m.role) < getRoleLevelNum(memberToManage.role))
                                             .map(m => (
                                                 <SelectItem key={m.id} value={m.id}>
                                                     {m.full_name || m.email} ({getRoleLabel(m.role)})

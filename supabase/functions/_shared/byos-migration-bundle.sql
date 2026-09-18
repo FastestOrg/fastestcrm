@@ -723,6 +723,186 @@ CREATE INDEX IF NOT EXISTS idx_leads_real_estate_company_id ON public.leads_real
 CREATE INDEX IF NOT EXISTS idx_calendar_bookings_user_id ON public.calendar_bookings(user_id);
 CREATE INDEX IF NOT EXISTS idx_ai_employees_company_id ON public.ai_employees(company_id);
 
+-- ─── Fast Distinct Column Values (Recursive CTE Skip Scan) ─────────────────
+CREATE OR REPLACE FUNCTION public.get_distinct_column_values(
+    p_table_name text,
+    p_column_name text,
+    p_company_id uuid DEFAULT NULL
+)
+RETURNS text[]
+LANGUAGE plpgsql
+SECURITY DEFINER
+STABLE
+AS $$
+DECLARE
+    v_result text[];
+    v_query text;
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.tables 
+        WHERE table_schema = 'public' AND table_name = p_table_name
+    ) THEN
+        RETURN ARRAY[]::text[];
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' AND table_name = p_table_name AND column_name = p_column_name
+    ) THEN
+        RETURN ARRAY[]::text[];
+    END IF;
+
+    IF p_company_id IS NOT NULL THEN
+        v_query := format(
+            'SELECT ARRAY(
+                SELECT DISTINCT %I::text 
+                FROM public.%I 
+                WHERE (company_id = %L OR company_id IS NULL)
+                  AND %I IS NOT NULL 
+                  AND %I::text <> %L 
+                ORDER BY %I::text ASC
+            )',
+            p_column_name, p_table_name, p_company_id,
+            p_column_name, p_column_name, '', p_column_name
+        );
+    ELSE
+        v_query := format(
+            'SELECT ARRAY(
+                SELECT DISTINCT %I::text 
+                FROM public.%I 
+                WHERE %I IS NOT NULL 
+                  AND %I::text <> %L 
+                ORDER BY %I::text ASC
+            )',
+            p_column_name, p_table_name,
+            p_column_name, p_column_name, '', p_column_name
+        );
+    END IF;
+
+    EXECUTE v_query INTO v_result;
+    RETURN COALESCE(v_result, ARRAY[]::text[]);
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.get_distinct_column_values(text, text, uuid) TO authenticated, service_role, anon;
+
+-- ─── Get Company Lead Columns ──────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION public.get_company_lead_columns(
+  input_company_id uuid DEFAULT NULL
+)
+RETURNS TABLE (
+  column_name text,
+  data_type text,
+  is_nullable text
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_table_name text := 'leads';
+BEGIN
+  RETURN QUERY
+  SELECT c.column_name::text, c.data_type::text, c.is_nullable::text
+  FROM information_schema.columns c
+  WHERE c.table_schema = 'public'
+  AND c.table_name = v_table_name
+  ORDER BY c.ordinal_position;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.get_company_lead_columns(uuid) TO authenticated, service_role, anon;
+
+-- ─── Add Lead Attribute (DDL) ──────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION public.add_lead_attribute(
+  input_company_id uuid DEFAULT NULL,
+  attribute_name text DEFAULT '',
+  attribute_type text DEFAULT 'text'
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_table_name text := 'leads';
+  v_clean_attr text;
+BEGIN
+  v_clean_attr := lower(regexp_replace(trim(attribute_name), '[^a-z0-9_]', '_', 'g'));
+  IF v_clean_attr = '' THEN
+    RETURN jsonb_build_object('success', false, 'message', 'Invalid attribute name');
+  END IF;
+
+  IF attribute_type NOT IN ('text', 'integer', 'boolean', 'date', 'numeric', 'jsonb', 'timestamp with time zone') THEN
+     attribute_type := 'text';
+  END IF;
+
+  BEGIN
+    EXECUTE format('ALTER TABLE public.%I ADD COLUMN IF NOT EXISTS %I %s', v_table_name, v_clean_attr, attribute_type);
+    RETURN jsonb_build_object('success', true, 'message', 'Attribute added successfully', 'column_name', v_clean_attr);
+  EXCEPTION WHEN OTHERS THEN
+    RETURN jsonb_build_object('success', false, 'message', SQLERRM);
+  END;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.add_lead_attribute(uuid, text, text) TO authenticated, service_role;
+
+-- ─── Remove Lead Attribute (DDL) ───────────────────────────────────────────
+CREATE OR REPLACE FUNCTION public.remove_lead_attribute(
+  input_company_id uuid DEFAULT NULL,
+  attribute_name text DEFAULT ''
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_table_name text := 'leads';
+  v_clean_attr text;
+BEGIN
+  v_clean_attr := lower(regexp_replace(trim(attribute_name), '[^a-z0-9_]', '_', 'g'));
+  
+  IF v_clean_attr IN ('id', 'created_at', 'updated_at', 'company_id', 'created_by_id', 'name', 'email', 'phone', 'status') THEN
+     RETURN jsonb_build_object('success', false, 'message', 'Cannot delete system attribute');
+  END IF;
+
+  BEGIN
+    EXECUTE format('ALTER TABLE public.%I DROP COLUMN IF EXISTS %I', v_table_name, v_clean_attr);
+    RETURN jsonb_build_object('success', true, 'message', 'Attribute removed successfully');
+  EXCEPTION WHEN OTHERS THEN
+    RETURN jsonb_build_object('success', false, 'message', SQLERRM);
+  END;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.remove_lead_attribute(uuid, text) TO authenticated, service_role;
+
+-- ─── Toggle Lead Unique Constraint ─────────────────────────────────────────
+CREATE OR REPLACE FUNCTION public.toggle_lead_unique_constraint(
+  input_company_id uuid DEFAULT NULL,
+  attribute_name text DEFAULT '',
+  is_unique boolean DEFAULT true
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_idx_name text;
+  v_clean_attr text;
+BEGIN
+  v_clean_attr := lower(regexp_replace(trim(attribute_name), '[^a-z0-9_]', '_', 'g'));
+  v_idx_name := format('idx_leads_unique_%s', v_clean_attr);
+
+  IF is_unique THEN
+    EXECUTE format('CREATE UNIQUE INDEX IF NOT EXISTS %I ON public.leads(%I) WHERE %I IS NOT NULL AND %I <> ''''', 
+                   v_idx_name, v_clean_attr, v_clean_attr, v_clean_attr);
+    RETURN jsonb_build_object('success', true, 'message', format('Unique constraint enabled on %s', v_clean_attr));
+  ELSE
+    EXECUTE format('DROP INDEX IF EXISTS public.%I', v_idx_name);
+    RETURN jsonb_build_object('success', true, 'message', format('Unique constraint removed from %s', v_clean_attr));
+  END IF;
+EXCEPTION WHEN OTHERS THEN
+  RETURN jsonb_build_object('success', false, 'message', SQLERRM);
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.toggle_lead_unique_constraint(uuid, text, boolean) TO authenticated, service_role;
+
 -- ─── Storage bucket ─────────────────────────────────────────────────────────
 INSERT INTO storage.buckets (id, name, public)
 VALUES ('company-assets', 'company-assets', true)
@@ -755,4 +935,5 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Done!
-UPDATE public._byos_meta SET value = '1.0.0', updated_at = now() WHERE key = 'migration_version';
+UPDATE public._byos_meta SET value = '1.1.0', updated_at = now() WHERE key = 'migration_version';
+

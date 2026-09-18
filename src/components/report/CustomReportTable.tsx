@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useDeferredValue } from 'react';
 import {
   Table,
   TableBody,
@@ -86,10 +86,26 @@ export function CustomReportTable({
 }: CustomReportTableProps) {
   const [matrixSearch, setMatrixSearch] = useState('');
   const [tableSearch, setTableSearch] = useState('');
+  const deferredTableSearch = useDeferredValue(tableSearch);
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 15;
 
   const [isDetailsLoaded, setIsDetailsLoaded] = useState(Boolean(config.showLeadDetailsTable));
+
+  // O(1) Indexed Maps for instant status lookups across thousands of rows
+  const statusMap = useMemo(() => {
+    const map = new Map<string, CompanyLeadStatus>();
+    (leadStatuses || []).forEach((s) => map.set(s.value, s));
+    return map;
+  }, [leadStatuses]);
+
+  const paidStatusSet = useMemo(() => {
+    const set = new Set<string>(['paid']);
+    (leadStatuses || []).forEach((s) => {
+      if (s.category === 'paid') set.add(s.value);
+    });
+    return set;
+  }, [leadStatuses]);
 
   const rowDim = (config.rowDimension || config.groupBy || 'owner') as ReportDimension;
   const colDim = (config.colDimension || 'status') as ReportColumnDimension;
@@ -122,7 +138,7 @@ export function CustomReportTable({
 
     if (dimension === 'status') {
       const key = lead.status || 'unknown';
-      const stObj = leadStatuses.find((s) => s.value === lead.status);
+      const stObj = statusMap.get(lead.status || '');
       const label = stObj
         ? stObj.label
         : lead.status
@@ -341,7 +357,7 @@ export function CustomReportTable({
 
       const isPaid =
         lead.status === 'paid' ||
-        leadStatuses.find((s) => s.value === lead.status)?.category === 'paid' ||
+        (lead.status ? paidStatusSet.has(lead.status) : false) ||
         (lead.revenue_received !== null &&
           lead.revenue_received !== undefined &&
           lead.revenue_received > 0);
@@ -437,8 +453,8 @@ export function CustomReportTable({
 
   // ─── 4. Detailed Filtered Leads Table (Tabular List) ───────────────────────
   const filteredLeads = useMemo(() => {
-    if (!tableSearch.trim()) return leads;
-    const q = tableSearch.toLowerCase();
+    if (!deferredTableSearch.trim()) return leads;
+    const q = deferredTableSearch.toLowerCase();
     return leads.filter((lead) => {
       return (
         lead.name?.toLowerCase().includes(q) ||
@@ -449,7 +465,7 @@ export function CustomReportTable({
         lead.status?.toLowerCase().includes(q)
       );
     });
-  }, [leads, tableSearch]);
+  }, [leads, deferredTableSearch]);
 
   const totalPages = Math.ceil(filteredLeads.length / pageSize) || 1;
   const paginatedLeads = useMemo(() => {
@@ -592,7 +608,7 @@ export function CustomReportTable({
   };
 
   const getStatusObj = (statusVal: string) => {
-    return leadStatuses.find((s) => s.value === statusVal);
+    return statusMap.get(statusVal);
   };
 
   // Helper to format cell value in matrix

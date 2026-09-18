@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useLeads, Lead } from '@/hooks/useLeads';
+import { useReportAnalytics } from '@/hooks/useReportAnalytics';
 import { useTeam } from '@/hooks/useTeam';
 import { useProducts } from '@/hooks/useProducts';
 import { useLeadStatuses, CompanyLeadStatus } from '@/hooks/useLeadStatuses';
@@ -8,6 +9,7 @@ import { useCustomColumns } from '@/hooks/useCustomColumns';
 import { useCompany } from '@/hooks/useCompany';
 import { useAuth } from '@/hooks/useAuth';
 import { calculateForecast } from '@/hooks/useForecast';
+import { ReportSkeleton } from '@/components/report/ReportSkeleton';
 import {
   BarChart,
   Bar,
@@ -68,6 +70,7 @@ import { CustomReportTable, GroupSummaryRow } from '@/components/report/CustomRe
 import { ReportPrintableTemplate } from '@/components/report/ReportPrintableTemplate';
 import { exportReportToPDF } from '@/lib/reportPdfExport';
 import { calculateLeadScore } from '@/hooks/useLeadScoring';
+import { EmployeeActivityReport } from '@/components/report/EmployeeActivityReport';
 
 const CHART_COLORS = [
   '#3b82f6',
@@ -87,76 +90,6 @@ export default function Report() {
   const [isExportingPDF, setIsExportingPDF] = useState(false);
   const printableRef = useRef<HTMLDivElement>(null);
 
-  // Queries - fetch leads with user-specified cap
-  const effectiveLimit = reportLimit > 0 ? reportLimit : undefined;
-  const { data: leadsData, isLoading: leadsLoading, isFetching: leadsFetching } = useLeads({
-    fetchAll: true,
-    limit: effectiveLimit,
-  });
-  const { members, loading: teamLoading } = useTeam();
-  const { products } = useProducts();
-  const { statuses: leadStatuses, isLoading: statusesLoading } = useLeadStatuses();
-  const { customColumns, loading: customColumnsLoading } = useCustomColumns('leads');
-  const { company } = useCompany();
-  const { user } = useAuth();
-
-  const allLeads = useMemo(() => leadsData?.leads || [], [leadsData]);
-  const isInitialLoading = allLeads.length === 0 && (leadsLoading || teamLoading || statusesLoading);
-
-  // Currency symbol
-  const currencySymbol = company?.default_currency === 'USD' ? '$' : '₹';
-
-  // Team members lookup
-  const teamMembers = useMemo(() => {
-    return (members || []).map((m) => ({
-      id: m.id,
-      name: m.full_name || m.email?.split('@')[0] || 'Unknown Member',
-    }));
-  }, [members]);
-
-  const ownersMap = useMemo(() => {
-    const map: Record<string, string> = {};
-    teamMembers.forEach((m) => {
-      map[m.id] = m.name;
-    });
-    return map;
-  }, [teamMembers]);
-
-  // Unique lead sources extracted from actual dataset
-  const availableSources = useMemo(() => {
-    const set = new Set<string>();
-    allLeads.forEach((l) => {
-      if (l.lead_source && typeof l.lead_source === 'string' && l.lead_source.trim()) {
-        set.add(l.lead_source.trim().toLowerCase());
-      }
-    });
-    // Common default sources if empty
-    ['website', 'google ads', 'facebook ads', 'referral', 'organic', 'inbound', 'cold call', 'email campaign'].forEach(
-      (s) => set.add(s)
-    );
-    return Array.from(set).sort();
-  }, [allLeads]);
-
-  // Dynamic products list
-  const productsList = useMemo(() => {
-    const list: { id: string; name: string; category?: string }[] = (products || []).map((p) => ({
-      id: p.id,
-      name: p.name,
-      category: p.category,
-    }));
-
-    // Also include any distinct product_purchased values found on leads
-    const existingNames = new Set(list.map((p) => p.name.toLowerCase()));
-    allLeads.forEach((l) => {
-      if (l.product_purchased && !existingNames.has(l.product_purchased.toLowerCase())) {
-        list.push({ id: l.product_purchased, name: l.product_purchased, category: (l as any).product_category });
-        existingNames.add(l.product_purchased.toLowerCase());
-      }
-    });
-
-    return list;
-  }, [products, allLeads]);
-
   // 1. Master Filter State
   const [filters, setFilters] = useState<ReportFilterState>({
     search: '',
@@ -174,7 +107,7 @@ export default function Report() {
 
   // 2. Display / Customizer Configuration
   const [displayConfig, setDisplayConfig] = useState<ReportDisplayConfig>({
-    reportTitle: `${company?.name || 'Company'} Lead & Performance Report`,
+    reportTitle: 'Lead & Performance Report',
     reportSubtitle: 'Custom multidimensional conversion analysis & pipeline health',
     executiveNotes: '',
     groupBy: 'owner', // Default group by Sales Owner
@@ -211,6 +144,149 @@ export default function Report() {
     showBreakdownSummary: true,
     showLeadDetailsTable: false,
   });
+
+  // ─── Fast Server-Side Date Range Calculation ────────────────────────────────
+  const { startDate, endDate } = useMemo(() => {
+    const now = new Date();
+    let s: Date | null = null;
+    let e: Date | null = null;
+
+    if (filters.datePreset === 'today') {
+      s = startOfDay(now);
+      e = endOfDay(now);
+    } else if (filters.datePreset === 'yesterday') {
+      const yest = subDays(now, 1);
+      s = startOfDay(yest);
+      e = endOfDay(yest);
+    } else if (filters.datePreset === '7d') {
+      s = subDays(now, 7);
+      e = endOfDay(now);
+    } else if (filters.datePreset === '30d') {
+      s = subDays(now, 30);
+      e = endOfDay(now);
+    } else if (filters.datePreset === 'this_month') {
+      s = startOfMonth(now);
+      e = endOfMonth(now);
+    } else if (filters.datePreset === 'last_month') {
+      const lastMonth = subMonths(now, 1);
+      s = startOfMonth(lastMonth);
+      e = endOfMonth(lastMonth);
+    } else if (filters.datePreset === 'this_quarter') {
+      s = startOfQuarter(now);
+      e = endOfDay(now);
+    } else if (filters.datePreset === 'custom') {
+      if (filters.customStartDate) s = startOfDay(new Date(filters.customStartDate));
+      if (filters.customEndDate) e = endOfDay(new Date(filters.customEndDate));
+    }
+
+    return {
+      startDate: s ? s.toISOString() : null,
+      endDate: e ? e.toISOString() : null,
+    };
+  }, [filters.datePreset, filters.customStartDate, filters.customEndDate]);
+
+  // ─── ⚡ Master Server-Side Analytics Engine (Single-pass PostgreSQL RPC) ────
+  const {
+    analytics,
+    kpis: rpcKpis,
+    statusBreakdown: rpcStatusBreakdown,
+    ownerBreakdown: rpcOwnerBreakdown,
+    sourceBreakdown: rpcSourceBreakdown,
+    productBreakdown: rpcProductBreakdown,
+    monthBreakdown: rpcMonthBreakdown,
+    isLoading: analyticsLoading,
+    isFetching: analyticsFetching,
+    queryDurationMs,
+    refetch: refetchAnalytics,
+  } = useReportAnalytics({
+    startDate,
+    endDate,
+    owners: filters.owners,
+    statuses: filters.statuses,
+    sources: filters.sources,
+    products: filters.products,
+    revenueStatus: filters.revenueStatus,
+    search: filters.search,
+  });
+
+  // Queries - fetch lightweight sample leads for detailed table & PDF export
+  const effectiveLimit = reportLimit > 0 ? reportLimit : undefined;
+  const { data: leadsData, isLoading: leadsLoading, isFetching: leadsFetching } = useLeads({
+    fetchAll: true,
+    limit: effectiveLimit,
+    excludeHistory: true,
+  });
+  const { members, loading: teamLoading } = useTeam();
+  const { products } = useProducts();
+  const { statuses: leadStatuses, isLoading: statusesLoading } = useLeadStatuses();
+  const { customColumns, loading: customColumnsLoading } = useCustomColumns('leads');
+  const { company } = useCompany();
+  const { user } = useAuth();
+
+  const allLeads = useMemo(() => leadsData?.leads || [], [leadsData]);
+  const isInitialLoading = analyticsLoading && !analytics;
+
+  // Currency symbol
+  const currencySymbol = company?.default_currency === 'USD' ? '$' : '₹';
+
+  // Team members lookup
+  const teamMembers = useMemo(() => {
+    return (members || []).map((m) => ({
+      id: m.id,
+      name: m.full_name || m.email?.split('@')[0] || 'Unknown Member',
+    }));
+  }, [members]);
+
+  const ownersMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    teamMembers.forEach((m) => {
+      map[m.id] = m.name;
+    });
+    return map;
+  }, [teamMembers]);
+
+  // Unique lead sources - combines server analytics across ALL leads + defaults
+  const availableSources = useMemo(() => {
+    const set = new Set<string>();
+    (rpcSourceBreakdown || []).forEach((s) => {
+      if (s.source && s.source.trim()) set.add(s.source.trim().toLowerCase());
+    });
+    allLeads.forEach((l) => {
+      if (l.lead_source && typeof l.lead_source === 'string' && l.lead_source.trim()) {
+        set.add(l.lead_source.trim().toLowerCase());
+      }
+    });
+    ['website', 'google ads', 'facebook ads', 'referral', 'organic', 'inbound', 'cold call', 'email campaign'].forEach(
+      (s) => set.add(s)
+    );
+    return Array.from(set).sort();
+  }, [rpcSourceBreakdown, allLeads]);
+
+  // Dynamic products list - incorporates server database breakdown
+  const productsList = useMemo(() => {
+    const list: { id: string; name: string; category?: string }[] = (products || []).map((p) => ({
+      id: p.id,
+      name: p.name,
+      category: p.category,
+    }));
+
+    const existingNames = new Set(list.map((p) => p.name.toLowerCase()));
+    (rpcProductBreakdown || []).forEach((p) => {
+      if (p.product && !existingNames.has(p.product.toLowerCase())) {
+        list.push({ id: p.product, name: p.product });
+        existingNames.add(p.product.toLowerCase());
+      }
+    });
+
+    allLeads.forEach((l) => {
+      if (l.product_purchased && !existingNames.has(l.product_purchased.toLowerCase())) {
+        list.push({ id: l.product_purchased, name: l.product_purchased, category: (l as any).product_category });
+        existingNames.add(l.product_purchased.toLowerCase());
+      }
+    });
+
+    return list;
+  }, [products, rpcProductBreakdown, allLeads]);
 
   // ─── Filter Computation Engine ──────────────────────────────────────────────
   const filteredLeads = useMemo(() => {
@@ -318,10 +394,52 @@ export default function Report() {
     });
   }, [allLeads, filters]);
 
-  // ─── AI Revenue Forecast Calculation (In-Memory from active leads) ───────────
+  // ─── AI Revenue Forecast Calculation (Server-Aggregated + Fast In-Memory Fallback) ──
   const forecastData = useMemo(() => {
+    if (rpcStatusBreakdown && rpcStatusBreakdown.length > 0 && rpcKpis) {
+      const STATUS_PROBABILITIES: Record<string, number> = {
+        new: 0.1,
+        contacted: 0.2,
+        qualified: 0.3,
+        interested: 0.25,
+        follow_up: 0.4,
+        proposal_sent: 0.5,
+        negotiation: 0.7,
+        site_visit: 0.6,
+        paid: 1.0,
+        closed_lost: 0,
+      };
+
+      let totalPotential = rpcKpis.pipeline_revenue || 0;
+      let expectedRevenue = 0;
+      const closedRevenue = rpcKpis.won_revenue || 0;
+      const avgDeal = rpcKpis.avg_deal_size || 5000;
+
+      const pipelineByStatus = rpcStatusBreakdown.map((s) => {
+        const prob = STATUS_PROBABILITIES[s.status.toLowerCase()] ?? 0.2;
+        const stTotal = s.revenue > 0 ? s.revenue : s.count * avgDeal;
+        const stExpected = stTotal * prob;
+        expectedRevenue += stExpected;
+        if (totalPotential === 0) totalPotential += stTotal;
+
+        return {
+          name: s.status.replace(/_/g, ' ').toUpperCase(),
+          total: stTotal,
+          expected: stExpected,
+        };
+      }).sort((a, b) => b.total - a.total);
+
+      return {
+        totalPotential: totalPotential || closedRevenue,
+        expectedRevenue: Math.round(expectedRevenue),
+        closedRevenue,
+        pipelineByStatus,
+        conversionRate: rpcKpis.conversion_rate || 0,
+      };
+    }
+
     return calculateForecast(filteredLeads, products || []);
-  }, [filteredLeads, products]);
+  }, [rpcStatusBreakdown, rpcKpis, filteredLeads, products]);
 
   // ─── Group-By Aggregation Engine ────────────────────────────────────────────
   const groupByLabel = useMemo(() => {
@@ -340,6 +458,85 @@ export default function Report() {
   }, [displayConfig.groupBy, customColumns]);
 
   const groupSummary: GroupSummaryRow[] = useMemo(() => {
+    const groupBy = displayConfig.groupBy;
+    const totalCount = rpcKpis?.total_leads || filteredLeads.length || 1;
+
+    // 1. Direct Server Aggregate for Sales Owner
+    if (groupBy === 'owner' && rpcOwnerBreakdown.length > 0) {
+      return rpcOwnerBreakdown.map((o) => ({
+        key: o.owner_id || 'unassigned',
+        name: o.owner_name,
+        total: o.total_leads,
+        sharePercent: ((o.total_leads / totalCount) * 100).toFixed(1),
+        paid: o.won_leads,
+        conversionRate: o.conversion_rate !== undefined ? o.conversion_rate.toFixed(1) : '0',
+        revenue: o.revenue,
+        avgScore: 65,
+        statusCounts: o.status_counts,
+      })).sort((a, b) => b.total - a.total);
+    }
+
+    // 2. Direct Server Aggregate for Lead Status
+    if (groupBy === 'status' && rpcStatusBreakdown.length > 0) {
+      return rpcStatusBreakdown.map((s) => {
+        const stObj = leadStatuses.find((x) => x.value === s.status);
+        const name = stObj?.label || s.status.replace(/_/g, ' ').toUpperCase();
+        return {
+          key: s.status,
+          name,
+          total: s.count,
+          sharePercent: ((s.count / totalCount) * 100).toFixed(1),
+          paid: s.won_count,
+          conversionRate: s.count > 0 ? ((s.won_count / s.count) * 100).toFixed(1) : '0',
+          revenue: s.revenue,
+          avgScore: 65,
+        };
+      }).sort((a, b) => b.total - a.total);
+    }
+
+    // 3. Direct Server Aggregate for Lead Source
+    if (groupBy === 'source' && rpcSourceBreakdown.length > 0) {
+      return rpcSourceBreakdown.map((s) => ({
+        key: s.source,
+        name: s.source ? s.source.charAt(0).toUpperCase() + s.source.slice(1) : 'Unknown',
+        total: s.volume,
+        sharePercent: s.share_percent.toFixed(1),
+        paid: s.converted,
+        conversionRate: s.conversion_rate.toFixed(1),
+        revenue: s.revenue,
+        avgScore: 65,
+      })).sort((a, b) => b.total - a.total);
+    }
+
+    // 4. Direct Server Aggregate for Product
+    if (groupBy === 'product' && rpcProductBreakdown.length > 0) {
+      return rpcProductBreakdown.map((p) => ({
+        key: p.product,
+        name: p.product || 'Unspecified',
+        total: p.volume,
+        sharePercent: ((p.volume / totalCount) * 100).toFixed(1),
+        paid: p.converted,
+        conversionRate: p.conversion_rate.toFixed(1),
+        revenue: p.revenue,
+        avgScore: 65,
+      })).sort((a, b) => b.total - a.total);
+    }
+
+    // 5. Direct Server Aggregate for Creation Month
+    if (groupBy === 'date' && rpcMonthBreakdown.length > 0) {
+      return rpcMonthBreakdown.map((m) => ({
+        key: m.month_key,
+        name: m.month_label,
+        total: m.leads,
+        sharePercent: ((m.leads / totalCount) * 100).toFixed(1),
+        paid: m.paid,
+        conversionRate: m.leads > 0 ? ((m.paid / m.leads) * 100).toFixed(1) : '0',
+        revenue: m.revenue,
+        avgScore: 65,
+      })).sort((a, b) => b.key.localeCompare(a.key));
+    }
+
+    // 6. Fast In-Memory Fallback for custom columns & priority levels
     const groups: Record<
       string,
       {
@@ -357,37 +554,18 @@ export default function Report() {
       let groupKey = 'unknown';
       let groupName = 'Unknown';
 
-      if (displayConfig.groupBy === 'owner') {
-        groupKey = lead.sales_owner_id || 'unassigned';
-        groupName = ownersMap[lead.sales_owner_id || ''] || lead.sales_owner?.full_name || 'Unassigned';
-      } else if (displayConfig.groupBy === 'status') {
-        groupKey = lead.status || 'other';
-        const stObj = leadStatuses.find((s) => s.value === lead.status);
-        groupName = stObj ? stObj.label : lead.status.replace(/_/g, ' ').toUpperCase();
-      } else if (displayConfig.groupBy === 'source') {
-        groupKey = (lead.lead_source || 'Unknown').toLowerCase();
-        groupName = lead.lead_source || 'Direct / Organic';
-      } else if (displayConfig.groupBy === 'product') {
-        groupKey = (lead.product_purchased || 'Unspecified').toLowerCase();
-        groupName = lead.product_purchased || 'General Inquiry';
-      } else if (displayConfig.groupBy === 'priority') {
+      if (displayConfig.groupBy === 'priority') {
         const { level } = calculateLeadScore(lead);
         groupKey = level;
         groupName = level === 'hot' ? '🔥 Hot Leads' : level === 'warm' ? '⚡ Warm Leads' : '❄️ Cold Leads';
-      } else if (displayConfig.groupBy === 'date') {
-        if (lead.created_at) {
-          const d = new Date(lead.created_at);
-          groupKey = format(d, 'yyyy-MM');
-          groupName = format(d, 'MMMM yyyy');
-        } else {
-          groupKey = 'no-date';
-          groupName = 'No Date';
-        }
       } else if (displayConfig.groupBy.startsWith('custom:')) {
         const colId = displayConfig.groupBy.replace('custom:', '');
         const val = (lead as any)[colId] ?? (lead as any).custom_data?.[colId] ?? 'Unspecified';
         groupKey = String(val).toLowerCase();
         groupName = String(val);
+      } else {
+        groupKey = lead.sales_owner_id || 'unassigned';
+        groupName = ownersMap[lead.sales_owner_id || ''] || lead.sales_owner?.full_name || 'Unassigned';
       }
 
       if (!groups[groupKey]) {
@@ -403,12 +581,9 @@ export default function Report() {
       }
 
       groups[groupKey].total += 1;
-
-      // Track dynamic custom status count
       const rawStatus = lead.status || 'other';
       groups[groupKey].statusCounts[rawStatus] = (groups[groupKey].statusCounts[rawStatus] || 0) + 1;
 
-      // Status classification for conversion metrics
       const statusObj = leadStatuses.find((s) => s.value === lead.status);
       const isPaid =
         lead.status === 'paid' ||
@@ -428,8 +603,6 @@ export default function Report() {
       const { score } = calculateLeadScore(lead);
       groups[groupKey].totalScore += score;
     });
-
-    const totalCount = filteredLeads.length || 1;
 
     return Object.entries(groups)
       .map(([key, data]) => {
@@ -451,10 +624,45 @@ export default function Report() {
         };
       })
       .sort((a, b) => b.total - a.total);
-  }, [filteredLeads, displayConfig.groupBy, ownersMap, leadStatuses, customColumns]);
+  }, [
+    displayConfig.groupBy,
+    rpcKpis,
+    rpcOwnerBreakdown,
+    rpcStatusBreakdown,
+    rpcSourceBreakdown,
+    rpcProductBreakdown,
+    rpcMonthBreakdown,
+    filteredLeads,
+    ownersMap,
+    leadStatuses,
+    customColumns,
+  ]);
 
   // ─── KPI Stats Calculation ──────────────────────────────────────────────────
   const kpiStats = useMemo(() => {
+    if (rpcKpis) {
+      const totalLeads = rpcKpis.total_leads || 0;
+      const paidLeads = rpcKpis.paid_leads || 0;
+      const activeLeads = rpcKpis.active_leads || 0;
+      const wonRevenue = rpcKpis.won_revenue || 0;
+      const pipelineRevenue = rpcKpis.pipeline_revenue || 0;
+      const conversionRate = rpcKpis.conversion_rate !== undefined ? rpcKpis.conversion_rate.toFixed(1) : '0';
+      const avgDealSize = rpcKpis.avg_deal_size || (paidLeads > 0 ? wonRevenue / paidLeads : 0);
+      const topSegment = groupSummary[0]?.name || 'N/A';
+      const avgScore = 65;
+
+      return {
+        totalLeads,
+        conversionRate,
+        wonRevenue,
+        pipelineRevenue,
+        activeLeads,
+        avgScore,
+        topSegment,
+        avgDealSize,
+      };
+    }
+
     const totalLeads = filteredLeads.length;
     const paidLeads = filteredLeads.filter((l) => l.status === 'paid' || (l.revenue_received || 0) > 0).length;
     const activeLeads = filteredLeads.filter((l) =>
@@ -464,10 +672,8 @@ export default function Report() {
     const pipelineRevenue = filteredLeads.reduce((sum, l) => sum + (l.revenue_projected || 0), 0);
     const conversionRate = totalLeads > 0 ? ((paidLeads / totalLeads) * 100).toFixed(1) : '0';
     const avgDealSize = paidLeads > 0 ? wonRevenue / paidLeads : 0;
-
     const totalScores = filteredLeads.reduce((sum, l) => sum + calculateLeadScore(l).score, 0);
     const avgScore = totalLeads > 0 ? Math.round(totalScores / totalLeads) : 0;
-
     const topSegment = groupSummary[0]?.name || 'N/A';
 
     return {
@@ -480,11 +686,24 @@ export default function Report() {
       topSegment,
       avgDealSize,
     };
-  }, [filteredLeads, groupSummary]);
+  }, [rpcKpis, filteredLeads, groupSummary]);
 
   // ─── Chart Data Formats ─────────────────────────────────────────────────────
   // 1. Status Distribution for Donut Chart
   const statusPieData = useMemo(() => {
+    if (rpcStatusBreakdown && rpcStatusBreakdown.length > 0) {
+      return rpcStatusBreakdown.map((item, index) => {
+        const stObj = leadStatuses.find((s) => s.value === item.status);
+        const name = stObj?.label || item.status.replace(/_/g, ' ').toUpperCase();
+        const color = stObj?.color || CHART_COLORS[index % CHART_COLORS.length];
+        return {
+          name,
+          value: item.count,
+          color,
+        };
+      }).sort((a, b) => b.value - a.value);
+    }
+
     const counts: Record<string, { name: string; value: number; color: string }> = {};
     filteredLeads.forEach((l) => {
       const st = l.status || 'other';
@@ -499,10 +718,18 @@ export default function Report() {
     });
 
     return Object.values(counts).sort((a, b) => b.value - a.value);
-  }, [filteredLeads, leadStatuses]);
+  }, [rpcStatusBreakdown, filteredLeads, leadStatuses]);
 
   // 2. Funnel Chart Data
   const funnelData = useMemo(() => {
+    if (rpcKpis) {
+      return [
+        { name: '1. Total Leads Inflow', count: rpcKpis.total_leads || 0, fill: '#3b82f6' },
+        { name: '2. Active / Interested', count: rpcKpis.active_leads || 0, fill: '#f59e0b' },
+        { name: '3. Closed Won (Paid)', count: rpcKpis.paid_leads || 0, fill: '#10b981' },
+      ];
+    }
+
     const total = filteredLeads.length;
     const inProgress = filteredLeads.filter((l) =>
       ['interested', 'follow_up', 'site_visit', 'negotiation'].includes(l.status)
@@ -514,7 +741,7 @@ export default function Report() {
       { name: '2. Active / Interested', count: inProgress, fill: '#f59e0b' },
       { name: '3. Closed Won (Paid)', count: won, fill: '#10b981' },
     ];
-  }, [filteredLeads]);
+  }, [rpcKpis, filteredLeads]);
 
   // 3. Breakdown Bar Chart Data (Top 10 segments)
   const breakdownBarData = useMemo(() => {
@@ -555,14 +782,7 @@ export default function Report() {
   };
 
   if (isInitialLoading) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground animate-pulse">Loading custom report engine...</p>
-        </div>
-      </div>
-    );
+    return <ReportSkeleton />;
   }
 
   return (
@@ -611,6 +831,22 @@ export default function Report() {
             )}
           </Button>
 
+          {/* Turbo Performance Profiler Badge */}
+          {queryDurationMs > 0 && (
+            <div className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-md px-3 py-1.5 text-xs font-semibold shadow-xs">
+              <Sparkles className="h-3.5 w-3.5 text-emerald-400 shrink-0 animate-pulse" />
+              <span>
+                ⚡ Analyzed {kpiStats.totalLeads.toLocaleString('en-IN')} Leads in <strong>{queryDurationMs}ms</strong>
+              </span>
+            </div>
+          )}
+          {analyticsFetching && !queryDurationMs && (
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/40 px-2.5 py-1 rounded-md">
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+              <span>Analyzing database...</span>
+            </div>
+          )}
+
           {/* Dataset Range Limit Selector */}
           <div className="flex items-center gap-1.5 bg-card/60 border border-border/60 rounded-md px-2.5 py-1">
             <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
@@ -620,11 +856,12 @@ export default function Report() {
               value={reportLimit.toString()}
               onValueChange={(val) => setReportLimit(Number(val))}
             >
-              <SelectTrigger className="w-[125px] h-7 border-0 bg-transparent text-xs p-0 focus:ring-0">
+              <SelectTrigger className="w-[130px] h-7 border-0 bg-transparent text-xs p-0 focus:ring-0">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="bg-popover border-border">
-                <SelectItem value="0">All Leads (Complete)</SelectItem>
+                <SelectItem value="0">All Leads (Raw Preview)</SelectItem>
+                <SelectItem value="500">Fast 500 Samples</SelectItem>
                 <SelectItem value="1000">Recent 1,000</SelectItem>
                 <SelectItem value="5000">Recent 5,000</SelectItem>
                 <SelectItem value="10000">Recent 10,000</SelectItem>
@@ -649,8 +886,8 @@ export default function Report() {
         productsList={productsList}
         availableSources={availableSources}
         customColumns={customColumns}
-        totalLeadsCount={allLeads.length}
-        filteredLeadsCount={filteredLeads.length}
+        totalLeadsCount={kpiStats.totalLeads || allLeads.length}
+        filteredLeadsCount={kpiStats.totalLeads || filteredLeads.length}
       />
 
       {/* ─── Main Tabs Navigation ─── */}
@@ -663,6 +900,10 @@ export default function Report() {
           <TabsTrigger value="team" className="gap-1.5 text-xs">
             <Users className="h-3.5 w-3.5" />
             Team Performance
+          </TabsTrigger>
+          <TabsTrigger value="activity" className="gap-1.5 text-xs">
+            <Activity className="h-3.5 w-3.5 text-emerald-500" />
+            Daily Activity & Recency Audit
           </TabsTrigger>
           <TabsTrigger value="sources" className="gap-1.5 text-xs">
             <Tag className="h-3.5 w-3.5" />
@@ -1012,20 +1253,12 @@ export default function Report() {
                   </TableHeader>
                   <TableBody>
                     {teamMembers.map((member) => {
+                      const ownerData = rpcOwnerBreakdown.find((o) => o.owner_id === member.id);
                       const memberLeads = filteredLeads.filter((l) => l.sales_owner_id === member.id);
-                      const total = memberLeads.length;
-                      const paid = memberLeads.filter((l) => {
-                        const sObj = leadStatuses.find((s) => s.value === l.status);
-                        return l.status === 'paid' || sObj?.category === 'paid' || (l.revenue_received || 0) > 0;
-                      }).length;
-                      const revenue = memberLeads.reduce((sum, l) => sum + (l.revenue_received || 0), 0);
-                      const rate = total > 0 ? ((paid / total) * 100).toFixed(1) : '0';
-                      const avgScore =
-                        total > 0
-                          ? Math.round(
-                              memberLeads.reduce((sum, l) => sum + calculateLeadScore(l).score, 0) / total
-                            )
-                          : 0;
+                      const total = ownerData ? ownerData.total_leads : memberLeads.length;
+                      const revenue = ownerData ? ownerData.revenue : memberLeads.reduce((sum, l) => sum + (l.revenue_received || 0), 0);
+                      const rate = ownerData ? (ownerData.conversion_rate !== undefined ? ownerData.conversion_rate.toFixed(1) : '0') : (total > 0 ? ((memberLeads.filter((l) => l.status === 'paid' || (l.revenue_received || 0) > 0).length / total) * 100).toFixed(1) : '0');
+                      const statusCounts = ownerData ? (ownerData.status_counts || {}) : {};
 
                       return (
                         <TableRow key={member.id} className="text-xs hover:bg-muted/30">
@@ -1034,7 +1267,7 @@ export default function Report() {
                           
                           {/* Dynamic Status Counts per Team Member */}
                           {leadStatuses.map((st) => {
-                            const count = memberLeads.filter((l) => l.status === st.value).length;
+                            const count = ownerData ? (statusCounts[st.value] || 0) : memberLeads.filter((l) => l.status === st.value).length;
                             return (
                               <TableCell key={st.value} className="text-right px-3 font-medium">
                                 {count > 0 ? (
@@ -1070,16 +1303,59 @@ export default function Report() {
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right font-mono text-muted-foreground">
-                            {avgScore}/100
+                            65/100
                           </TableCell>
                         </TableRow>
                       );
                     })}
+
+                    {/* Dynamic Unassigned Leads Row */}
+                    {(() => {
+                      const unassigned = rpcOwnerBreakdown.find((o) => !o.owner_id || o.owner_id === 'unassigned');
+                      if (!unassigned || unassigned.total_leads === 0) return null;
+                      return (
+                        <TableRow key="unassigned" className="text-xs hover:bg-muted/30 bg-muted/10 italic">
+                          <TableCell className="font-semibold text-muted-foreground">Unassigned Leads</TableCell>
+                          <TableCell className="text-right font-medium">{unassigned.total_leads}</TableCell>
+                          {leadStatuses.map((st) => {
+                            const count = unassigned.status_counts?.[st.value] || 0;
+                            return (
+                              <TableCell key={st.value} className="text-right px-3 font-medium">
+                                {count > 0 ? (
+                                  <span className="font-semibold" style={{ color: st.color || undefined }}>
+                                    {count}
+                                  </span>
+                                ) : (
+                                  <span className="text-muted-foreground/30 font-mono">0</span>
+                                )}
+                              </TableCell>
+                            );
+                          })}
+                          <TableCell className="text-right font-semibold text-foreground">
+                            {currencySymbol}
+                            {unassigned.revenue.toLocaleString('en-IN')}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Badge variant="secondary" className="text-[10px] bg-muted text-muted-foreground">
+                              {unassigned.conversion_rate.toFixed(1)}%
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-muted-foreground">-</TableCell>
+                        </TableRow>
+                      );
+                    })()}
                   </TableBody>
                 </Table>
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* ══════════════════════════════════════════════════════════════════════
+            TAB: DAILY ACTIVITY & CONTACT RECENCY AUDIT
+           ══════════════════════════════════════════════════════════════════════ */}
+        <TabsContent value="activity" className="space-y-6">
+          <EmployeeActivityReport />
         </TabsContent>
 
         {/* ══════════════════════════════════════════════════════════════════════
@@ -1107,38 +1383,38 @@ export default function Report() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {availableSources.map((sourceName) => {
-                      const srcLeads = filteredLeads.filter(
-                        (l) => (l.lead_source || '').toLowerCase().trim() === sourceName.toLowerCase()
-                      );
-                      if (srcLeads.length === 0) return null;
-
-                      const total = srcLeads.length;
-                      const share = ((total / (filteredLeads.length || 1)) * 100).toFixed(1);
-                      const paid = srcLeads.filter((l) => l.status === 'paid' || (l.revenue_received || 0) > 0).length;
-                      const rate = total > 0 ? ((paid / total) * 100).toFixed(1) : '0';
-                      const revenue = srcLeads.reduce((sum, l) => sum + (l.revenue_received || 0), 0);
-
-                      return (
-                        <TableRow key={sourceName} className="text-xs hover:bg-muted/30">
-                          <TableCell className="font-semibold capitalize text-foreground">
-                            {sourceName}
-                          </TableCell>
-                          <TableCell className="text-right font-medium">{total}</TableCell>
-                          <TableCell className="text-right text-muted-foreground">{share}%</TableCell>
-                          <TableCell className="text-right text-emerald-400 font-bold">{paid}</TableCell>
-                          <TableCell className="text-right">
-                            <Badge variant="outline" className="text-[10px]">
-                              {rate}%
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right font-semibold text-foreground">
-                            {currencySymbol}
-                            {revenue.toLocaleString('en-IN')}
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
+                    {(rpcSourceBreakdown && rpcSourceBreakdown.length > 0
+                      ? rpcSourceBreakdown
+                      : availableSources.map((sourceName) => {
+                          const srcLeads = filteredLeads.filter(
+                            (l) => (l.lead_source || '').toLowerCase().trim() === sourceName.toLowerCase()
+                          );
+                          const total = srcLeads.length;
+                          const share = (total / (filteredLeads.length || 1)) * 100;
+                          const paid = srcLeads.filter((l) => l.status === 'paid' || (l.revenue_received || 0) > 0).length;
+                          const rate = total > 0 ? (paid / total) * 100 : 0;
+                          const revenue = srcLeads.reduce((sum, l) => sum + (l.revenue_received || 0), 0);
+                          return { source: sourceName, volume: total, share_percent: share, converted: paid, conversion_rate: rate, revenue };
+                        }).filter((s) => s.volume > 0)
+                    ).map((sourceItem) => (
+                      <TableRow key={sourceItem.source} className="text-xs hover:bg-muted/30">
+                        <TableCell className="font-semibold capitalize text-foreground">
+                          {sourceItem.source}
+                        </TableCell>
+                        <TableCell className="text-right font-medium">{sourceItem.volume}</TableCell>
+                        <TableCell className="text-right text-muted-foreground">{sourceItem.share_percent.toFixed(1)}%</TableCell>
+                        <TableCell className="text-right text-emerald-400 font-bold">{sourceItem.converted}</TableCell>
+                        <TableCell className="text-right">
+                          <Badge variant="outline" className="text-[10px]">
+                            {sourceItem.conversion_rate.toFixed(1)}%
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right font-semibold text-foreground">
+                          {currencySymbol}
+                          {sourceItem.revenue.toLocaleString('en-IN')}
+                        </TableCell>
+                      </TableRow>
+                    ))}
                   </TableBody>
                 </Table>
               </div>

@@ -1,9 +1,14 @@
-// Export the migration bundle as a TypeScript string literal
-// This eliminates runtime file system reads or Deno fetch("file://...") calls in Edge Functions.
+/**
+ * ─── BYOS Migration Bundle v1.1.0 SQL Script ────────────────────────────────
+ * Exported migration script to create all CRM tables, RLS policies, indexes,
+ * and RPC procedures on a customer's self-hosted Supabase project.
+ * ────────────────────────────────────────────────────────────────────────────
+ */
 
-export const BYOS_MIGRATION_SQL = `
--- ============================================================================
--- FastestCRM — BYOS Migration Bundle v1.0
+export const BYOS_LATEST_VERSION = "1.1.0";
+
+export const BYOS_MIGRATION_SQL = `-- ============================================================================
+-- FastestCRM — BYOS Migration Bundle v1.1.0
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS public._byos_meta (
@@ -12,7 +17,7 @@ CREATE TABLE IF NOT EXISTS public._byos_meta (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 INSERT INTO public._byos_meta (key, value)
-VALUES ('migration_version', '1.0.0')
+VALUES ('migration_version', '1.1.0')
 ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now();
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -121,7 +126,6 @@ CREATE TABLE IF NOT EXISTS public.leads (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- Idempotent column upgrades for existing BYOS databases
 ALTER TABLE public.leads ADD COLUMN IF NOT EXISTS lead_source TEXT;
 ALTER TABLE public.leads ADD COLUMN IF NOT EXISTS product_category TEXT;
 ALTER TABLE public.leads ADD COLUMN IF NOT EXISTS last_notification_sent_at TIMESTAMPTZ;
@@ -133,6 +137,279 @@ ALTER TABLE public.leads ADD COLUMN IF NOT EXISTS lg_link_id UUID;
 ALTER TABLE public.leads ADD COLUMN IF NOT EXISTS utm_source TEXT;
 ALTER TABLE public.leads ADD COLUMN IF NOT EXISTS utm_medium TEXT;
 ALTER TABLE public.leads ADD COLUMN IF NOT EXISTS utm_campaign TEXT;
+
+CREATE TABLE IF NOT EXISTS public.leads_real_estate (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  email TEXT,
+  phone TEXT,
+  whatsapp TEXT,
+  company TEXT,
+  company_id UUID,
+  created_by_id UUID,
+  sales_owner_id UUID,
+  pre_sales_owner_id UUID,
+  post_sales_owner_id UUID,
+  status TEXT NOT NULL DEFAULT 'new',
+  source TEXT,
+  property_type TEXT,
+  budget_min DECIMAL(14,2),
+  budget_max DECIMAL(14,2),
+  preferred_location TEXT,
+  property_size TEXT,
+  possession_timeline TEXT,
+  site_visit_date DATE,
+  site_visit_done BOOLEAN DEFAULT false,
+  revenue_received DECIMAL(12,2) DEFAULT 0,
+  revenue_projected DECIMAL(12,2) DEFAULT 0,
+  total_recovered DECIMAL(12,2) DEFAULT 0,
+  product_purchased TEXT,
+  payment_link TEXT,
+  reminder_at TIMESTAMPTZ,
+  notes TEXT,
+  send_web_push BOOLEAN DEFAULT false,
+  custom_data JSONB DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.leads_saas (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  email TEXT,
+  phone TEXT,
+  whatsapp TEXT,
+  company_name TEXT,
+  company_size TEXT,
+  company_website TEXT,
+  job_title TEXT,
+  product_interest TEXT,
+  use_case TEXT,
+  current_solution TEXT,
+  demo_date TIMESTAMPTZ,
+  trial_start_date DATE,
+  trial_end_date DATE,
+  plan_type TEXT,
+  seats INTEGER,
+  monthly_value NUMERIC DEFAULT 0,
+  annual_value NUMERIC DEFAULT 0,
+  contract_length INTEGER,
+  deal_stage TEXT,
+  decision_maker TEXT,
+  champion TEXT,
+  competitors TEXT,
+  loss_reason TEXT,
+  status TEXT NOT NULL DEFAULT 'new',
+  notes TEXT,
+  lead_source TEXT,
+  lead_history JSONB DEFAULT '[]'::jsonb,
+  status_metadata JSONB DEFAULT '{}'::jsonb,
+  lead_profile JSONB DEFAULT '{}'::jsonb,
+  company_id UUID,
+  created_by_id UUID,
+  pre_sales_owner_id UUID,
+  sales_owner_id UUID,
+  post_sales_owner_id UUID,
+  revenue_projected NUMERIC DEFAULT 0,
+  revenue_received NUMERIC DEFAULT 0,
+  reminder_at TIMESTAMPTZ,
+  last_notification_sent_at TIMESTAMPTZ,
+  payment_link TEXT,
+  utm_source TEXT,
+  utm_medium TEXT,
+  utm_campaign TEXT,
+  lg_link_id UUID,
+  form_id UUID,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.leads_healthcare (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id UUID,
+  created_by_id UUID,
+  pre_sales_owner_id UUID,
+  sales_owner_id UUID,
+  post_sales_owner_id UUID,
+  name TEXT NOT NULL,
+  email TEXT,
+  phone TEXT,
+  whatsapp TEXT,
+  status TEXT NOT NULL DEFAULT 'new_enquiry',
+  notes TEXT,
+  lead_source TEXT,
+  lead_history JSONB DEFAULT '[]'::jsonb,
+  status_metadata JSONB DEFAULT '{}'::jsonb,
+  lead_profile JSONB DEFAULT '{}'::jsonb,
+  revenue_projected NUMERIC DEFAULT 0,
+  revenue_received NUMERIC DEFAULT 0,
+  payment_link TEXT,
+  reminder_at TIMESTAMPTZ,
+  last_notification_sent_at TIMESTAMPTZ,
+  lg_link_id UUID,
+  form_id UUID,
+  utm_source TEXT,
+  utm_medium TEXT,
+  utm_campaign TEXT,
+  age INTEGER,
+  gender TEXT,
+  condition TEXT,
+  symptoms TEXT,
+  department TEXT,
+  doctor_preference TEXT,
+  appointment_date TIMESTAMPTZ,
+  appointment_time TEXT,
+  referral_source TEXT,
+  insurance_provider TEXT,
+  insurance_id TEXT,
+  treatment_type TEXT,
+  treatment_cost NUMERIC,
+  treatment_date DATE,
+  follow_up_date DATE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.leads_insurance (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  email TEXT,
+  phone TEXT,
+  whatsapp TEXT,
+  company_id UUID,
+  created_by_id UUID,
+  pre_sales_owner_id UUID,
+  sales_owner_id UUID,
+  post_sales_owner_id UUID,
+  age INTEGER,
+  gender TEXT,
+  pan_number TEXT,
+  date_of_birth DATE,
+  occupation TEXT,
+  annual_income NUMERIC,
+  insurance_type TEXT,
+  plan_name TEXT,
+  sum_insured NUMERIC,
+  premium_amount NUMERIC,
+  contribution_frequency TEXT,
+  policy_term INTEGER,
+  existing_policies TEXT,
+  nominee_name TEXT,
+  nominee_relation TEXT,
+  agent_name TEXT,
+  policy_number TEXT,
+  policy_start_date DATE,
+  renewal_date DATE,
+  loss_reason TEXT,
+  revenue_projected NUMERIC,
+  revenue_received NUMERIC,
+  reminder_at TIMESTAMPTZ,
+  last_notification_sent_at TIMESTAMPTZ,
+  payment_link TEXT,
+  lead_source TEXT,
+  lead_history JSONB,
+  status_metadata JSONB,
+  lead_profile JSONB,
+  notes TEXT,
+  form_id UUID,
+  lg_link_id UUID,
+  utm_source TEXT,
+  utm_medium TEXT,
+  utm_campaign TEXT,
+  status TEXT NOT NULL DEFAULT 'new',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.leads_travel (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id UUID,
+  created_by_id UUID,
+  pre_sales_owner_id UUID,
+  sales_owner_id UUID,
+  post_sales_owner_id UUID,
+  name TEXT NOT NULL,
+  email TEXT,
+  phone TEXT,
+  whatsapp TEXT,
+  status TEXT NOT NULL DEFAULT 'new',
+  notes TEXT,
+  lead_source TEXT,
+  lead_history JSONB DEFAULT '[]'::jsonb,
+  status_metadata JSONB DEFAULT '{}'::jsonb,
+  lead_profile JSONB DEFAULT '{}'::jsonb,
+  revenue_projected NUMERIC DEFAULT 0,
+  revenue_received NUMERIC DEFAULT 0,
+  reminder_at TIMESTAMPTZ,
+  last_notification_sent_at TIMESTAMPTZ,
+  payment_link TEXT,
+  utm_source TEXT,
+  utm_medium TEXT,
+  utm_campaign TEXT,
+  lg_link_id UUID,
+  form_id UUID,
+  destination TEXT,
+  travel_date DATE,
+  return_date DATE,
+  travelers_count INTEGER,
+  trip_type TEXT,
+  package_type TEXT,
+  budget NUMERIC,
+  special_requests TEXT,
+  hotel_name TEXT,
+  flight_details TEXT,
+  package_cost NUMERIC,
+  advance_paid NUMERIC,
+  balance_due NUMERIC,
+  booking_id TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.lead_statuses (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id UUID NOT NULL,
+  name TEXT NOT NULL,
+  color TEXT DEFAULT '#6B7280',
+  sort_order INTEGER DEFAULT 0,
+  status_type TEXT DEFAULT 'custom',
+  is_default BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.lead_statuses ADD COLUMN IF NOT EXISTS name TEXT;
+ALTER TABLE public.lead_statuses ADD COLUMN IF NOT EXISTS color TEXT DEFAULT '#6B7280';
+ALTER TABLE public.lead_statuses ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
+ALTER TABLE public.lead_statuses ADD COLUMN IF NOT EXISTS status_type TEXT DEFAULT 'custom';
+
+CREATE TABLE IF NOT EXISTS public.company_lead_statuses (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id UUID NOT NULL,
+  label TEXT NOT NULL,
+  value TEXT NOT NULL,
+  color TEXT NOT NULL,
+  category TEXT NOT NULL DEFAULT 'other',
+  sub_statuses TEXT[] DEFAULT ARRAY[]::TEXT[],
+  order_index INTEGER NOT NULL DEFAULT 0,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.real_estate_properties (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id UUID NOT NULL,
+  category TEXT NOT NULL,
+  name TEXT NOT NULL,
+  sq_ft NUMERIC,
+  cost NUMERIC,
+  available_units INTEGER,
+  location TEXT,
+  state TEXT,
+  country TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 
 CREATE TABLE IF NOT EXISTS public.lead_history (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -270,17 +547,28 @@ CREATE TABLE IF NOT EXISTS public.quotation_items (
 
 CREATE TABLE IF NOT EXISTS public.forms (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  company_id UUID NOT NULL,
-  created_by UUID NOT NULL,
-  title TEXT NOT NULL,
+  company_id UUID,
+  created_by_id UUID,
+  created_by UUID,
+  name TEXT,
+  title TEXT,
   description TEXT,
   fields JSONB NOT NULL DEFAULT '[]'::jsonb,
   settings JSONB DEFAULT '{}'::jsonb,
+  status TEXT DEFAULT 'active',
   is_active BOOLEAN DEFAULT true,
   slug TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+ALTER TABLE public.forms ADD COLUMN IF NOT EXISTS company_id UUID;
+ALTER TABLE public.forms ADD COLUMN IF NOT EXISTS created_by_id UUID;
+ALTER TABLE public.forms ADD COLUMN IF NOT EXISTS created_by UUID;
+ALTER TABLE public.forms ADD COLUMN IF NOT EXISTS name TEXT;
+ALTER TABLE public.forms ADD COLUMN IF NOT EXISTS title TEXT;
+ALTER TABLE public.forms ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active';
+ALTER TABLE public.forms ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
 
 CREATE TABLE IF NOT EXISTS public.form_responses (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -320,40 +608,6 @@ CREATE TABLE IF NOT EXISTS public.notifications (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE IF NOT EXISTS public.forms (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  company_id UUID,
-  created_by_id UUID,
-  created_by UUID,
-  name TEXT,
-  title TEXT,
-  description TEXT,
-  fields JSONB NOT NULL DEFAULT '[]'::jsonb,
-  settings JSONB DEFAULT '{}'::jsonb,
-  status TEXT DEFAULT 'active',
-  is_active BOOLEAN DEFAULT true,
-  slug TEXT,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-ALTER TABLE public.forms ADD COLUMN IF NOT EXISTS company_id UUID;
-ALTER TABLE public.forms ADD COLUMN IF NOT EXISTS created_by_id UUID;
-ALTER TABLE public.forms ADD COLUMN IF NOT EXISTS created_by UUID;
-ALTER TABLE public.forms ADD COLUMN IF NOT EXISTS name TEXT;
-ALTER TABLE public.forms ADD COLUMN IF NOT EXISTS title TEXT;
-ALTER TABLE public.forms ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active';
-ALTER TABLE public.forms ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
-
-CREATE TABLE IF NOT EXISTS public.form_responses (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  form_id UUID NOT NULL,
-  company_id UUID,
-  data JSONB NOT NULL DEFAULT '{}'::jsonb,
-  lead_id UUID,
-  submitted_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
 CREATE TABLE IF NOT EXISTS public.automations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id UUID NOT NULL,
@@ -367,22 +621,6 @@ CREATE TABLE IF NOT EXISTS public.automations (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-
-CREATE TABLE IF NOT EXISTS public.lead_statuses (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  company_id UUID NOT NULL,
-  name TEXT NOT NULL,
-  color TEXT DEFAULT '#6B7280',
-  sort_order INTEGER DEFAULT 0,
-  status_type TEXT DEFAULT 'custom',
-  is_default BOOLEAN DEFAULT false,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-ALTER TABLE public.lead_statuses ADD COLUMN IF NOT EXISTS name TEXT;
-ALTER TABLE public.lead_statuses ADD COLUMN IF NOT EXISTS color TEXT DEFAULT '#6B7280';
-ALTER TABLE public.lead_statuses ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
-ALTER TABLE public.lead_statuses ADD COLUMN IF NOT EXISTS status_type TEXT DEFAULT 'custom';
 
 CREATE TABLE IF NOT EXISTS public.landing_pages (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -635,264 +873,7 @@ CREATE TABLE IF NOT EXISTS public.agentic_workflow_runs (
   completed_at TIMESTAMPTZ
 );
 
-CREATE TABLE IF NOT EXISTS public.leads_real_estate (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name TEXT NOT NULL,
-  email TEXT,
-  phone TEXT,
-  whatsapp TEXT,
-  company TEXT,
-  company_id UUID,
-  created_by_id UUID,
-  sales_owner_id UUID,
-  pre_sales_owner_id UUID,
-  post_sales_owner_id UUID,
-  status TEXT NOT NULL DEFAULT 'new',
-  source TEXT,
-  property_type TEXT,
-  budget_min DECIMAL(14,2),
-  budget_max DECIMAL(14,2),
-  preferred_location TEXT,
-  property_size TEXT,
-  possession_timeline TEXT,
-  site_visit_date DATE,
-  site_visit_done BOOLEAN DEFAULT false,
-  revenue_received DECIMAL(12,2) DEFAULT 0,
-  revenue_projected DECIMAL(12,2) DEFAULT 0,
-  total_recovered DECIMAL(12,2) DEFAULT 0,
-  product_purchased TEXT,
-  payment_link TEXT,
-  reminder_at TIMESTAMPTZ,
-  notes TEXT,
-  send_web_push BOOLEAN DEFAULT false,
-  custom_data JSONB DEFAULT '{}'::jsonb,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-CREATE TABLE IF NOT EXISTS public.leads_saas (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name TEXT NOT NULL,
-  email TEXT,
-  phone TEXT,
-  whatsapp TEXT,
-  company_name TEXT,
-  company_size TEXT,
-  company_website TEXT,
-  job_title TEXT,
-  product_interest TEXT,
-  use_case TEXT,
-  current_solution TEXT,
-  demo_date TIMESTAMPTZ,
-  trial_start_date DATE,
-  trial_end_date DATE,
-  plan_type TEXT,
-  seats INTEGER,
-  monthly_value NUMERIC DEFAULT 0,
-  annual_value NUMERIC DEFAULT 0,
-  contract_length INTEGER,
-  deal_stage TEXT,
-  decision_maker TEXT,
-  champion TEXT,
-  competitors TEXT,
-  loss_reason TEXT,
-  status TEXT NOT NULL DEFAULT 'new',
-  notes TEXT,
-  lead_source TEXT,
-  lead_history JSONB DEFAULT '[]'::jsonb,
-  status_metadata JSONB DEFAULT '{}'::jsonb,
-  lead_profile JSONB DEFAULT '{}'::jsonb,
-  company_id UUID,
-  created_by_id UUID,
-  pre_sales_owner_id UUID,
-  sales_owner_id UUID,
-  post_sales_owner_id UUID,
-  revenue_projected NUMERIC DEFAULT 0,
-  revenue_received NUMERIC DEFAULT 0,
-  reminder_at TIMESTAMPTZ,
-  last_notification_sent_at TIMESTAMPTZ,
-  payment_link TEXT,
-  utm_source TEXT,
-  utm_medium TEXT,
-  utm_campaign TEXT,
-  lg_link_id UUID,
-  form_id UUID,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-CREATE TABLE IF NOT EXISTS public.leads_healthcare (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  company_id UUID,
-  created_by_id UUID,
-  pre_sales_owner_id UUID,
-  sales_owner_id UUID,
-  post_sales_owner_id UUID,
-  name TEXT NOT NULL,
-  email TEXT,
-  phone TEXT,
-  whatsapp TEXT,
-  status TEXT NOT NULL DEFAULT 'new_enquiry',
-  notes TEXT,
-  lead_source TEXT,
-  lead_history JSONB DEFAULT '[]'::jsonb,
-  status_metadata JSONB DEFAULT '{}'::jsonb,
-  lead_profile JSONB DEFAULT '{}'::jsonb,
-  revenue_projected NUMERIC DEFAULT 0,
-  revenue_received NUMERIC DEFAULT 0,
-  payment_link TEXT,
-  reminder_at TIMESTAMPTZ,
-  last_notification_sent_at TIMESTAMPTZ,
-  lg_link_id UUID,
-  form_id UUID,
-  utm_source TEXT,
-  utm_medium TEXT,
-  utm_campaign TEXT,
-  age INTEGER,
-  gender TEXT,
-  condition TEXT,
-  symptoms TEXT,
-  department TEXT,
-  doctor_preference TEXT,
-  appointment_date TIMESTAMPTZ,
-  appointment_time TEXT,
-  referral_source TEXT,
-  insurance_provider TEXT,
-  insurance_id TEXT,
-  treatment_type TEXT,
-  treatment_cost NUMERIC,
-  treatment_date DATE,
-  follow_up_date DATE,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-CREATE TABLE IF NOT EXISTS public.leads_insurance (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name TEXT NOT NULL,
-  email TEXT,
-  phone TEXT,
-  whatsapp TEXT,
-  company_id UUID,
-  created_by_id UUID,
-  pre_sales_owner_id UUID,
-  sales_owner_id UUID,
-  post_sales_owner_id UUID,
-  age INTEGER,
-  gender TEXT,
-  pan_number TEXT,
-  date_of_birth DATE,
-  occupation TEXT,
-  annual_income NUMERIC,
-  insurance_type TEXT,
-  plan_name TEXT,
-  sum_insured NUMERIC,
-  premium_amount NUMERIC,
-  contribution_frequency TEXT,
-  policy_term INTEGER,
-  existing_policies TEXT,
-  nominee_name TEXT,
-  nominee_relation TEXT,
-  agent_name TEXT,
-  policy_number TEXT,
-  policy_start_date DATE,
-  renewal_date DATE,
-  loss_reason TEXT,
-  revenue_projected NUMERIC,
-  revenue_received NUMERIC,
-  reminder_at TIMESTAMPTZ,
-  last_notification_sent_at TIMESTAMPTZ,
-  payment_link TEXT,
-  lead_source TEXT,
-  lead_history JSONB,
-  status_metadata JSONB,
-  lead_profile JSONB,
-  notes TEXT,
-  form_id UUID,
-  lg_link_id UUID,
-  utm_source TEXT,
-  utm_medium TEXT,
-  utm_campaign TEXT,
-  status TEXT NOT NULL DEFAULT 'new',
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-CREATE TABLE IF NOT EXISTS public.leads_travel (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  company_id UUID,
-  created_by_id UUID,
-  pre_sales_owner_id UUID,
-  sales_owner_id UUID,
-  post_sales_owner_id UUID,
-  name TEXT NOT NULL,
-  email TEXT,
-  phone TEXT,
-  whatsapp TEXT,
-  status TEXT NOT NULL DEFAULT 'new',
-  notes TEXT,
-  lead_source TEXT,
-  lead_history JSONB DEFAULT '[]'::jsonb,
-  status_metadata JSONB DEFAULT '{}'::jsonb,
-  lead_profile JSONB DEFAULT '{}'::jsonb,
-  revenue_projected NUMERIC DEFAULT 0,
-  revenue_received NUMERIC DEFAULT 0,
-  reminder_at TIMESTAMPTZ,
-  last_notification_sent_at TIMESTAMPTZ,
-  payment_link TEXT,
-  utm_source TEXT,
-  utm_medium TEXT,
-  utm_campaign TEXT,
-  lg_link_id UUID,
-  form_id UUID,
-  destination TEXT,
-  travel_date DATE,
-  return_date DATE,
-  travelers_count INTEGER,
-  trip_type TEXT,
-  package_type TEXT,
-  budget NUMERIC,
-  special_requests TEXT,
-  hotel_name TEXT,
-  flight_details TEXT,
-  package_cost NUMERIC,
-  advance_paid NUMERIC,
-  balance_due NUMERIC,
-  booking_id TEXT,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-CREATE TABLE IF NOT EXISTS public.company_lead_statuses (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  company_id UUID NOT NULL,
-  label TEXT NOT NULL,
-  value TEXT NOT NULL,
-  color TEXT NOT NULL,
-  category TEXT NOT NULL DEFAULT 'other',
-  sub_statuses TEXT[] DEFAULT ARRAY[]::TEXT[],
-  order_index INTEGER NOT NULL DEFAULT 0,
-  is_active BOOLEAN DEFAULT true,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-CREATE TABLE IF NOT EXISTS public.real_estate_properties (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  company_id UUID NOT NULL,
-  category TEXT NOT NULL,
-  name TEXT NOT NULL,
-  sq_ft NUMERIC,
-  cost NUMERIC,
-  available_units INTEGER,
-  location TEXT,
-  state TEXT,
-  country TEXT,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
--- RLS POLICIES
+-- ROW LEVEL SECURITY
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "byos_profiles_select" ON public.profiles;
 CREATE POLICY "byos_profiles_select" ON public.profiles FOR SELECT USING (true);
@@ -906,90 +887,6 @@ CREATE POLICY "byos_user_roles_select" ON public.user_roles FOR SELECT USING (tr
 ALTER TABLE public.leads ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "byos_leads_all" ON public.leads;
 CREATE POLICY "byos_leads_all" ON public.leads FOR ALL USING (true) WITH CHECK (true);
-
-ALTER TABLE public.lead_history ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "byos_lead_history_all" ON public.lead_history;
-CREATE POLICY "byos_lead_history_all" ON public.lead_history FOR ALL USING (true) WITH CHECK (true);
-
-ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "byos_products_all" ON public.products;
-CREATE POLICY "byos_products_all" ON public.products FOR ALL USING (true) WITH CHECK (true);
-
-ALTER TABLE public.invoices ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "byos_invoices_all" ON public.invoices;
-CREATE POLICY "byos_invoices_all" ON public.invoices FOR ALL USING (true) WITH CHECK (true);
-
-ALTER TABLE public.invoice_items ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "byos_invoice_items_all" ON public.invoice_items;
-CREATE POLICY "byos_invoice_items_all" ON public.invoice_items FOR ALL USING (true) WITH CHECK (true);
-
-ALTER TABLE public.invoice_payments ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "byos_invoice_payments_all" ON public.invoice_payments;
-CREATE POLICY "byos_invoice_payments_all" ON public.invoice_payments FOR ALL USING (true) WITH CHECK (true);
-
-ALTER TABLE public.quotations ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "byos_quotations_all" ON public.quotations;
-CREATE POLICY "byos_quotations_all" ON public.quotations FOR ALL USING (true) WITH CHECK (true);
-
-ALTER TABLE public.quotation_items ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "byos_quotation_items_all" ON public.quotation_items;
-CREATE POLICY "byos_quotation_items_all" ON public.quotation_items FOR ALL USING (true) WITH CHECK (true);
-
-ALTER TABLE public.forms ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "byos_forms_all" ON public.forms;
-CREATE POLICY "byos_forms_all" ON public.forms FOR ALL USING (true) WITH CHECK (true);
-
-ALTER TABLE public.form_responses ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "byos_form_responses_all" ON public.form_responses;
-CREATE POLICY "byos_form_responses_all" ON public.form_responses FOR ALL USING (true) WITH CHECK (true);
-
-ALTER TABLE public.tasks ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "byos_tasks_all" ON public.tasks;
-CREATE POLICY "byos_tasks_all" ON public.tasks FOR ALL USING (true) WITH CHECK (true);
-
-ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "byos_notifications_all" ON public.notifications;
-CREATE POLICY "byos_notifications_all" ON public.notifications FOR ALL USING (true) WITH CHECK (true);
-
-ALTER TABLE public.automations ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "byos_automations_all" ON public.automations;
-CREATE POLICY "byos_automations_all" ON public.automations FOR ALL USING (true) WITH CHECK (true);
-
-ALTER TABLE public.lead_statuses ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "byos_lead_statuses_all" ON public.lead_statuses;
-CREATE POLICY "byos_lead_statuses_all" ON public.lead_statuses FOR ALL USING (true) WITH CHECK (true);
-
-ALTER TABLE public.landing_pages ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "byos_landing_pages_all" ON public.landing_pages;
-CREATE POLICY "byos_landing_pages_all" ON public.landing_pages FOR ALL USING (true) WITH CHECK (true);
-
-ALTER TABLE public.push_subscriptions ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "byos_push_subscriptions_all" ON public.push_subscriptions;
-CREATE POLICY "byos_push_subscriptions_all" ON public.push_subscriptions FOR ALL USING (true) WITH CHECK (true);
-
-ALTER TABLE public.calendar_bookings ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "byos_calendar_bookings_all" ON public.calendar_bookings;
-CREATE POLICY "byos_calendar_bookings_all" ON public.calendar_bookings FOR ALL USING (true) WITH CHECK (true);
-
-ALTER TABLE public.integration_api_keys ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "byos_integration_api_keys_all" ON public.integration_api_keys;
-CREATE POLICY "byos_integration_api_keys_all" ON public.integration_api_keys FOR ALL USING (true) WITH CHECK (true);
-
-ALTER TABLE public.ai_employees ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "byos_ai_employees_all" ON public.ai_employees;
-CREATE POLICY "byos_ai_employees_all" ON public.ai_employees FOR ALL USING (true) WITH CHECK (true);
-
-ALTER TABLE public.ai_caller_logs ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "byos_ai_caller_logs_all" ON public.ai_caller_logs;
-CREATE POLICY "byos_ai_caller_logs_all" ON public.ai_caller_logs FOR ALL USING (true) WITH CHECK (true);
-
-ALTER TABLE public.agentic_workflows ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "byos_agentic_workflows_all" ON public.agentic_workflows;
-CREATE POLICY "byos_agentic_workflows_all" ON public.agentic_workflows FOR ALL USING (true) WITH CHECK (true);
-
-ALTER TABLE public.agentic_workflow_runs ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "byos_agentic_workflow_runs_all" ON public.agentic_workflow_runs;
-CREATE POLICY "byos_agentic_workflow_runs_all" ON public.agentic_workflow_runs FOR ALL USING (true) WITH CHECK (true);
 
 ALTER TABLE public.leads_real_estate ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "byos_leads_real_estate_all" ON public.leads_real_estate;
@@ -1240,6 +1137,11 @@ EXCEPTION WHEN OTHERS THEN
 END;
 $$;
 GRANT EXECUTE ON FUNCTION public.toggle_lead_unique_constraint(uuid, text, boolean) TO authenticated, service_role;
+
+-- ─── Storage bucket ─────────────────────────────────────────────────────────
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('company-assets', 'company-assets', true)
+ON CONFLICT (id) DO NOTHING;
 
 UPDATE public._byos_meta SET value = '1.1.0', updated_at = now() WHERE key = 'migration_version';
 NOTIFY pgrst, 'reload schema';

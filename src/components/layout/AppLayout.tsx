@@ -1,6 +1,7 @@
 import { useNavigate, useLocation, useSearchParams, Outlet } from 'react-router-dom';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { DashboardSkeleton, FullDashboardSkeleton } from '@/components/dashboard/DashboardSkeleton';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useCompany } from '@/hooks/useCompany';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -398,18 +399,7 @@ export default function AppLayout() {
     });
 
     if (loading) {
-        return <div className="min-h-screen bg-background flex">
-            {!isMobile && <div className="w-64 bg-sidebar border-r border-sidebar-border p-4">
-                <Skeleton className="h-10 w-full mb-8" />
-                {[...Array(8)].map((_, i) => <Skeleton key={i} className="h-10 w-full mb-2" />)}
-            </div>}
-            <div className="flex-1 p-4 md:p-8">
-                <Skeleton className="h-10 w-64 mb-8" />
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-                    {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-32" />)}
-                </div>
-            </div>
-        </div>;
+        return <FullDashboardSkeleton />;
     }
 
     if (!user) return null;
@@ -1145,7 +1135,9 @@ export default function AppLayout() {
                 <AnnouncementBanner />
                 <div className="p-4 md:p-8 min-h-[calc(100vh-2rem)] flex flex-col">
                     <div className="flex-1 max-w-full">
-                        <SubscriptionExpiredGuard />
+                        <Suspense fallback={<DashboardSkeleton />}>
+                            <SubscriptionExpiredGuard />
+                        </Suspense>
                     </div>
                     <footer className="mt-auto pt-6 border-t border-border flex flex-col md:flex-row items-center justify-between gap-4">
                         <p className="text-sm text-muted-foreground order-2 md:order-1">
