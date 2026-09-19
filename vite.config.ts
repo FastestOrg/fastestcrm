@@ -76,8 +76,23 @@ export default defineConfig(({ mode }) => {
       rollupOptions: {
         output: {
           manualChunks(id) {
+            if (id.includes('commonjsHelpers')) {
+              return 'vendor-react';
+            }
             const normalizedId = id.replace(/\\/g, '/');
             if (normalizedId.includes('/node_modules/')) {
+              if (
+                normalizedId.includes('/react/') ||
+                normalizedId.includes('/react-dom/') ||
+                normalizedId.includes('/react-router-dom/') ||
+                normalizedId.includes('/react-router/') ||
+                normalizedId.includes('/react-is/') ||
+                normalizedId.includes('/scheduler/') ||
+                normalizedId.includes('/prop-types/') ||
+                normalizedId.includes('/use-sync-external-store/')
+              ) {
+                return 'vendor-react';
+              }
               if (normalizedId.includes('/three/')) {
                 return 'vendor-three';
               }
@@ -114,14 +129,6 @@ export default defineConfig(({ mode }) => {
               }
               if (normalizedId.includes('/lucide-react/')) {
                 return 'vendor-lucide';
-              }
-              if (
-                normalizedId.includes('/react/') ||
-                normalizedId.includes('/react-dom/') ||
-                normalizedId.includes('/react-router-dom/') ||
-                normalizedId.includes('/react-router/')
-              ) {
-                return 'vendor-react';
               }
             }
           },
