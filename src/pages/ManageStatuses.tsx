@@ -192,9 +192,39 @@ NOTIFY pgrst, 'reload schema';
             const targetUrl = (orgClient as any)?.supabaseUrl || 'default';
             const isDefaultHost = targetUrl.includes('api.fastestcrm.com') || targetUrl.includes('uykdyqdeyilpulaqlqip');
 
-            const primaryTable = isDefaultHost ? 'company_lead_statuses' : 'lead_statuses';
-            const fallbackTable = isDefaultHost ? 'lead_statuses' : 'company_lead_statuses';
+            if (isDefaultHost) {
+                try {
+                    const { data, error } = await orgClient
+                        .from('company_lead_statuses' as any)
+                        .select('*')
+                        .eq('company_id', company.id)
+                        .order('order_index', { ascending: true });
 
+                    if (error || !data) {
+                        setIsTableMissing(false);
+                        return [];
+                    }
+                    setIsTableMissing(false);
+                    return data.map((s: any) => ({
+                        id: s.id,
+                        company_id: s.company_id,
+                        label: s.label || s.name || 'Status',
+                        value: s.value || (s.name || s.label || 'status').toLowerCase().replace(/[^a-z0-9_]/g, '_'),
+                        color: s.color || '#3B82F6',
+                        category: s.category || s.status_type || 'other',
+                        sub_statuses: s.sub_statuses || [],
+                        order_index: s.order_index ?? s.sort_order ?? 0,
+                        is_active: s.is_active !== undefined ? s.is_active : true,
+                        status_type: s.status_type || 'simple',
+                        web_push_enabled: s.web_push_enabled || false
+                    }));
+                } catch (e) {
+                    return [];
+                }
+            }
+
+            const primaryTable = 'lead_statuses';
+            const fallbackTable = 'company_lead_statuses';
             const cacheKeyMissingPrimary = `${targetUrl}_missing_${primaryTable}`;
 
             try {
@@ -203,7 +233,7 @@ NOTIFY pgrst, 'reload schema';
                         .from(primaryTable as any)
                         .select('*')
                         .eq('company_id', company.id)
-                        .order(primaryTable === 'company_lead_statuses' ? 'order_index' : 'sort_order', { ascending: true });
+                        .order('sort_order', { ascending: true });
 
                     if (!error && data && data.length > 0) {
                         setIsTableMissing(false);
@@ -231,7 +261,7 @@ NOTIFY pgrst, 'reload schema';
                     .from(fallbackTable as any)
                     .select('*')
                     .eq('company_id', company.id)
-                    .order(fallbackTable === 'company_lead_statuses' ? 'order_index' : 'sort_order', { ascending: true });
+                    .order('order_index', { ascending: true });
 
                 if (!fbErr && fbData) {
                     setIsTableMissing(false);
@@ -299,21 +329,11 @@ NOTIFY pgrst, 'reload schema';
     };
 
     const updateOrder = async (updates: { id: string, order_index: number }[]) => {
+        const targetUrl = (orgClient as any)?.supabaseUrl || 'default';
+        const isDefaultHost = targetUrl.includes('api.fastestcrm.com') || targetUrl.includes('uykdyqdeyilpulaqlqip');
+
         try {
-            // Standard Primary: lead_statuses
-            await Promise.all(updates.map(update =>
-                orgClient
-                    .from('lead_statuses' as any)
-                    .update({ sort_order: update.order_index })
-                    .eq('id', update.id)
-            ));
-
-            queryClient.invalidateQueries({ queryKey: ['lead-statuses'] });
-            toast.success('Order updated');
-
-        } catch (error) {
-            try {
-                // Legacy Fallback: company_lead_statuses
+            if (isDefaultHost) {
                 await Promise.all(updates.map(update =>
                     orgClient
                         .from('company_lead_statuses' as any)
@@ -322,11 +342,36 @@ NOTIFY pgrst, 'reload schema';
                 ));
                 queryClient.invalidateQueries({ queryKey: ['lead-statuses'] });
                 toast.success('Order updated');
-            } catch (fbError) {
-                console.error('Failed to update order', fbError);
-                toast.error('Failed to save new order');
-                refetch();
+                return;
             }
+
+            try {
+                // Standard Primary for BYOS: lead_statuses
+                await Promise.all(updates.map(update =>
+                    orgClient
+                        .from('lead_statuses' as any)
+                        .update({ sort_order: update.order_index })
+                        .eq('id', update.id)
+                ));
+
+                queryClient.invalidateQueries({ queryKey: ['lead-statuses'] });
+                toast.success('Order updated');
+
+            } catch (error) {
+                // Fallback: company_lead_statuses
+                await Promise.all(updates.map(update =>
+                    orgClient
+                        .from('company_lead_statuses' as any)
+                        .update({ order_index: update.order_index })
+                        .eq('id', update.id)
+                ));
+                queryClient.invalidateQueries({ queryKey: ['lead-statuses'] });
+                toast.success('Order updated');
+            }
+        } catch (fbError) {
+            console.error('Failed to update order', fbError);
+            toast.error('Failed to save new order');
+            refetch();
         }
     };
 
@@ -362,41 +407,15 @@ NOTIFY pgrst, 'reload schema';
             return;
         }
 
+        const targetUrl = (orgClient as any)?.supabaseUrl || 'default';
+        const isDefaultHost = targetUrl.includes('api.fastestcrm.com') || targetUrl.includes('uykdyqdeyilpulaqlqip');
+
         setSaving(true);
         try {
             const value = formData.label.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_');
 
-            // Standard Primary Payload for lead_statuses
-            const primaryPayload = {
-                company_id: company.id,
-                name: formData.label.trim(),
-                color: formData.color,
-                sort_order: editingStatus ? editingStatus.order_index : (statuses?.length || 0),
-                status_type: formData.status_type,
-            };
-
-            let saveErr: any = null;
-            if (editingStatus) {
-                const { error } = await orgClient
-                    .from('lead_statuses' as any)
-                    .update({
-                        name: primaryPayload.name,
-                        color: primaryPayload.color,
-                        sort_order: primaryPayload.sort_order,
-                        status_type: primaryPayload.status_type
-                    })
-                    .eq('id', editingStatus.id);
-                saveErr = error;
-            } else {
-                const { error } = await orgClient
-                    .from('lead_statuses' as any)
-                    .insert(primaryPayload);
-                saveErr = error;
-            }
-
-            // Legacy Fallback to company_lead_statuses if lead_statuses failed
-            if (saveErr) {
-                const fbPayload = {
+            if (isDefaultHost) {
+                const payload = {
                     company_id: company.id,
                     label: formData.label.trim(),
                     value: editingStatus ? editingStatus.value : value,
@@ -408,16 +427,71 @@ NOTIFY pgrst, 'reload schema';
                 };
 
                 if (editingStatus) {
-                    const { error: fbErr } = await orgClient
+                    const { error } = await orgClient
                         .from('company_lead_statuses' as any)
-                        .update(fbPayload)
+                        .update(payload)
                         .eq('id', editingStatus.id);
-                    if (fbErr) throw saveErr;
+                    if (error) throw error;
                 } else {
-                    const { error: fbErr } = await orgClient
+                    const { error } = await orgClient
                         .from('company_lead_statuses' as any)
-                        .insert(fbPayload);
-                    if (fbErr) throw saveErr;
+                        .insert(payload);
+                    if (error) throw error;
+                }
+            } else {
+                // BYOS flow
+                const primaryPayload = {
+                    company_id: company.id,
+                    name: formData.label.trim(),
+                    color: formData.color,
+                    sort_order: editingStatus ? editingStatus.order_index : (statuses?.length || 0),
+                    status_type: formData.status_type,
+                };
+
+                let saveErr: any = null;
+                if (editingStatus) {
+                    const { error } = await orgClient
+                        .from('lead_statuses' as any)
+                        .update({
+                            name: primaryPayload.name,
+                            color: primaryPayload.color,
+                            sort_order: primaryPayload.sort_order,
+                            status_type: primaryPayload.status_type
+                        })
+                        .eq('id', editingStatus.id);
+                    saveErr = error;
+                } else {
+                    const { error } = await orgClient
+                        .from('lead_statuses' as any)
+                        .insert(primaryPayload);
+                    saveErr = error;
+                }
+
+                // Legacy Fallback to company_lead_statuses if lead_statuses failed on BYOS
+                if (saveErr) {
+                    const fbPayload = {
+                        company_id: company.id,
+                        label: formData.label.trim(),
+                        value: editingStatus ? editingStatus.value : value,
+                        color: formData.color,
+                        category: formData.category,
+                        status_type: formData.status_type,
+                        web_push_enabled: formData.web_push_enabled,
+                        order_index: editingStatus ? editingStatus.order_index : (statuses?.length || 0),
+                    };
+
+                    if (editingStatus) {
+                        const { error: fbErr } = await orgClient
+                            .from('company_lead_statuses' as any)
+                            .update(fbPayload)
+                            .eq('id', editingStatus.id);
+                        if (fbErr) throw saveErr;
+                    } else {
+                        const { error: fbErr } = await orgClient
+                            .from('company_lead_statuses' as any)
+                            .insert(fbPayload);
+                        if (fbErr) throw saveErr;
+                    }
                 }
             }
 
@@ -457,10 +531,18 @@ NOTIFY pgrst, 'reload schema';
     const handleDelete = async (id: string) => {
         if (!confirm('Are you sure? leads with this status might display incorrectly if not migrated.')) return;
         try {
-            const { error } = await orgClient.from('lead_statuses' as any).delete().eq('id', id);
-            if (error) {
-                const { error: fbErr } = await orgClient.from('company_lead_statuses' as any).delete().eq('id', id);
-                if (fbErr) throw error;
+            const targetUrl = (orgClient as any)?.supabaseUrl || 'default';
+            const isDefaultHost = targetUrl.includes('api.fastestcrm.com') || targetUrl.includes('uykdyqdeyilpulaqlqip');
+
+            if (isDefaultHost) {
+                const { error } = await orgClient.from('company_lead_statuses' as any).delete().eq('id', id);
+                if (error) throw error;
+            } else {
+                const { error } = await orgClient.from('lead_statuses' as any).delete().eq('id', id);
+                if (error) {
+                    const { error: fbErr } = await orgClient.from('company_lead_statuses' as any).delete().eq('id', id);
+                    if (fbErr) throw error;
+                }
             }
 
             if (company?.byos_enabled) {

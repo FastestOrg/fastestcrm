@@ -1,4 +1,4 @@
-import { useState, useMemo, useDeferredValue } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import {
   Table,
   TableBody,
@@ -18,18 +18,10 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
-  Download,
   Search,
-  ChevronLeft,
-  ChevronRight,
-  Phone,
-  Mail,
   Layers,
   ArrowLeftRight,
   FileSpreadsheet,
-  Eye,
-  EyeOff,
-  Database,
 } from 'lucide-react';
 import { Lead } from '@/hooks/useLeads';
 import { CompanyLeadStatus } from '@/hooks/useLeadStatuses';
@@ -39,9 +31,9 @@ import {
   ReportDimension,
   ReportColumnDimension,
   MatrixMetricType,
+  GroupByDimension,
 } from './ReportCustomizerModal';
 import { format } from 'date-fns';
-import { PriorityBadge } from '@/components/leads/PriorityBadge';
 import { calculatePriorityLevel } from '@/hooks/useLeadScoring';
 
 export interface GroupSummaryRow {
@@ -58,7 +50,7 @@ export interface GroupSummaryRow {
 }
 
 interface CustomReportTableProps {
-  leads: Lead[];
+  leads?: Lead[];
   groupSummary?: GroupSummaryRow[];
   groupByLabel?: string;
   config: ReportDisplayConfig;
@@ -76,7 +68,8 @@ interface DimensionItem {
 }
 
 export function CustomReportTable({
-  leads,
+  leads = [],
+  groupSummary = [],
   config,
   onConfigChange,
   leadStatuses,
@@ -85,12 +78,6 @@ export function CustomReportTable({
   currencySymbol = '₹',
 }: CustomReportTableProps) {
   const [matrixSearch, setMatrixSearch] = useState('');
-  const [tableSearch, setTableSearch] = useState('');
-  const deferredTableSearch = useDeferredValue(tableSearch);
-  const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 15;
-
-  const [isDetailsLoaded, setIsDetailsLoaded] = useState(Boolean(config.showLeadDetailsTable));
 
   // O(1) Indexed Maps for instant status lookups across thousands of rows
   const statusMap = useMemo(() => {
@@ -121,93 +108,99 @@ export function CustomReportTable({
   // Swap Row and Column dimensions with 1 click
   const handleSwapDimensions = () => {
     handleUpdateConfig({
-      groupBy: colDim as any,
-      rowDimension: colDim as any,
-      colDimension: rowDim as any,
+      groupBy: colDim as GroupByDimension,
+      rowDimension: colDim as ReportDimension,
+      colDimension: rowDim as ReportColumnDimension,
     });
   };
 
   // Helper to extract dimension key & label for a single lead
-  const getDimensionItem = (lead: Lead, dimension: string): DimensionItem => {
-    if (dimension === 'owner') {
-      const key = lead.sales_owner_id || 'unassigned';
-      const label =
-        ownersMap[lead.sales_owner_id || ''] || lead.sales_owner?.full_name || 'Unassigned';
-      return { key, label };
-    }
-
-    if (dimension === 'status') {
-      const key = lead.status || 'unknown';
-      const stObj = statusMap.get(lead.status || '');
-      const label = stObj
-        ? stObj.label
-        : lead.status
-        ? lead.status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
-        : 'Unknown Status';
-      return { key, label, color: stObj?.color || '#3B82F6' };
-    }
-
-    if (dimension === 'source') {
-      const key = (lead.lead_source || 'direct').trim().toLowerCase();
-      const label = lead.lead_source?.trim() || 'Direct / Organic';
-      return { key, label };
-    }
-
-    if (dimension === 'product') {
-      const key = (lead.product_purchased || 'unspecified').trim().toLowerCase();
-      const label = lead.product_purchased?.trim() || 'General Inquiry';
-      return { key, label };
-    }
-
-    if (dimension === 'priority') {
-      const { level } = calculatePriorityLevel(lead);
-      const label =
-        level === 'hot' ? '🔥 Hot Leads' : level === 'warm' ? '⚡ Warm Leads' : '❄️ Cold Leads';
-      const color = level === 'hot' ? '#EF4444' : level === 'warm' ? '#F59E0B' : '#3B82F6';
-      return { key: level, label, color };
-    }
-
-    if (dimension === 'date_month' || dimension === 'date') {
-      if (lead.created_at) {
-        const d = new Date(lead.created_at);
-        return { key: format(d, 'yyyy-MM'), label: format(d, 'MMMM yyyy') };
+  const getDimensionItem = useCallback(
+    (lead: Lead, dimension: string): DimensionItem => {
+      if (dimension === 'owner') {
+        const key = lead.sales_owner_id || 'unassigned';
+        const label =
+          ownersMap[lead.sales_owner_id || ''] || lead.sales_owner?.full_name || 'Unassigned';
+        return { key, label };
       }
-      return { key: 'no-date', label: 'No Date' };
-    }
 
-    if (dimension === 'date_quarter') {
-      if (lead.created_at) {
-        const d = new Date(lead.created_at);
-        const q = Math.floor(d.getMonth() / 3) + 1;
-        return { key: `${d.getFullYear()}-Q${q}`, label: `Q${q} ${d.getFullYear()}` };
+      if (dimension === 'status') {
+        const key = lead.status || 'unknown';
+        const stObj = statusMap.get(lead.status || '');
+        const label = stObj
+          ? stObj.label
+          : lead.status
+          ? lead.status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+          : 'Unknown Status';
+        return { key, label, color: stObj?.color || '#3B82F6' };
       }
-      return { key: 'no-date', label: 'No Date' };
-    }
 
-    if (dimension === 'date_day') {
-      if (lead.created_at) {
-        const d = new Date(lead.created_at);
-        return { key: format(d, 'yyyy-MM-dd'), label: format(d, 'MMM dd, yyyy') };
+      if (dimension === 'source') {
+        const key = (lead.lead_source || 'direct').trim().toLowerCase();
+        const label = lead.lead_source?.trim() || 'Direct / Organic';
+        return { key, label };
       }
-      return { key: 'no-date', label: 'No Date' };
-    }
 
-    if (dimension === 'city') {
-      const city =
-        (lead as any).city || (lead as any).address || (lead as any).location || 'Unspecified';
-      const str = String(city).trim();
-      return { key: str.toLowerCase() || 'unspecified', label: str || 'Unspecified' };
-    }
+      if (dimension === 'product') {
+        const key = (lead.product_purchased || 'unspecified').trim().toLowerCase();
+        const label = lead.product_purchased?.trim() || 'General Inquiry';
+        return { key, label };
+      }
 
-    if (dimension.startsWith('custom:')) {
-      const colId = dimension.replace('custom:', '');
-      const raw = (lead as any)[colId] ?? (lead as any).custom_data?.[colId] ?? '';
-      const str = String(raw).trim();
-      return { key: str.toLowerCase() || 'empty', label: str || '(Empty / Unset)' };
-    }
+      if (dimension === 'priority') {
+        const { level } = calculatePriorityLevel(lead);
+        const label =
+          level === 'hot' ? '🔥 Hot Leads' : level === 'warm' ? '⚡ Warm Leads' : '❄️ Cold Leads';
+        const color = level === 'hot' ? '#EF4444' : level === 'warm' ? '#F59E0B' : '#3B82F6';
+        return { key, level: label, label, color };
+      }
 
-    return { key: 'other', label: 'Other' };
-  };
+      if (dimension === 'date_month' || dimension === 'date') {
+        if (lead.created_at) {
+          const d = new Date(lead.created_at);
+          return { key: format(d, 'yyyy-MM'), label: format(d, 'MMMM yyyy') };
+        }
+        return { key: 'no-date', label: 'No Date' };
+      }
+
+      if (dimension === 'date_quarter') {
+        if (lead.created_at) {
+          const d = new Date(lead.created_at);
+          const q = Math.floor(d.getMonth() / 3) + 1;
+          return { key: `${d.getFullYear()}-Q${q}`, label: `Q${q} ${d.getFullYear()}` };
+        }
+        return { key: 'no-date', label: 'No Date' };
+      }
+
+      if (dimension === 'date_day') {
+        if (lead.created_at) {
+          const d = new Date(lead.created_at);
+          return { key: format(d, 'yyyy-MM-dd'), label: format(d, 'MMM dd, yyyy') };
+        }
+        return { key: 'no-date', label: 'No Date' };
+      }
+
+      if (dimension === 'city') {
+        const leadObj = lead as unknown as Record<string, unknown>;
+        const city =
+          leadObj.city || leadObj.address || leadObj.location || 'Unspecified';
+        const str = String(city).trim();
+        return { key: str.toLowerCase() || 'unspecified', label: str || 'Unspecified' };
+      }
+
+      if (dimension.startsWith('custom:')) {
+        const colId = dimension.replace('custom:', '');
+        const leadObj = lead as unknown as Record<string, unknown>;
+        const customData = lead.custom_data as Record<string, unknown> | undefined;
+        const raw = leadObj[colId] ?? customData?.[colId] ?? '';
+        const str = String(raw).trim();
+        return { key: str.toLowerCase() || 'empty', label: str || '(Empty / Unset)' };
+      }
+
+      return { key: 'other', label: 'Other' };
+    },
+    [ownersMap, statusMap]
+  );
 
   // Helper to format human-readable title of dimension
   const getDimensionTitle = (dim: string): string => {
@@ -242,7 +235,7 @@ export function CustomReportTable({
       });
 
       // Include any other active status present in leads
-      leads.forEach((l) => {
+      (leads || []).forEach((l) => {
         if (l.status && !map.has(l.status)) {
           map.set(l.status, {
             key: l.status,
@@ -270,7 +263,7 @@ export function CustomReportTable({
       Object.entries(ownersMap).forEach(([id, name]) => {
         map.set(id, { key: id, label: name });
       });
-      leads.forEach((l) => {
+      (leads || []).forEach((l) => {
         const item = getDimensionItem(l, 'owner');
         if (!map.has(item.key)) {
           map.set(item.key, item);
@@ -289,7 +282,7 @@ export function CustomReportTable({
 
     // Dynamic extraction for source, product, dates, custom fields, etc.
     const map = new Map<string, DimensionItem>();
-    leads.forEach((l) => {
+    (leads || []).forEach((l) => {
       const item = getDimensionItem(l, colDim);
       if (!map.has(item.key)) {
         map.set(item.key, item);
@@ -301,10 +294,56 @@ export function CustomReportTable({
     }
 
     return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label));
-  }, [colDim, leadStatuses, leads, ownersMap, customColumns]);
+  }, [colDim, leadStatuses, leads, ownersMap, getDimensionItem]);
 
   // ─── 2. Build Multi-Dimensional Matrix (Rows × Columns) ───────────────────
   const matrixData = useMemo(() => {
+    // 1. If no raw leads are loaded, leverage master server-side groupSummary directly
+    if ((!leads || leads.length === 0) && groupSummary && groupSummary.length > 0) {
+      const totalDatasetLeads = groupSummary.reduce((sum, g) => sum + g.total, 0) || 1;
+      return groupSummary.map((g) => {
+        const colCells: Record<
+          string,
+          {
+            count: number;
+            revenue: number;
+            pipeline: number;
+            paid: number;
+            avgScore: number;
+          }
+        > = {};
+
+        columnItems.forEach((c) => {
+          const count = g.statusCounts?.[c.key] || 0;
+          colCells[c.key] = {
+            count,
+            revenue: c.key === 'paid' ? g.revenue : 0,
+            pipeline: 0,
+            paid: c.key === 'paid' ? count : 0,
+            avgScore: g.avgScore || 65,
+          };
+        });
+
+        const sharePercent = ((g.total / totalDatasetLeads) * 100).toFixed(1);
+
+        return {
+          key: g.key,
+          name: g.name,
+          color: undefined,
+          totalLeads: g.total,
+          revenue: g.revenue,
+          pipeline: 0,
+          paid: g.paid,
+          totalScore: (g.avgScore || 65) * g.total,
+          sharePercent,
+          conversionRate: g.conversionRate,
+          avgScore: g.avgScore || 65,
+          colCells,
+        };
+      }).sort((a, b) => b.totalLeads - a.totalLeads);
+    }
+
+    // 2. Client-side grouping if sample leads are provided
     const rowMap: Record<
       string,
       {
@@ -329,7 +368,7 @@ export function CustomReportTable({
       }
     > = {};
 
-    leads.forEach((lead) => {
+    (leads || []).forEach((lead) => {
       const rowItem = getDimensionItem(lead, rowDim);
       const colItem = getDimensionItem(lead, colDim);
 
@@ -386,7 +425,7 @@ export function CustomReportTable({
     });
 
     // Compute averages and sort rows by total volume
-    const totalDatasetLeads = leads.length || 1;
+    const totalDatasetLeads = (leads || []).length || 1;
 
     const rows = Object.values(rowMap).map((r) => {
       const sharePercent = ((r.totalLeads / totalDatasetLeads) * 100).toFixed(1);
@@ -407,71 +446,7 @@ export function CustomReportTable({
     });
 
     return rows.sort((a, b) => b.totalLeads - a.totalLeads);
-  }, [leads, rowDim, colDim, leadStatuses, ownersMap, customColumns]);
-
-  // Filter matrix rows by quick matrix search
-  const filteredMatrixRows = useMemo(() => {
-    if (!matrixSearch.trim()) return matrixData;
-    const q = matrixSearch.toLowerCase();
-    return matrixData.filter((r) => r.name.toLowerCase().includes(q));
-  }, [matrixData, matrixSearch]);
-
-  // ─── 3. Matrix Column & Grand Totals ───────────────────────────────────────
-  const matrixTotals = useMemo(() => {
-    const totalLeads = matrixData.reduce((sum, r) => sum + r.totalLeads, 0);
-    const totalRevenue = matrixData.reduce((sum, r) => sum + r.revenue, 0);
-    const totalPipeline = matrixData.reduce((sum, r) => sum + r.pipeline, 0);
-    const totalPaid = matrixData.reduce((sum, r) => sum + r.paid, 0);
-    const avgConvRate = totalLeads > 0 ? ((totalPaid / totalLeads) * 100).toFixed(1) : '0';
-    const overallAvgScore =
-      totalLeads > 0
-        ? Math.round(
-            matrixData.reduce((sum, r) => sum + r.avgScore * r.totalLeads, 0) / totalLeads
-          )
-        : 0;
-
-    // Column sums for the selected metric
-    const colTotals: Record<string, { count: number; revenue: number; pipeline: number }> = {};
-    columnItems.forEach((c) => {
-      colTotals[c.key] = {
-        count: matrixData.reduce((sum, r) => sum + (r.colCells[c.key]?.count || 0), 0),
-        revenue: matrixData.reduce((sum, r) => sum + (r.colCells[c.key]?.revenue || 0), 0),
-        pipeline: matrixData.reduce((sum, r) => sum + (r.colCells[c.key]?.pipeline || 0), 0),
-      };
-    });
-
-    return {
-      totalLeads,
-      totalRevenue,
-      totalPipeline,
-      totalPaid,
-      avgConvRate,
-      overallAvgScore,
-      colTotals,
-    };
-  }, [matrixData, columnItems]);
-
-  // ─── 4. Detailed Filtered Leads Table (Tabular List) ───────────────────────
-  const filteredLeads = useMemo(() => {
-    if (!deferredTableSearch.trim()) return leads;
-    const q = deferredTableSearch.toLowerCase();
-    return leads.filter((lead) => {
-      return (
-        lead.name?.toLowerCase().includes(q) ||
-        lead.email?.toLowerCase().includes(q) ||
-        lead.phone?.toLowerCase().includes(q) ||
-        lead.lead_source?.toLowerCase().includes(q) ||
-        lead.product_purchased?.toLowerCase().includes(q) ||
-        lead.status?.toLowerCase().includes(q)
-      );
-    });
-  }, [leads, deferredTableSearch]);
-
-  const totalPages = Math.ceil(filteredLeads.length / pageSize) || 1;
-  const paginatedLeads = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return filteredLeads.slice(start, start + pageSize);
-  }, [filteredLeads, currentPage, pageSize]);
+  }, [leads, groupSummary, columnItems, rowDim, colDim, paidStatusSet, getDimensionItem]);
 
   // ─── 5. Export 2D Pivot Matrix to CSV ──────────────────────────────────────
   const handleExportMatrixCSV = () => {
@@ -489,7 +464,7 @@ export function CustomReportTable({
     ];
 
     const rows = matrixData.map((r) => {
-      const rowVals: any[] = [
+      const rowVals: (string | number)[] = [
         `"${r.name.replace(/"/g, '""')}"`,
         r.totalLeads,
         `${r.sharePercent}%`,
@@ -516,7 +491,7 @@ export function CustomReportTable({
     });
 
     // Total Row in CSV
-    const totalRowVals: any[] = [
+    const totalRowVals: (string | number)[] = [
       `"Total / Overall Average"`,
       matrixTotals.totalLeads,
       '100%',
@@ -549,66 +524,6 @@ export function CustomReportTable({
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-  };
-
-  // ─── 6. Export Filtered Leads Dataset to CSV ────────────────────────────────
-  const handleExportLeadsCSV = () => {
-    const headers = [
-      'Lead Name',
-      'Email',
-      'Phone',
-      'Status',
-      'Owner',
-      'Source',
-      'Product',
-      'Revenue Received',
-      'Projected Revenue',
-      'Lead Score',
-      'Created Date',
-    ];
-
-    customColumns.forEach((c) => headers.push(c.label));
-
-    const rows = filteredLeads.map((l) => {
-      const { score } = calculatePriorityLevel(l);
-      const row = [
-        `"${(l.name || '').replace(/"/g, '""')}"`,
-        `"${(l.email || '').replace(/"/g, '""')}"`,
-        `"${(l.phone || '').replace(/"/g, '""')}"`,
-        `"${l.status || ''}"`,
-        `"${ownersMap[l.sales_owner_id || ''] || l.sales_owner?.full_name || 'Unassigned'}"`,
-        `"${l.lead_source || ''}"`,
-        `"${l.product_purchased || ''}"`,
-        l.revenue_received || 0,
-        l.revenue_projected || 0,
-        score,
-        l.created_at ? format(new Date(l.created_at), 'yyyy-MM-dd HH:mm') : '',
-      ];
-
-      customColumns.forEach((col) => {
-        const val = (l as any)[col.id] ?? (l as any).custom_data?.[col.id] ?? '';
-        row.push(`"${String(val).replace(/"/g, '""')}"`);
-      });
-
-      return row.join(',');
-    });
-
-    const csvContent =
-      'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute(
-      'download',
-      `fastestcrm_leads_data_${format(new Date(), 'yyyyMMdd_HHmm')}.csv`
-    );
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  const getStatusObj = (statusVal: string) => {
-    return statusMap.get(statusVal);
   };
 
   // Helper to format cell value in matrix
@@ -725,8 +640,8 @@ export function CustomReportTable({
                   value={rowDim}
                   onValueChange={(val) =>
                     handleUpdateConfig({
-                      groupBy: val as any,
-                      rowDimension: val as any,
+                      groupBy: val as GroupByDimension,
+                      rowDimension: val as ReportDimension,
                     })
                   }
                 >
@@ -772,7 +687,7 @@ export function CustomReportTable({
                   value={colDim}
                   onValueChange={(val) =>
                     handleUpdateConfig({
-                      colDimension: val as any,
+                      colDimension: val as ReportColumnDimension,
                     })
                   }
                 >
@@ -804,7 +719,7 @@ export function CustomReportTable({
                   value={cellMetric}
                   onValueChange={(val) =>
                     handleUpdateConfig({
-                      cellMetric: val as any,
+                      cellMetric: val as MatrixMetricType,
                     })
                   }
                 >
@@ -973,271 +888,7 @@ export function CustomReportTable({
           </div>
         </div>
       )}
-
-      {/* ══════════════════════════════════════════════════════════════════════
-          2. FILTERED LEADS DATASET (ON-DEMAND LAZY LOAD)
-         ══════════════════════════════════════════════════════════════════════ */}
-      {!isDetailsLoaded ? (
-        <div className="bg-card/60 border border-dashed border-border/80 rounded-xl p-5 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4 hover:border-primary/40 hover:bg-card/80 transition-all">
-          <div className="flex items-center gap-3 text-left">
-            <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0">
-              <Database className="h-5 w-5" />
-            </div>
-            <div>
-              <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                Filtered Leads Raw Dataset
-                <Badge variant="secondary" className="text-xs font-normal">
-                  {leads.length} records ready
-                </Badge>
-              </h4>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Detailed record view is hidden by default for maximum speed. Click below to load and inspect individual lead details.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleExportLeadsCSV}
-              className="h-9 text-xs gap-1.5 bg-background/80 hover:bg-muted"
-            >
-              <Download className="h-3.5 w-3.5" /> Quick CSV Export
-            </Button>
-
-            <Button
-              size="sm"
-              onClick={() => {
-                setIsDetailsLoaded(true);
-                handleUpdateConfig({ showLeadDetailsTable: true });
-              }}
-              className="h-9 text-xs gap-2 bg-primary text-primary-foreground hover:bg-primary/90 font-medium shadow-xs"
-            >
-              <Eye className="h-4 w-4" /> Load & View Leads ({leads.length})
-            </Button>
-          </div>
-        </div>
-      ) : (
-        <div className="bg-card/70 border border-border/70 rounded-xl overflow-hidden shadow-sm space-y-3">
-          <div className="p-4 border-b border-border/60 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-muted/20">
-            <div>
-              <h3 className="font-semibold text-sm flex items-center gap-2">
-                Filtered Leads Dataset
-                <Badge variant="secondary" className="text-xs font-normal">
-                  {filteredLeads.length} leads
-                </Badge>
-              </h3>
-              <p className="text-xs text-muted-foreground">
-                Displaying detailed records matching current report criteria
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <div className="relative w-full sm:w-56">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                <Input
-                  placeholder="Search in table..."
-                  value={tableSearch}
-                  onChange={(e) => {
-                    setTableSearch(e.target.value);
-                    setCurrentPage(1);
-                  }}
-                  className="pl-8 h-8 text-xs bg-background/80"
-                />
-              </div>
-
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleExportLeadsCSV}
-                className="h-8 text-xs gap-1.5 shrink-0"
-              >
-                <Download className="h-3.5 w-3.5" /> CSV
-              </Button>
-
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setIsDetailsLoaded(false);
-                  handleUpdateConfig({ showLeadDetailsTable: false });
-                }}
-                className="h-8 text-xs gap-1.5 text-muted-foreground hover:text-foreground shrink-0"
-                title="Hide / Collapse Leads Table"
-              >
-                <EyeOff className="h-3.5 w-3.5" /> Hide Table
-              </Button>
-            </div>
-          </div>
-
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/30 hover:bg-muted/30 text-xs">
-                  {config.columns.name && <TableHead>Name</TableHead>}
-                  {config.columns.priority && <TableHead>Priority / Score</TableHead>}
-                  {config.columns.status && <TableHead>Status</TableHead>}
-                  {config.columns.contact && <TableHead>Contact</TableHead>}
-                  {config.columns.owner && <TableHead>Sales Owner</TableHead>}
-                  {config.columns.source && <TableHead>Lead Source</TableHead>}
-                  {config.columns.product && <TableHead>Product</TableHead>}
-                  {config.columns.revenue && <TableHead className="text-right">Revenue</TableHead>}
-                  {config.columns.createdAt && <TableHead className="text-right">Created Date</TableHead>}
-                  {customColumns.map((col) => {
-                    if (!config.columns[col.id]) return null;
-                    return <TableHead key={col.id}>{col.label}</TableHead>;
-                  })}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {paginatedLeads.map((lead) => {
-                  const { level, score } = calculatePriorityLevel(lead);
-                  const statusObj = getStatusObj(lead.status);
-
-                  return (
-                    <TableRow key={lead.id} className="hover:bg-muted/30 transition-colors text-xs">
-                      {config.columns.name && (
-                        <TableCell className="font-medium text-foreground max-w-[160px] truncate">
-                          {lead.name || 'Unnamed Lead'}
-                        </TableCell>
-                      )}
-
-                      {config.columns.priority && (
-                        <TableCell>
-                          <PriorityBadge level={level} score={score} />
-                        </TableCell>
-                      )}
-
-                      {config.columns.status && (
-                        <TableCell>
-                          <span
-                            className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium text-white shadow-xs"
-                            style={{ backgroundColor: statusObj?.color || '#3B82F6' }}
-                          >
-                            <span className="w-1.5 h-1.5 rounded-full bg-white/70" />
-                            {statusObj?.label || lead.status}
-                          </span>
-                        </TableCell>
-                      )}
-
-                      {config.columns.contact && (
-                        <TableCell className="text-muted-foreground text-[11px] max-w-[180px] truncate">
-                          {lead.email && (
-                            <div className="flex items-center gap-1 truncate">
-                              <Mail className="h-3 w-3 shrink-0" />
-                              <span className="truncate">{lead.email}</span>
-                            </div>
-                          )}
-                          {lead.phone && (
-                            <div className="flex items-center gap-1 truncate">
-                              <Phone className="h-3 w-3 shrink-0" />
-                              <span>{lead.phone}</span>
-                            </div>
-                          )}
-                          {!lead.email && !lead.phone && <span>-</span>}
-                        </TableCell>
-                      )}
-
-                      {config.columns.owner && (
-                        <TableCell className="text-muted-foreground truncate max-w-[140px]">
-                          {ownersMap[lead.sales_owner_id || ''] || lead.sales_owner?.full_name || 'Unassigned'}
-                        </TableCell>
-                      )}
-
-                      {config.columns.source && (
-                        <TableCell className="text-muted-foreground capitalize">
-                          {lead.lead_source || '-'}
-                        </TableCell>
-                      )}
-
-                      {config.columns.product && (
-                        <TableCell className="text-muted-foreground max-w-[140px] truncate">
-                          {lead.product_purchased || '-'}
-                        </TableCell>
-                      )}
-
-                      {config.columns.revenue && (
-                        <TableCell className="text-right font-medium">
-                          {lead.revenue_received ? (
-                            <span className="text-emerald-400 font-semibold">
-                              {currencySymbol}
-                              {lead.revenue_received.toLocaleString('en-IN')}
-                            </span>
-                          ) : lead.revenue_projected ? (
-                            <span className="text-muted-foreground">
-                              ~{currencySymbol}
-                              {lead.revenue_projected.toLocaleString('en-IN')}
-                            </span>
-                          ) : (
-                            <span className="text-muted-foreground">-</span>
-                          )}
-                        </TableCell>
-                      )}
-
-                      {config.columns.createdAt && (
-                        <TableCell className="text-right text-muted-foreground text-[11px]">
-                          {lead.created_at ? format(new Date(lead.created_at), 'MMM dd, yyyy') : '-'}
-                        </TableCell>
-                      )}
-
-                      {customColumns.map((col) => {
-                        if (!config.columns[col.id]) return null;
-                        const val = (lead as any)[col.id] ?? (lead as any).custom_data?.[col.id] ?? '-';
-                        return (
-                          <TableCell key={col.id} className="text-muted-foreground max-w-[120px] truncate">
-                            {String(val)}
-                          </TableCell>
-                        );
-                      })}
-                    </TableRow>
-                  );
-                })}
-
-                {paginatedLeads.length === 0 && (
-                  <TableRow>
-                    <TableCell
-                      colSpan={10}
-                      className="text-center py-8 text-sm text-muted-foreground"
-                    >
-                      No leads match the selected filter criteria.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
-
-          {/* Table Pagination Controls */}
-          {totalPages > 1 && (
-            <div className="p-3 border-t border-border/50 flex items-center justify-between text-xs text-muted-foreground">
-              <div>
-                Page {currentPage} of {totalPages} ({filteredLeads.length} records)
-              </div>
-              <div className="flex items-center gap-1.5">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={currentPage === 1}
-                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  className="h-7 px-2"
-                >
-                  <ChevronLeft className="h-3.5 w-3.5" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={currentPage === totalPages}
-                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                  className="h-7 px-2"
-                >
-                  <ChevronRight className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }
+

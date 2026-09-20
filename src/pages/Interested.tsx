@@ -114,8 +114,8 @@ export default function Interested() {
         statusFilter: statusFilter
     };
 
-    const genericLeadsQuery = useLeads(hookOptions);
-    const realEstateLeadsQuery = useRealEstateLeads(hookOptions);
+    const genericLeadsQuery = useLeads({ ...hookOptions, enabled: !isRealEstate });
+    const realEstateLeadsQuery = useRealEstateLeads({ ...hookOptions, enabled: isRealEstate });
 
     const isLoading = isRealEstate ? realEstateLeadsQuery.isLoading : genericLeadsQuery.isLoading;
     const refetch = isRealEstate ? realEstateLeadsQuery.refetch : genericLeadsQuery.refetch;

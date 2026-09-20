@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { SlidersHorizontal, BarChart3, PieChart, Table2, Layers, Sparkles, Check } from 'lucide-react';
+import { SlidersHorizontal, BarChart3, PieChart, Layers, Sparkles, Check } from 'lucide-react';
 import { CustomColumn } from '@/hooks/useCustomColumns';
 
 export type GroupByDimension =
@@ -95,9 +95,9 @@ export interface ReportDisplayConfig {
   cellMetric?: MatrixMetricType;
   kpis: VisibleKPICards;
   charts: VisibleCharts;
-  columns: VisibleTableColumns;
+  columns?: VisibleTableColumns;
   showBreakdownSummary: boolean;
-  showLeadDetailsTable: boolean;
+  showLeadDetailsTable?: boolean;
 }
 
 interface ReportCustomizerModalProps {
@@ -152,13 +152,6 @@ export function ReportCustomizerModal({
     setLocalConfig((prev) => ({
       ...prev,
       charts: { ...prev.charts, [key]: !prev.charts[key] },
-    }));
-  };
-
-  const toggleColumn = (key: string) => {
-    setLocalConfig((prev) => ({
-      ...prev,
-      columns: { ...prev.columns, [key]: !prev.columns[key] },
     }));
   };
 
@@ -416,50 +409,6 @@ export function ReportCustomizerModal({
                     <div className="font-medium text-foreground">{chart.label}</div>
                     <div className="text-[11px] text-muted-foreground">{chart.desc}</div>
                   </div>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          {/* 5. Detailed Table Columns */}
-          <div className="space-y-2 p-3.5 bg-muted/20 rounded-lg border border-border/50">
-            <div className="text-sm font-semibold flex items-center gap-2">
-              <Table2 className="h-4 w-4 text-purple-500" /> Data Table Columns
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 pt-1">
-              {[
-                { id: 'name', label: 'Lead Name' },
-                { id: 'contact', label: 'Contact (Email/Phone)' },
-                { id: 'status', label: 'Status' },
-                { id: 'owner', label: 'Sales Owner' },
-                { id: 'source', label: 'Lead Source' },
-                { id: 'product', label: 'Product' },
-                { id: 'revenue', label: 'Revenue / Value' },
-                { id: 'priority', label: 'Priority / Score' },
-                { id: 'createdAt', label: 'Creation Date' },
-              ].map((col) => (
-                <label
-                  key={col.id}
-                  className="flex items-center gap-2 text-xs p-1.5 rounded hover:bg-muted/40 cursor-pointer"
-                >
-                  <Checkbox
-                    checked={localConfig.columns[col.id as keyof VisibleTableColumns] ?? true}
-                    onCheckedChange={() => toggleColumn(col.id)}
-                  />
-                  <span>{col.label}</span>
-                </label>
-              ))}
-
-              {customColumns.map((customCol) => (
-                <label
-                  key={customCol.id}
-                  className="flex items-center gap-2 text-xs p-1.5 rounded hover:bg-muted/40 cursor-pointer"
-                >
-                  <Checkbox
-                    checked={localConfig.columns[customCol.id] ?? false}
-                    onCheckedChange={() => toggleColumn(customCol.id)}
-                  />
-                  <span className="truncate">{customCol.label}</span>
                 </label>
               ))}
             </div>

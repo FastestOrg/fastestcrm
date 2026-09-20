@@ -1,6 +1,5 @@
 import { useState, useMemo, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useLeads, Lead } from '@/hooks/useLeads';
 import { useReportAnalytics } from '@/hooks/useReportAnalytics';
 import { useTeam } from '@/hooks/useTeam';
 import { useProducts } from '@/hooks/useProducts';
@@ -8,7 +7,6 @@ import { useLeadStatuses, CompanyLeadStatus } from '@/hooks/useLeadStatuses';
 import { useCustomColumns } from '@/hooks/useCustomColumns';
 import { useCompany } from '@/hooks/useCompany';
 import { useAuth } from '@/hooks/useAuth';
-import { calculateForecast } from '@/hooks/useForecast';
 import { ReportSkeleton } from '@/components/report/ReportSkeleton';
 import {
   BarChart,
@@ -86,7 +84,6 @@ const CHART_COLORS = [
 ];
 
 export default function Report() {
-  const [reportLimit, setReportLimit] = useState<number>(1000); // Default to 1,000 for instant load
   const [isExportingPDF, setIsExportingPDF] = useState(false);
   const printableRef = useRef<HTMLDivElement>(null);
 
@@ -209,13 +206,6 @@ export default function Report() {
     search: filters.search,
   });
 
-  // Queries - fetch lightweight sample leads for detailed table & PDF export
-  const effectiveLimit = reportLimit > 0 ? reportLimit : undefined;
-  const { data: leadsData, isLoading: leadsLoading, isFetching: leadsFetching } = useLeads({
-    fetchAll: true,
-    limit: effectiveLimit,
-    excludeHistory: true,
-  });
   const { members, loading: teamLoading } = useTeam();
   const { products } = useProducts();
   const { statuses: leadStatuses, isLoading: statusesLoading } = useLeadStatuses();
@@ -223,7 +213,6 @@ export default function Report() {
   const { company } = useCompany();
   const { user } = useAuth();
 
-  const allLeads = useMemo(() => leadsData?.leads || [], [leadsData]);
   const isInitialLoading = analyticsLoading && !analytics;
 
   // Currency symbol
@@ -251,16 +240,11 @@ export default function Report() {
     (rpcSourceBreakdown || []).forEach((s) => {
       if (s.source && s.source.trim()) set.add(s.source.trim().toLowerCase());
     });
-    allLeads.forEach((l) => {
-      if (l.lead_source && typeof l.lead_source === 'string' && l.lead_source.trim()) {
-        set.add(l.lead_source.trim().toLowerCase());
-      }
-    });
     ['website', 'google ads', 'facebook ads', 'referral', 'organic', 'inbound', 'cold call', 'email campaign'].forEach(
       (s) => set.add(s)
     );
     return Array.from(set).sort();
-  }, [rpcSourceBreakdown, allLeads]);
+  }, [rpcSourceBreakdown]);
 
   // Dynamic products list - incorporates server database breakdown
   const productsList = useMemo(() => {
@@ -278,123 +262,10 @@ export default function Report() {
       }
     });
 
-    allLeads.forEach((l) => {
-      if (l.product_purchased && !existingNames.has(l.product_purchased.toLowerCase())) {
-        list.push({ id: l.product_purchased, name: l.product_purchased, category: (l as any).product_category });
-        existingNames.add(l.product_purchased.toLowerCase());
-      }
-    });
-
     return list;
-  }, [products, rpcProductBreakdown, allLeads]);
+  }, [products, rpcProductBreakdown]);
 
-  // ─── Filter Computation Engine ──────────────────────────────────────────────
-  const filteredLeads = useMemo(() => {
-    return allLeads.filter((lead) => {
-      // A. Search Query
-      if (filters.search.trim()) {
-        const q = filters.search.toLowerCase();
-        const matchesSearch =
-          lead.name?.toLowerCase().includes(q) ||
-          lead.email?.toLowerCase().includes(q) ||
-          lead.phone?.toLowerCase().includes(q) ||
-          lead.lead_source?.toLowerCase().includes(q) ||
-          lead.product_purchased?.toLowerCase().includes(q) ||
-          lead.notes?.toLowerCase().includes(q) ||
-          lead.college?.toLowerCase().includes(q);
-        if (!matchesSearch) return false;
-      }
-
-      // B. Date Preset & Range
-      if (filters.datePreset !== 'all' && lead.created_at) {
-        const leadDate = new Date(lead.created_at);
-        const now = new Date();
-
-        if (filters.datePreset === 'today') {
-          if (leadDate < startOfDay(now) || leadDate > endOfDay(now)) return false;
-        } else if (filters.datePreset === 'yesterday') {
-          const yest = subDays(now, 1);
-          if (leadDate < startOfDay(yest) || leadDate > endOfDay(yest)) return false;
-        } else if (filters.datePreset === '7d') {
-          if (leadDate < subDays(now, 7)) return false;
-        } else if (filters.datePreset === '30d') {
-          if (leadDate < subDays(now, 30)) return false;
-        } else if (filters.datePreset === 'this_month') {
-          if (leadDate < startOfMonth(now) || leadDate > endOfMonth(now)) return false;
-        } else if (filters.datePreset === 'last_month') {
-          const lastMonth = subMonths(now, 1);
-          if (leadDate < startOfMonth(lastMonth) || leadDate > endOfMonth(lastMonth)) return false;
-        } else if (filters.datePreset === 'this_quarter') {
-          if (leadDate < startOfQuarter(now)) return false;
-        } else if (filters.datePreset === 'custom') {
-          if (filters.customStartDate && isBefore(leadDate, startOfDay(new Date(filters.customStartDate)))) {
-            return false;
-          }
-          if (filters.customEndDate && isAfter(leadDate, endOfDay(new Date(filters.customEndDate)))) {
-            return false;
-          }
-        }
-      }
-
-      // C. Status Filter (Multi-select)
-      if (filters.statuses.length > 0) {
-        if (!filters.statuses.includes(lead.status)) return false;
-      }
-
-      // D. Sales Owner Filter (Multi-select)
-      if (filters.owners.length > 0) {
-        const isUnassigned = !lead.sales_owner_id;
-        const wantsUnassigned = filters.owners.includes('unassigned');
-        const matchesOwner = filters.owners.includes(lead.sales_owner_id || '');
-
-        if (isUnassigned && !wantsUnassigned) return false;
-        if (!isUnassigned && !matchesOwner) return false;
-      }
-
-      // E. Lead Source Filter (Multi-select)
-      if (filters.sources.length > 0) {
-        const src = (lead.lead_source || '').toLowerCase().trim();
-        if (!filters.sources.some((s) => s.toLowerCase() === src)) return false;
-      }
-
-      // F. Product Filter (Multi-select)
-      if (filters.products.length > 0) {
-        const prod = lead.product_purchased || '';
-        if (!filters.products.includes(prod)) return false;
-      }
-
-      // G. Priority / Lead Score Filter (Multi-select)
-      if (filters.priorities.length > 0) {
-        const { level } = calculateLeadScore(lead);
-        if (!filters.priorities.includes(level)) return false;
-      }
-
-      // H. Revenue Status Filter
-      if (filters.revenueStatus === 'with_revenue') {
-        if (!lead.revenue_received || lead.revenue_received <= 0) return false;
-      } else if (filters.revenueStatus === 'zero_revenue') {
-        if (lead.revenue_received && lead.revenue_received > 0) return false;
-      }
-
-      // I. Custom Field Filters
-      if (filters.customFieldFilters.length > 0) {
-        for (const cf of filters.customFieldFilters) {
-          const rawVal =
-            (lead as any)[cf.fieldId] ??
-            (lead as any).custom_data?.[cf.fieldId] ??
-            '';
-          const strVal = String(rawVal).toLowerCase();
-          if (!strVal.includes(cf.value.toLowerCase())) {
-            return false;
-          }
-        }
-      }
-
-      return true;
-    });
-  }, [allLeads, filters]);
-
-  // ─── AI Revenue Forecast Calculation (Server-Aggregated + Fast In-Memory Fallback) ──
+  // ─── AI Revenue Forecast Calculation (Server-Aggregated) ────────────────────
   const forecastData = useMemo(() => {
     if (rpcStatusBreakdown && rpcStatusBreakdown.length > 0 && rpcKpis) {
       const STATUS_PROBABILITIES: Record<string, number> = {
@@ -438,8 +309,14 @@ export default function Report() {
       };
     }
 
-    return calculateForecast(filteredLeads, products || []);
-  }, [rpcStatusBreakdown, rpcKpis, filteredLeads, products]);
+    return {
+      totalPotential: 0,
+      expectedRevenue: 0,
+      closedRevenue: 0,
+      pipelineByStatus: [],
+      conversionRate: 0,
+    };
+  }, [rpcStatusBreakdown, rpcKpis]);
 
   // ─── Group-By Aggregation Engine ────────────────────────────────────────────
   const groupByLabel = useMemo(() => {
@@ -459,7 +336,7 @@ export default function Report() {
 
   const groupSummary: GroupSummaryRow[] = useMemo(() => {
     const groupBy = displayConfig.groupBy;
-    const totalCount = rpcKpis?.total_leads || filteredLeads.length || 1;
+    const totalCount = rpcKpis?.total_leads || 1;
 
     // 1. Direct Server Aggregate for Sales Owner
     if (groupBy === 'owner' && rpcOwnerBreakdown.length > 0) {
@@ -536,94 +413,7 @@ export default function Report() {
       })).sort((a, b) => b.key.localeCompare(a.key));
     }
 
-    // 6. Fast In-Memory Fallback for custom columns & priority levels
-    const groups: Record<
-      string,
-      {
-        name: string;
-        total: number;
-        inProgress: number;
-        paid: number;
-        revenue: number;
-        totalScore: number;
-        statusCounts: Record<string, number>;
-      }
-    > = {};
-
-    filteredLeads.forEach((lead) => {
-      let groupKey = 'unknown';
-      let groupName = 'Unknown';
-
-      if (displayConfig.groupBy === 'priority') {
-        const { level } = calculateLeadScore(lead);
-        groupKey = level;
-        groupName = level === 'hot' ? '🔥 Hot Leads' : level === 'warm' ? '⚡ Warm Leads' : '❄️ Cold Leads';
-      } else if (displayConfig.groupBy.startsWith('custom:')) {
-        const colId = displayConfig.groupBy.replace('custom:', '');
-        const val = (lead as any)[colId] ?? (lead as any).custom_data?.[colId] ?? 'Unspecified';
-        groupKey = String(val).toLowerCase();
-        groupName = String(val);
-      } else {
-        groupKey = lead.sales_owner_id || 'unassigned';
-        groupName = ownersMap[lead.sales_owner_id || ''] || lead.sales_owner?.full_name || 'Unassigned';
-      }
-
-      if (!groups[groupKey]) {
-        groups[groupKey] = {
-          name: groupName,
-          total: 0,
-          inProgress: 0,
-          paid: 0,
-          revenue: 0,
-          totalScore: 0,
-          statusCounts: {},
-        };
-      }
-
-      groups[groupKey].total += 1;
-      const rawStatus = lead.status || 'other';
-      groups[groupKey].statusCounts[rawStatus] = (groups[groupKey].statusCounts[rawStatus] || 0) + 1;
-
-      const statusObj = leadStatuses.find((s) => s.value === lead.status);
-      const isPaid =
-        lead.status === 'paid' ||
-        statusObj?.category === 'paid' ||
-        (lead.revenue_received !== null && lead.revenue_received !== undefined && lead.revenue_received > 0);
-      const isInProgress =
-        ['interested', 'follow_up', 'site_visit', 'negotiation'].includes(lead.status) ||
-        statusObj?.category === 'interested';
-
-      if (isPaid) {
-        groups[groupKey].paid += 1;
-      } else if (isInProgress) {
-        groups[groupKey].inProgress += 1;
-      }
-
-      groups[groupKey].revenue += lead.revenue_received || 0;
-      const { score } = calculateLeadScore(lead);
-      groups[groupKey].totalScore += score;
-    });
-
-    return Object.entries(groups)
-      .map(([key, data]) => {
-        const sharePercent = ((data.total / totalCount) * 100).toFixed(1);
-        const conversionRate = data.total > 0 ? ((data.paid / data.total) * 100).toFixed(1) : '0';
-        const avgScore = data.total > 0 ? Math.round(data.totalScore / data.total) : 0;
-
-        return {
-          key,
-          name: data.name,
-          total: data.total,
-          sharePercent,
-          inProgress: data.inProgress,
-          paid: data.paid,
-          conversionRate,
-          revenue: data.revenue,
-          avgScore,
-          statusCounts: data.statusCounts,
-        };
-      })
-      .sort((a, b) => b.total - a.total);
+    return [];
   }, [
     displayConfig.groupBy,
     rpcKpis,
@@ -632,10 +422,7 @@ export default function Report() {
     rpcSourceBreakdown,
     rpcProductBreakdown,
     rpcMonthBreakdown,
-    filteredLeads,
-    ownersMap,
     leadStatuses,
-    customColumns,
   ]);
 
   // ─── KPI Stats Calculation ──────────────────────────────────────────────────
@@ -663,30 +450,17 @@ export default function Report() {
       };
     }
 
-    const totalLeads = filteredLeads.length;
-    const paidLeads = filteredLeads.filter((l) => l.status === 'paid' || (l.revenue_received || 0) > 0).length;
-    const activeLeads = filteredLeads.filter((l) =>
-      ['interested', 'follow_up', 'site_visit', 'negotiation'].includes(l.status)
-    ).length;
-    const wonRevenue = filteredLeads.reduce((sum, l) => sum + (l.revenue_received || 0), 0);
-    const pipelineRevenue = filteredLeads.reduce((sum, l) => sum + (l.revenue_projected || 0), 0);
-    const conversionRate = totalLeads > 0 ? ((paidLeads / totalLeads) * 100).toFixed(1) : '0';
-    const avgDealSize = paidLeads > 0 ? wonRevenue / paidLeads : 0;
-    const totalScores = filteredLeads.reduce((sum, l) => sum + calculateLeadScore(l).score, 0);
-    const avgScore = totalLeads > 0 ? Math.round(totalScores / totalLeads) : 0;
-    const topSegment = groupSummary[0]?.name || 'N/A';
-
     return {
-      totalLeads,
-      conversionRate,
-      wonRevenue,
-      pipelineRevenue,
-      activeLeads,
-      avgScore,
-      topSegment,
-      avgDealSize,
+      totalLeads: 0,
+      conversionRate: '0',
+      wonRevenue: 0,
+      pipelineRevenue: 0,
+      activeLeads: 0,
+      avgScore: 0,
+      topSegment: 'N/A',
+      avgDealSize: 0,
     };
-  }, [rpcKpis, filteredLeads, groupSummary]);
+  }, [rpcKpis, groupSummary]);
 
   // ─── Chart Data Formats ─────────────────────────────────────────────────────
   // 1. Status Distribution for Donut Chart
@@ -704,21 +478,8 @@ export default function Report() {
       }).sort((a, b) => b.value - a.value);
     }
 
-    const counts: Record<string, { name: string; value: number; color: string }> = {};
-    filteredLeads.forEach((l) => {
-      const st = l.status || 'other';
-      const stObj = leadStatuses.find((s) => s.value === st);
-      const label = stObj?.label || st.replace(/_/g, ' ').toUpperCase();
-      const color = stObj?.color || '#3b82f6';
-
-      if (!counts[st]) {
-        counts[st] = { name: label, value: 0, color };
-      }
-      counts[st].value += 1;
-    });
-
-    return Object.values(counts).sort((a, b) => b.value - a.value);
-  }, [rpcStatusBreakdown, filteredLeads, leadStatuses]);
+    return [];
+  }, [rpcStatusBreakdown, leadStatuses]);
 
   // 2. Funnel Chart Data
   const funnelData = useMemo(() => {
@@ -730,18 +491,8 @@ export default function Report() {
       ];
     }
 
-    const total = filteredLeads.length;
-    const inProgress = filteredLeads.filter((l) =>
-      ['interested', 'follow_up', 'site_visit', 'negotiation'].includes(l.status)
-    ).length;
-    const won = filteredLeads.filter((l) => l.status === 'paid' || (l.revenue_received || 0) > 0).length;
-
-    return [
-      { name: '1. Total Leads Inflow', count: total, fill: '#3b82f6' },
-      { name: '2. Active / Interested', count: inProgress, fill: '#f59e0b' },
-      { name: '3. Closed Won (Paid)', count: won, fill: '#10b981' },
-    ];
-  }, [rpcKpis, filteredLeads]);
+    return [];
+  }, [rpcKpis]);
 
   // 3. Breakdown Bar Chart Data (Top 10 segments)
   const breakdownBarData = useMemo(() => {
@@ -772,10 +523,10 @@ export default function Report() {
 
       toast.dismiss();
       toast.success('PDF report downloaded successfully!');
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast.dismiss();
       console.error('PDF Export Error:', err);
-      toast.error(err.message || 'Failed to download PDF report');
+      toast.error(err instanceof Error ? err.message : 'Failed to download PDF report');
     } finally {
       setIsExportingPDF(false);
     }
@@ -846,34 +597,6 @@ export default function Report() {
               <span>Analyzing database...</span>
             </div>
           )}
-
-          {/* Dataset Range Limit Selector */}
-          <div className="flex items-center gap-1.5 bg-card/60 border border-border/60 rounded-md px-2.5 py-1">
-            <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-              Data Limit:
-            </span>
-            <Select
-              value={reportLimit.toString()}
-              onValueChange={(val) => setReportLimit(Number(val))}
-            >
-              <SelectTrigger className="w-[130px] h-7 border-0 bg-transparent text-xs p-0 focus:ring-0">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="bg-popover border-border">
-                <SelectItem value="0">All Leads (Raw Preview)</SelectItem>
-                <SelectItem value="500">Fast 500 Samples</SelectItem>
-                <SelectItem value="1000">Recent 1,000</SelectItem>
-                <SelectItem value="5000">Recent 5,000</SelectItem>
-                <SelectItem value="10000">Recent 10,000</SelectItem>
-                <SelectItem value="25000">Recent 25,000</SelectItem>
-                <SelectItem value="50000">Recent 50,000</SelectItem>
-                <SelectItem value="100000">Recent 100,000</SelectItem>
-              </SelectContent>
-            </Select>
-            {leadsFetching && (
-              <Loader2 className="h-3 w-3 animate-spin text-primary shrink-0" />
-            )}
-          </div>
         </div>
       </div>
 
@@ -886,8 +609,8 @@ export default function Report() {
         productsList={productsList}
         availableSources={availableSources}
         customColumns={customColumns}
-        totalLeadsCount={kpiStats.totalLeads || allLeads.length}
-        filteredLeadsCount={kpiStats.totalLeads || filteredLeads.length}
+        totalLeadsCount={kpiStats.totalLeads}
+        filteredLeadsCount={kpiStats.totalLeads}
       />
 
       {/* ─── Main Tabs Navigation ─── */}
@@ -1203,9 +926,8 @@ export default function Report() {
             </Card>
           )}
 
-          {/* 3. Custom Report Table (Breakdown Summary & Filtered Lead Records) */}
+          {/* 3. Custom Report Table (Breakdown Summary) */}
           <CustomReportTable
-            leads={filteredLeads}
             groupSummary={groupSummary}
             groupByLabel={groupByLabel}
             config={displayConfig}
@@ -1254,10 +976,9 @@ export default function Report() {
                   <TableBody>
                     {teamMembers.map((member) => {
                       const ownerData = rpcOwnerBreakdown.find((o) => o.owner_id === member.id);
-                      const memberLeads = filteredLeads.filter((l) => l.sales_owner_id === member.id);
-                      const total = ownerData ? ownerData.total_leads : memberLeads.length;
-                      const revenue = ownerData ? ownerData.revenue : memberLeads.reduce((sum, l) => sum + (l.revenue_received || 0), 0);
-                      const rate = ownerData ? (ownerData.conversion_rate !== undefined ? ownerData.conversion_rate.toFixed(1) : '0') : (total > 0 ? ((memberLeads.filter((l) => l.status === 'paid' || (l.revenue_received || 0) > 0).length / total) * 100).toFixed(1) : '0');
+                      const total = ownerData ? ownerData.total_leads : 0;
+                      const revenue = ownerData ? ownerData.revenue : 0;
+                      const rate = ownerData && ownerData.conversion_rate !== undefined ? ownerData.conversion_rate.toFixed(1) : '0';
                       const statusCounts = ownerData ? (ownerData.status_counts || {}) : {};
 
                       return (
@@ -1267,7 +988,7 @@ export default function Report() {
                           
                           {/* Dynamic Status Counts per Team Member */}
                           {leadStatuses.map((st) => {
-                            const count = ownerData ? (statusCounts[st.value] || 0) : memberLeads.filter((l) => l.status === st.value).length;
+                            const count = statusCounts[st.value] || 0;
                             return (
                               <TableCell key={st.value} className="text-right px-3 font-medium">
                                 {count > 0 ? (
@@ -1383,20 +1104,7 @@ export default function Report() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {(rpcSourceBreakdown && rpcSourceBreakdown.length > 0
-                      ? rpcSourceBreakdown
-                      : availableSources.map((sourceName) => {
-                          const srcLeads = filteredLeads.filter(
-                            (l) => (l.lead_source || '').toLowerCase().trim() === sourceName.toLowerCase()
-                          );
-                          const total = srcLeads.length;
-                          const share = (total / (filteredLeads.length || 1)) * 100;
-                          const paid = srcLeads.filter((l) => l.status === 'paid' || (l.revenue_received || 0) > 0).length;
-                          const rate = total > 0 ? (paid / total) * 100 : 0;
-                          const revenue = srcLeads.reduce((sum, l) => sum + (l.revenue_received || 0), 0);
-                          return { source: sourceName, volume: total, share_percent: share, converted: paid, conversion_rate: rate, revenue };
-                        }).filter((s) => s.volume > 0)
-                    ).map((sourceItem) => (
+                    {(rpcSourceBreakdown || []).map((sourceItem) => (
                       <TableRow key={sourceItem.source} className="text-xs hover:bg-muted/30">
                         <TableCell className="font-semibold capitalize text-foreground">
                           {sourceItem.source}
@@ -1560,7 +1268,7 @@ export default function Report() {
                 <div className="p-4 rounded-lg bg-blue-500/5 border border-blue-500/10">
                   <h4 className="text-sm font-semibold text-blue-400 mb-1">Projected Outcome</h4>
                   <p className="text-xs text-muted-foreground leading-relaxed">
-                    Based on current conversion probabilities, your pipeline of {filteredLeads.length} leads is
+                    Based on current conversion probabilities, your pipeline of {kpiStats.totalLeads.toLocaleString('en-IN')} leads is
                     expected to generate{' '}
                     <span className="text-foreground font-bold">
                       {currencySymbol}
@@ -1618,7 +1326,7 @@ export default function Report() {
           groupSummary={groupSummary}
           groupByLabel={groupByLabel}
           kpiStats={kpiStats}
-          leads={filteredLeads}
+          leads={[]}
           leadStatuses={leadStatuses}
           customColumns={customColumns}
           ownersMap={ownersMap}

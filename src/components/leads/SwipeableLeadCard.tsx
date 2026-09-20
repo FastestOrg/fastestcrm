@@ -44,6 +44,7 @@ export function SwipeableLeadCard({
   onEdit,
   onStatusChange,
   onCall,
+  onChat,
   onCreatePaymentLink,
   owners = [],
   variant = 'education',

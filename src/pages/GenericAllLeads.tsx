@@ -184,8 +184,34 @@ export default function GenericAllLeads() {
 
             const dynamicColsToFetch = filterableCols.filter((c: any) => !isPredefinedFilter(c.id));
 
+            const targetUrl = (orgClient as any)?.supabaseUrl || 'default';
+            const isDefaultHost = targetUrl.includes('api.fastestcrm.com') || targetUrl.includes('uykdyqdeyilpulaqlqip');
+
+            const fetchStatuses = async () => {
+                if (isDefaultHost) {
+                    const { data } = await orgClient
+                        .from('company_lead_statuses' as any)
+                        .select('*')
+                        .eq('company_id', company.id)
+                        .order('order_index');
+                    return data || [];
+                }
+                const { data, error } = await orgClient
+                    .from('lead_statuses' as any)
+                    .select('*')
+                    .eq('company_id', company.id)
+                    .order('sort_order');
+                if (!error && data && data.length > 0) return data;
+                const { data: fbData } = await orgClient
+                    .from('company_lead_statuses' as any)
+                    .select('*')
+                    .eq('company_id', company.id)
+                    .order('order_index');
+                return fbData || [];
+            };
+
             // Fire all standard and dynamic queries at the same time
-            const [ownersResult, productsResult, statusesResult, ...dynamicResults] = await Promise.all([
+            const [ownersResult, productsResult, statusesData, ...dynamicResults] = await Promise.all([
                 supabase
                     .from('profiles')
                     .select('id, full_name')
@@ -196,11 +222,7 @@ export default function GenericAllLeads() {
                     .select('name')
                     .eq('company_id', company.id)
                     .order('name'),
-                orgClient
-                    .from('lead_statuses' as any)
-                    .select('*')
-                    .eq('company_id', company.id)
-                    .order('sort_order'),
+                fetchStatuses(),
                 ...dynamicColsToFetch.map(async (c: any) => {
                     try {
                         let uniqueVals: string[] = [];
@@ -220,7 +242,8 @@ export default function GenericAllLeads() {
                                 .from(tableName as any)
                                 .select(c.id)
                                 .eq('company_id', company.id)
-                                .not(c.id, 'is', null);
+                                .not(c.id, 'is', null)
+                                .limit(250);
 
                             if (error) {
                                 console.error(`Error fetching dynamic values for ${c.id}:`, error);
@@ -269,19 +292,9 @@ export default function GenericAllLeads() {
             }
 
             const products = productsResult.data;
-            let statusesData = statusesResult.data as any[] | null;
 
-            if (!statusesData || statusesData.length === 0) {
-                const { data: fbData } = await orgClient
-                    .from('company_lead_statuses' as any)
-                    .select('*')
-                    .eq('company_id', company.id)
-                    .order('order_index');
-                statusesData = fbData;
-            }
-
-            const statuses = statusesData && statusesData.length > 0
-                ? statusesData.map((s: any) => ({
+            const statuses = statusesData && (statusesData as any[]).length > 0
+                ? (statusesData as any[]).map((s: any) => ({
                     label: s.name || s.label || 'Status',
                     value: s.value || (s.name || s.label || 'status').toLowerCase().replace(/[^a-z0-9_]/g, '_'),
                     group: s.category || s.status_type || 'Custom'
@@ -383,13 +396,14 @@ export default function GenericAllLeads() {
 
     const { data: leadsData, isLoading, refetch } = useLeads({
         search: searchQuery,
-        statusFilter: selectedStatuses.size === 1 ? Array.from(selectedStatuses)[0] : undefined,
+        statusFilter: selectedStatuses.size > 0 ? Array.from(selectedStatuses) : undefined,
         ownerFilter: Array.from(selectedOwners),
         activeOwnerIds,
         productFilter: Array.from(selectedProducts),
         page,
         pageSize,
         dynamicFilters,
+        excludeHistory: true,
         accessibleUserIds,
         canViewAll,
     });

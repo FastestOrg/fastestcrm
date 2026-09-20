@@ -17,6 +17,7 @@ interface UseRealEstateLeadsOptions {
   accessibleUserIds?: string[];
   canViewAll?: boolean;
   activeOwnerIds?: string[];
+  enabled?: boolean;
 }
 
 async function fetchRealEstateLeadsData({
@@ -129,6 +130,7 @@ export function useRealEstateLeads({
   accessibleUserIds = [],
   canViewAll = true,
   activeOwnerIds = [],
+  enabled = true,
 }: UseRealEstateLeadsOptions = {}) {
   const { company, loading: companyLoading } = useCompany();
   const { orgClient, isBYOSLoading } = useOrgClient();
@@ -164,7 +166,7 @@ export function useRealEstateLeads({
       canViewAll,
       activeOwnerIds
     }),
-    enabled: !companyLoading && !!company?.id && !isBYOSLoading,
+    enabled: enabled && !companyLoading && !!company?.id && !isBYOSLoading,
     placeholderData: (prev) => prev,
     retry: 2,
     staleTime: 60000,
@@ -173,7 +175,7 @@ export function useRealEstateLeads({
 
   // Prefetch the next page
   useEffect(() => {
-    if (query.data && query.data.count > page * pageSize && company?.id) {
+    if (enabled && query.data && query.data.count > page * pageSize && company?.id) {
       const nextPage = page + 1;
       const nextQueryKey = [
         'real-estate-leads',
@@ -206,7 +208,7 @@ export function useRealEstateLeads({
         staleTime: 60000,
       });
     }
-  }, [query.data, page, pageSize, search, statusFilter, ownerFilter, propertyTypeFilter, company?.id, accessibleUserIds, canViewAll, activeOwnerIds, queryClient]);
+  }, [query.data, page, pageSize, search, statusFilter, ownerFilter, propertyTypeFilter, company?.id, accessibleUserIds, canViewAll, activeOwnerIds, queryClient, enabled, orgClient]);
 
   return {
     ...query,

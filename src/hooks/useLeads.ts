@@ -33,6 +33,7 @@ interface UseLeadsOptions {
   excludeHistory?: boolean;
   accessibleUserIds?: string[];
   canViewAll?: boolean;
+  enabled?: boolean;
 }
 
 async function fetchLeadsData({
@@ -50,7 +51,7 @@ async function fetchLeadsData({
   fetchAll,
   limit,
   dynamicFilters,
-  excludeHistory,
+  excludeHistory = true,
   accessibleUserIds,
   canViewAll,
 }: {
@@ -348,9 +349,10 @@ export function useLeads({
   fetchAll = false,
   limit,
   dynamicFilters,
-  excludeHistory,
+  excludeHistory = true,
   accessibleUserIds: explicitAccessibleUserIds,
   canViewAll: explicitCanViewAll,
+  enabled = true,
 }: UseLeadsOptions = {}) {
   const queryClient = useQueryClient();
   const { tableName, companyId, loading: tableLoading } = useLeadsTable();
@@ -402,7 +404,7 @@ export function useLeads({
       accessibleUserIds,
       canViewAll,
     }),
-    enabled: !tableLoading && !!companyId && !isBYOSLoading && !hierarchyLoading,
+    enabled: enabled && !tableLoading && !!companyId && !isBYOSLoading && !hierarchyLoading,
     placeholderData: (previousData) => previousData,
     retry: 2,
     staleTime: 60000,
@@ -411,7 +413,7 @@ export function useLeads({
 
   // Prefetch both next and previous pages for instant 0ms pagination
   useEffect(() => {
-    if (!fetchAll && query.data && companyId && tableName && !hierarchyLoading) {
+    if (enabled && !fetchAll && query.data && companyId && tableName && !hierarchyLoading) {
       const orgUrl = (orgClient as any)?.supabaseUrl || 'default';
 
       // Prefetch Next Page
@@ -510,7 +512,7 @@ export function useLeads({
         });
       }
     }
-  }, [query.data, page, pageSize, fetchAll, search, statusFilter, ownerFilter, activeOwnerIds, productFilter, pendingPaymentOnly, limit, dynamicFilters, tableName, companyId, queryClient, orgClient, excludeHistory, canViewAll, accessibleUserIds, hierarchyLoading]);
+  }, [query.data, page, pageSize, fetchAll, search, statusFilter, ownerFilter, activeOwnerIds, productFilter, pendingPaymentOnly, limit, dynamicFilters, tableName, companyId, queryClient, orgClient, excludeHistory, canViewAll, accessibleUserIds, hierarchyLoading, enabled]);
 
   return {
     ...query,

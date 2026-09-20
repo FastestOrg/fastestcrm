@@ -50,7 +50,9 @@ export interface Profile {
   phone: string | null;
   avatar_url: string | null;
   company_id: string | null;
-  [key: string]: any;
+  is_deactivated?: boolean | null;
+  company?: Record<string, unknown> | null;
+  [key: string]: unknown;
 }
 
 interface AuthContextType {
@@ -83,7 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('*')
+        .select('*, company:companies(*)')
         .eq('id', userId)
         .single();
       
@@ -92,7 +94,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setProfile(null);
       } else {
         lastProfileFetchIdRef.current = userId;
-        setProfile(data);
+        setProfile(data as unknown as Profile);
       }
     } catch (err) {
       console.error('[Auth] Error in fetchProfile:', err);

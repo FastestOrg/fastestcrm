@@ -71,9 +71,21 @@ export function LeadTimeline({ leadId, email, phone, leadHistory }: LeadTimeline
                 }
             }
 
-            // 3. Add Lead History
-            if (leadHistory && Array.isArray(leadHistory)) {
-                leadHistory.forEach((h: any, index: number) => {
+            // 3. Add Lead History (use passed prop or fetch on-demand if empty)
+            let effectiveHistory = leadHistory;
+            if ((!effectiveHistory || effectiveHistory.length === 0) && leadId) {
+                const { data: leadData } = await supabase
+                    .from('leads')
+                    .select('lead_history')
+                    .eq('id', leadId)
+                    .single();
+                if (leadData?.lead_history && Array.isArray(leadData.lead_history)) {
+                    effectiveHistory = leadData.lead_history;
+                }
+            }
+
+            if (effectiveHistory && Array.isArray(effectiveHistory)) {
+                effectiveHistory.forEach((h: any, index: number) => {
                     const timestampStr = h.date_time || h.timestamp || h.at;
                     let dateVal = new Date();
                     try {

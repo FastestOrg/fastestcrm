@@ -31,10 +31,37 @@ export function useLeadStatuses() {
             const targetUrl = (orgClient as any)?.supabaseUrl || 'default';
             const isDefaultHost = targetUrl.includes('api.fastestcrm.com') || targetUrl.includes('uykdyqdeyilpulaqlqip');
 
-            // Default Supabase host has company_lead_statuses; BYOS hosts prefer lead_statuses
-            const primaryTable = isDefaultHost ? 'company_lead_statuses' : 'lead_statuses';
-            const fallbackTable = isDefaultHost ? 'lead_statuses' : 'company_lead_statuses';
+            // Default Supabase host only has company_lead_statuses
+            if (isDefaultHost) {
+                try {
+                    const { data, error } = await orgClient
+                        .from('company_lead_statuses' as any)
+                        .select('*')
+                        .eq('company_id', company.id)
+                        .order('order_index', { ascending: true });
 
+                    if (error || !data) return [];
+                    return data.map((s: any) => ({
+                        id: s.id,
+                        company_id: s.company_id,
+                        label: s.label || s.name || 'Status',
+                        value: s.value || (s.name || s.label || 'status').toLowerCase().replace(/[^a-z0-9_]/g, '_'),
+                        color: s.color || '#3B82F6',
+                        category: s.category || s.status_type || 'other',
+                        sub_statuses: s.sub_statuses || [],
+                        order_index: s.order_index ?? s.sort_order ?? 0,
+                        is_active: s.is_active !== undefined ? s.is_active : true,
+                        status_type: s.status_type || 'simple',
+                        web_push_enabled: s.web_push_enabled || false
+                    }));
+                } catch (e) {
+                    return [];
+                }
+            }
+
+            // BYOS hosts: try lead_statuses first, then fallback to company_lead_statuses
+            const primaryTable = 'lead_statuses';
+            const fallbackTable = 'company_lead_statuses';
             const cacheKeyMissingPrimary = `${targetUrl}_missing_${primaryTable}`;
 
             try {
@@ -43,9 +70,9 @@ export function useLeadStatuses() {
                         .from(primaryTable as any)
                         .select('*')
                         .eq('company_id', company.id)
-                        .order(primaryTable === 'company_lead_statuses' ? 'order_index' : 'sort_order', { ascending: true });
+                        .order('sort_order', { ascending: true });
 
-                    if (!error && data && data.length > 0) {
+                    if (!error && data) {
                         return data.map((s: any) => ({
                             id: s.id,
                             company_id: s.company_id,
@@ -66,12 +93,12 @@ export function useLeadStatuses() {
                     }
                 }
 
-                // Fallback table
+                // Fallback table for BYOS
                 const { data: fbData, error: fbErr } = await orgClient
                     .from(fallbackTable as any)
                     .select('*')
                     .eq('company_id', company.id)
-                    .order(fallbackTable === 'company_lead_statuses' ? 'order_index' : 'sort_order', { ascending: true });
+                    .order('order_index', { ascending: true });
 
                 if (!fbErr && fbData) {
                     return fbData.map((s: any) => ({

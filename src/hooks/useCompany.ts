@@ -16,7 +16,7 @@ interface Company {
   admin_id: string;
   industry: string | null;
   mask_leads?: boolean;
-  features?: Record<string, any> | null;
+  features?: Record<string, unknown> | null;
   default_currency?: string | null;
   ai_calling_button_active?: boolean;
 }
@@ -31,7 +31,7 @@ async function fetchCompanyData(userId: string): Promise<Company | null> {
 
   if (profileError) return null;
 
-  let company = (profile as any)?.company as Company | null;
+  let company = (profile as unknown as Record<string, unknown>)?.company as Company | null;
 
   // Fallback for platform_admin or unjoined company
   if (!company) {
@@ -78,8 +78,10 @@ async function fetchCompanyData(userId: string): Promise<Company | null> {
 }
 
 export function useCompany() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const queryClient = useQueryClient();
+
+  const initialCompany = profile?.company ? (profile.company as unknown as Company) : undefined;
 
   const {
     data: company = null,
@@ -87,6 +89,7 @@ export function useCompany() {
   } = useQuery({
     queryKey: ['company', user?.id],
     queryFn: () => fetchCompanyData(user!.id),
+    initialData: initialCompany,
     enabled: !!user?.id,
     staleTime: 1000 * 60 * 5,  // Cache for 5 minutes — shared across all hook callers
     gcTime: 1000 * 60 * 10,    // Keep in memory for 10 minutes

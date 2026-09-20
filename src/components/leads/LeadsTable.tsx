@@ -1,4 +1,4 @@
-import { useState, useMemo, memo } from 'react';
+import { useState, useMemo, memo, useCallback } from 'react';
 import { Tables } from '@/integrations/supabase/types';
 import {
   Table,
@@ -52,13 +52,144 @@ type Lead = Tables<'leads'> & {
     full_name: string | null;
   } | null;
   reminder_at?: string | null;
-  lead_history?: any;
+  lead_history?: Record<string, unknown> | null;
 };
 
 interface ColumnConfigItem {
   id: string;
   visible: boolean;
 }
+
+interface LeadRowProps {
+  lead: Lead;
+  index: number;
+  isSelected: boolean;
+  onToggleSelect: (id: string) => void;
+  visibleColumnIds: string[];
+  columnDefinitionsWithCustom: Record<string, { label: string; render: (lead: Lead) => React.ReactNode }>;
+  statuses: CompanyLeadStatus[];
+  getStatusColor: (status: string) => string;
+  onChat: (lead: Lead) => void;
+  onViewDetails: (lead: Lead) => void;
+  onViewHistory: (lead: Lead) => void;
+  onEdit: (lead: Lead) => void;
+  onStatusChange: (leadId: string, newStatusValue: string) => void;
+  onCreatePaymentLink: (lead: Lead) => void;
+}
+
+const LeadRow = memo(function LeadRow({
+  lead,
+  index,
+  isSelected,
+  onToggleSelect,
+  visibleColumnIds,
+  columnDefinitionsWithCustom,
+  statuses,
+  getStatusColor,
+  onChat,
+  onViewDetails,
+  onViewHistory,
+  onEdit,
+  onStatusChange,
+  onCreatePaymentLink,
+}: LeadRowProps) {
+  return (
+    <TableRow className="group animate-row-fade-in" style={{ animationDelay: `${index * 30}ms` }}>
+      <TableCell>
+        <input
+          type="checkbox"
+          className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
+          checked={isSelected}
+          onChange={() => onToggleSelect(lead.id)}
+        />
+      </TableCell>
+
+      {visibleColumnIds.map((colId) => (
+        <TableCell key={colId}>
+          {columnDefinitionsWithCustom[colId]?.render(lead)}
+        </TableCell>
+      ))}
+
+      <TableCell>
+        <div className="flex items-center justify-end gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 opacity-70 group-hover:opacity-100 transition-opacity"
+            onClick={() => onChat(lead)}
+            title="Open WhatsApp & Email Inbox"
+          >
+            <MessageSquare className="h-4 w-4" />
+          </Button>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="bg-popover border-border">
+              <DropdownMenuItem onClick={() => onChat(lead)} className="text-emerald-600 dark:text-emerald-400 font-medium">
+                <MessageSquare className="mr-2 h-4 w-4" />
+                Open Inbox / Chat
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onViewDetails(lead)}>
+                View Details
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onViewHistory(lead)}>
+                View History
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onEdit(lead)}>
+                Edit Lead
+              </DropdownMenuItem>
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger>Change Status</DropdownMenuSubTrigger>
+                <DropdownMenuSubContent>
+                  {statuses.map((status) => {
+                    const isStatusSelected = lead.status === status.value;
+                    const statusColor = status.color || getStatusColor(status.value);
+                    return (
+                      <DropdownMenuItem
+                        key={status.id}
+                        onClick={() => onStatusChange(lead.id, status.value)}
+                        className={cn(
+                          "capitalize cursor-pointer flex items-center justify-between gap-2 transition-colors",
+                          isStatusSelected && "font-semibold text-white focus:text-white"
+                        )}
+                        style={isStatusSelected ? { backgroundColor: statusColor, color: '#ffffff' } : undefined}
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div
+                            className={cn("w-2 h-2 rounded-full shrink-0", isStatusSelected && "ring-1 ring-white/40")}
+                            style={{ backgroundColor: isStatusSelected ? '#ffffff' : statusColor }}
+                          />
+                          <span className="truncate">{status.label}</span>
+                        </div>
+                        {isStatusSelected && <Check className="h-4 w-4 shrink-0 text-white ml-auto" />}
+                      </DropdownMenuItem>
+                    );
+                  })}
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+              <DropdownMenuItem onClick={() => onCreatePaymentLink(lead)}>
+                Create Payment Link
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </TableCell>
+    </TableRow>
+  );
+}, (prev, next) => {
+  return (
+    prev.lead === next.lead &&
+    prev.isSelected === next.isSelected &&
+    prev.index === next.index &&
+    prev.visibleColumnIds === next.visibleColumnIds &&
+    prev.columnDefinitionsWithCustom === next.columnDefinitionsWithCustom &&
+    prev.statuses === next.statuses
+  );
+});
 
 interface LeadsTableProps {
   leads: Lead[];
@@ -83,7 +214,7 @@ export const LeadsTable = memo(function LeadsTable({ leads, loading, selectedLea
   const [pendingStatus, setPendingStatus] = useState<{ leadId: string; status: CompanyLeadStatus } | null>(null);
   const [reminderDialogOpen, setReminderDialogOpen] = useState(false);
 
-  const handleStatusChange = async (leadId: string, newStatusValue: string, metadata?: Record<string, any>) => {
+  const handleStatusChange = useCallback(async (leadId: string, newStatusValue: string, metadata?: Record<string, unknown>) => {
     const newStatus = statuses?.find(s => s.value === newStatusValue);
 
     // Check if status requires date/time input (Derived Status)
@@ -94,9 +225,9 @@ export const LeadsTable = memo(function LeadsTable({ leads, loading, selectedLea
     }
 
     try {
-      const updates: any = {
+      const updates: { id: string; status: string; [key: string]: unknown } = {
         id: leadId,
-        status: newStatusValue as any
+        status: newStatusValue
       };
 
       if (metadata && metadata.reminder_at) {
@@ -114,12 +245,12 @@ export const LeadsTable = memo(function LeadsTable({ leads, loading, selectedLea
     } catch (error) {
       toast.error('Failed to update status');
     }
-  };
+  }, [statuses, updateLead]);
 
   const handleReminderConfirm = async (dateTime: Date | null, sendNotification: boolean) => {
     if (!pendingStatus) return;
 
-    const metadata: Record<string, any> = {};
+    const metadata: Record<string, unknown> = {};
     if (dateTime) {
       metadata.reminder_at = dateTime.toISOString();
     }
@@ -135,7 +266,7 @@ export const LeadsTable = memo(function LeadsTable({ leads, loading, selectedLea
     setPendingStatus(null);
   };
 
-  const getStatusDisplay = (lead: Lead) => {
+  const getStatusDisplay = useCallback((lead: Lead) => {
     const status = statuses.find(s => s.value === lead.status);
     const label = status?.label || lead.status;
 
@@ -148,9 +279,9 @@ export const LeadsTable = memo(function LeadsTable({ leads, loading, selectedLea
     }
 
     return label;
-  };
+  }, [statuses]);
 
-  const handleProductChange = async (leadId: string, productName: string, productCategory?: string) => {
+  const handleProductChange = useCallback(async (leadId: string, productName: string, productCategory?: string) => {
     // If clearing
     if (!productName || productName === 'none') {
       try {
@@ -178,20 +309,21 @@ export const LeadsTable = memo(function LeadsTable({ leads, loading, selectedLea
         product_category: product.category,
         product_purchased: product.name
       });
-      toast.success('Product updated successfully');
+      toast.success(`Product updated successfully`);
     } catch (error) {
       toast.error('Failed to update product');
     }
-  };
+  }, [products, updateLead]);
 
-  const handleCreatePaymentLink = async (lead: Lead) => {
+  const handleCreatePaymentLink = useCallback(async (lead: Lead) => {
     if (!lead.product_purchased) {
       toast.error('Please select a specific product to create a payment link');
       return;
     }
 
     // Match by name. Ideally we should match by ID if we stored product_id
-    const selectedProgram = products?.find(p => p.name === lead.product_purchased && (!(lead as any).product_category || p.category === (lead as any).product_category));
+    const leadCategory = (lead as unknown as Record<string, unknown>).product_category;
+    const selectedProgram = products?.find(p => p.name === lead.product_purchased && (!leadCategory || p.category === leadCategory));
 
 
     if (!selectedProgram) {
@@ -244,12 +376,12 @@ export const LeadsTable = memo(function LeadsTable({ leads, loading, selectedLea
 
       toast.dismiss();
       toast.success('Payment link created successfully');
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.dismiss();
       console.error('Payment Link Error:', error);
-      toast.error(error.message || 'Failed to create payment link');
+      toast.error(error instanceof Error ? error.message : 'Failed to create payment link');
     }
-  };
+  }, [products, updateLead]);
 
   const columnDefinitions = useMemo<Record<string, { label: string, render: (lead: Lead) => React.ReactNode }>>(() => ({
     priority: {
@@ -347,7 +479,7 @@ export const LeadsTable = memo(function LeadsTable({ leads, loading, selectedLea
             <Button variant="outline" className="w-[180px] h-8 justify-between px-3 text-sm font-normal text-muted-foreground">
               <span className="truncate text-foreground">
                 {lead.product_purchased
-                  ? `${(lead as any).product_category ? `${(lead as any).product_category} - ` : ''}${lead.product_purchased}`
+                  ? `${(lead as unknown as Record<string, unknown>).product_category ? `${(lead as unknown as Record<string, unknown>).product_category} - ` : ''}${lead.product_purchased}`
                   : "Select Product"}
               </span>
               <ChevronDown className="h-4 w-4 opacity-50 ml-2" />
@@ -446,7 +578,7 @@ export const LeadsTable = memo(function LeadsTable({ leads, loading, selectedLea
       customColumns.forEach(col => {
         base[col.id] = {
           label: col.label,
-          render: (lead) => (lead as any)[col.id] || '-'
+          render: (lead) => ((lead as unknown as Record<string, unknown>)[col.id] as string | number) || '-'
         };
       });
     }
@@ -480,6 +612,30 @@ export const LeadsTable = memo(function LeadsTable({ leads, loading, selectedLea
   }, [columnConfig, columnDefinitionsWithCustom, customColumns]);
 
 
+  const allSelected = leads.length > 0 && leads.every((lead) => selectedLeads.has(lead.id));
+
+  const toggleAll = useCallback(() => {
+    if (allSelected) {
+      const newSelected = new Set(selectedLeads);
+      leads.forEach((lead) => newSelected.delete(lead.id));
+      onSelectionChange(newSelected);
+    } else {
+      const newSelected = new Set(selectedLeads);
+      leads.forEach((lead) => newSelected.add(lead.id));
+      onSelectionChange(newSelected);
+    }
+  }, [allSelected, leads, onSelectionChange, selectedLeads]);
+
+  const toggleOne = useCallback((id: string) => {
+    const newSelected = new Set(selectedLeads);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    onSelectionChange(newSelected);
+  }, [selectedLeads, onSelectionChange]);
+
   if (loading) {
     return (
       <div className="space-y-3">
@@ -497,30 +653,6 @@ export const LeadsTable = memo(function LeadsTable({ leads, loading, selectedLea
       </div>
     );
   }
-
-  const allSelected = leads.length > 0 && leads.every((lead) => selectedLeads.has(lead.id));
-
-  const toggleAll = () => {
-    if (allSelected) {
-      const newSelected = new Set(selectedLeads);
-      leads.forEach((lead) => newSelected.delete(lead.id));
-      onSelectionChange(newSelected);
-    } else {
-      const newSelected = new Set(selectedLeads);
-      leads.forEach((lead) => newSelected.add(lead.id));
-      onSelectionChange(newSelected);
-    }
-  };
-
-  const toggleOne = (id: string) => {
-    const newSelected = new Set(selectedLeads);
-    if (newSelected.has(id)) {
-      newSelected.delete(id);
-    } else {
-      newSelected.add(id);
-    }
-    onSelectionChange(newSelected);
-  };
 
   return (
     <>
@@ -546,91 +678,23 @@ export const LeadsTable = memo(function LeadsTable({ leads, loading, selectedLea
           </TableHeader>
           <TableBody>
             {leads.map((lead, index) => (
-              <TableRow key={lead.id} className="group animate-row-fade-in" style={{ animationDelay: `${index * 30}ms` }}>
-                <TableCell>
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                    checked={selectedLeads.has(lead.id)}
-                    onChange={() => toggleOne(lead.id)}
-                  />
-                </TableCell>
-
-                {visibleColumnIds.map(colId => (
-                  <TableCell key={colId}>
-                    {columnDefinitionsWithCustom[colId]?.render(lead)}
-                  </TableCell>
-                ))}
-
-                <TableCell>
-                  <div className="flex items-center justify-end gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 opacity-70 group-hover:opacity-100 transition-opacity"
-                      onClick={() => setChatLead(lead)}
-                      title="Open WhatsApp & Email Inbox"
-                    >
-                      <MessageSquare className="h-4 w-4" />
-                    </Button>
-
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="bg-popover border-border">
-                        <DropdownMenuItem onClick={() => setChatLead(lead)} className="text-emerald-600 dark:text-emerald-400 font-medium">
-                          <MessageSquare className="mr-2 h-4 w-4" />
-                          Open Inbox / Chat
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setViewingLead(lead)}>
-                          View Details
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setViewingHistoryLead(lead)}>
-                          View History
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setEditingLead(lead)}>
-                          Edit Lead
-                        </DropdownMenuItem>
-                        <DropdownMenuSub>
-                          <DropdownMenuSubTrigger>Change Status</DropdownMenuSubTrigger>
-                          <DropdownMenuSubContent>
-                            {statuses.map((status) => {
-                              const isSelected = lead.status === status.value;
-                              const statusColor = status.color || getStatusColor(status.value);
-                              return (
-                                <DropdownMenuItem
-                                  key={status.id}
-                                  onClick={() => handleStatusChange(lead.id, status.value)}
-                                  className={cn(
-                                    "capitalize cursor-pointer flex items-center justify-between gap-2 transition-colors",
-                                    isSelected && "font-semibold text-white focus:text-white"
-                                  )}
-                                  style={isSelected ? { backgroundColor: statusColor, color: '#ffffff' } : undefined}
-                                >
-                                  <div className="flex items-center gap-2 min-w-0">
-                                    <div
-                                      className={cn("w-2 h-2 rounded-full shrink-0", isSelected && "ring-1 ring-white/40")}
-                                      style={{ backgroundColor: isSelected ? '#ffffff' : statusColor }}
-                                    />
-                                    <span className="truncate">{status.label}</span>
-                                  </div>
-                                  {isSelected && <Check className="h-4 w-4 shrink-0 text-white ml-auto" />}
-                                </DropdownMenuItem>
-                              );
-                            })}
-                          </DropdownMenuSubContent>
-                        </DropdownMenuSub>
-                        <DropdownMenuItem onClick={() => handleCreatePaymentLink(lead)}>
-                          Create Payment Link
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </TableCell>
-              </TableRow>
+              <LeadRow
+                key={lead.id}
+                lead={lead}
+                index={index}
+                isSelected={selectedLeads.has(lead.id)}
+                onToggleSelect={toggleOne}
+                visibleColumnIds={visibleColumnIds}
+                columnDefinitionsWithCustom={columnDefinitionsWithCustom}
+                statuses={statuses}
+                getStatusColor={getStatusColor}
+                onChat={setChatLead}
+                onViewDetails={setViewingLead}
+                onViewHistory={setViewingHistoryLead}
+                onEdit={setEditingLead}
+                onStatusChange={handleStatusChange}
+                onCreatePaymentLink={handleCreatePaymentLink}
+              />
             ))}
           </TableBody>
         </Table>

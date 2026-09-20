@@ -85,9 +85,35 @@ export default function TravelAllLeads() {
     queryKey: ['travelLeadsFilterOptions', company?.id, canViewAll, accessibleUserIds, hierarchyLoading],
     queryFn: async () => {
       if (!company?.id) return null;
-      const [ownersResult, statusesResult] = await Promise.all([
+      const targetUrl = (orgClient as any)?.supabaseUrl || 'default';
+      const isDefaultHost = targetUrl.includes('api.fastestcrm.com') || targetUrl.includes('uykdyqdeyilpulaqlqip');
+
+      const fetchStatuses = async () => {
+        if (isDefaultHost) {
+          const { data } = await orgClient
+            .from('company_lead_statuses' as any)
+            .select('*')
+            .eq('company_id', company.id)
+            .order('order_index');
+          return data || [];
+        }
+        const { data, error } = await orgClient
+          .from('lead_statuses' as any)
+          .select('*')
+          .eq('company_id', company.id)
+          .order('sort_order');
+        if (!error && data && data.length > 0) return data;
+        const { data: fbData } = await orgClient
+          .from('company_lead_statuses' as any)
+          .select('*')
+          .eq('company_id', company.id)
+          .order('order_index');
+        return fbData || [];
+      };
+
+      const [ownersResult, statusesData] = await Promise.all([
         supabase.from('profiles').select('id, full_name').eq('company_id', company.id).not('full_name', 'is', null),
-        orgClient.from('lead_statuses' as any).select('*').eq('company_id', company.id).order('sort_order'),
+        fetchStatuses(),
       ]);
       let activeOwners = ownersResult.data || [];
       if (activeOwners.length > 0) {
@@ -98,11 +124,6 @@ export default function TravelAllLeads() {
       if (!hierarchyLoading && !canViewAll && accessibleUserIds.length > 0) {
         const accessibleSet = new Set(accessibleUserIds);
         activeOwners = activeOwners.filter(o => accessibleSet.has(o.id));
-      }
-      let statusesData = statusesResult.data as any[] | null;
-      if (!statusesData || statusesData.length === 0) {
-        const { data: fbData } = await orgClient.from('company_lead_statuses' as any).select('*').eq('company_id', company.id).order('order_index');
-        statusesData = fbData;
       }
       return {
         owners: activeOwners.map(o => ({ label: o.full_name || 'Unknown', value: o.id })),

@@ -177,44 +177,23 @@ function AuthRoute() {
 
 /** Basic protected route guard — also blocks deactivated users */
 function Protected({ children }: { children: React.ReactNode }) {
-  const { user, loading: authLoading, signOut } = useAuth();
+  const { user, profile, loading: authLoading, signOut } = useAuth();
   const location = useLocation();
   const { toast } = useToast();
-  const [checking, setChecking] = useState(true);
-  const [deactivated, setDeactivated] = useState(false);
 
   useEffect(() => {
-    let cancelled = false;
-    async function checkDeactivation() {
-      if (!user) {
-        setChecking(false);
-        return;
-      }
-      const { data } = await (await import('@/integrations/supabase/client')).supabase
-        .from('profiles')
-        .select('id, is_deactivated')
-        .eq('id', user.id)
-        .maybeSingle() as any;
-
-      if (cancelled) return;
-
-      if ((data as any)?.is_deactivated) {
-        setDeactivated(true);
-        toast({
-          title: 'Account Deactivated',
-          description: 'Your account has been deactivated. Please contact your administrator.',
-          variant: 'destructive',
-        });
-        await signOut();
-      }
-      setChecking(false);
+    if (user && profile?.is_deactivated) {
+      toast({
+        title: 'Account Deactivated',
+        description: 'Your account has been deactivated. Please contact your administrator.',
+        variant: 'destructive',
+      });
+      signOut();
     }
-    checkDeactivation();
-    return () => { cancelled = true; };
-  }, [user]);
+  }, [user, profile?.is_deactivated, signOut, toast]);
 
-  if (authLoading || checking) return <FullDashboardSkeleton />;
-  if (!user || deactivated) return <Navigate to="/auth" state={{ from: location }} replace />;
+  if (authLoading) return <FullDashboardSkeleton />;
+  if (!user || profile?.is_deactivated) return <Navigate to="/auth" state={{ from: location }} replace />;
 
   return <>{children}</>;
 }

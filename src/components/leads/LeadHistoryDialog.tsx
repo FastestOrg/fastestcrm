@@ -7,10 +7,14 @@ import {
 } from '@/components/ui/dialog';
 import { Tables } from '@/integrations/supabase/types';
 import { format } from 'date-fns';
-import { History } from 'lucide-react';
+import { History, Loader2 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useTeam } from '@/hooks/useTeam';
 import { formatLeadHistoryEntry, LeadHistoryEntry } from '@/lib/leadHistory';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useOrgClient } from '@/hooks/useOrgClient';
+import { useLeadsTable } from '@/hooks/useLeadsTable';
 
 type Lead = Tables<'leads'> & {
     lead_history?: LeadHistoryEntry[] | null;
@@ -24,13 +28,41 @@ interface LeadHistoryDialogProps {
 
 export function LeadHistoryDialog({ open, onOpenChange, lead }: LeadHistoryDialogProps) {
     const { members } = useTeam();
+    const { orgClient } = useOrgClient();
+    const { tableName } = useLeadsTable();
+
+    const hasEmbeddedHistory = !!(lead?.lead_history && Array.isArray(lead.lead_history) && lead.lead_history.length > 0);
+
+    // On-demand fetch when lead_history is excluded from main leads table queries
+    const { data: fetchedHistory, isLoading } = useQuery({
+        queryKey: ['lead_history', (orgClient as any)?.supabaseUrl || 'default', tableName, lead?.id],
+        queryFn: async () => {
+            if (!lead?.id) return [];
+            const client = orgClient || supabase;
+            const { data, error } = await client
+                .from(tableName as any)
+                .select('lead_history')
+                .eq('id', lead.id)
+                .single();
+
+            if (error) {
+                console.error('[LeadHistoryDialog] Failed to fetch lead history:', error);
+                return [];
+            }
+            return ((data as any)?.lead_history as LeadHistoryEntry[]) || [];
+        },
+        enabled: open && !!lead?.id && !hasEmbeddedHistory,
+        staleTime: 30000,
+    });
 
     if (!lead) return null;
 
+    const rawHistory: LeadHistoryEntry[] = hasEmbeddedHistory
+        ? (lead.lead_history as LeadHistoryEntry[])
+        : (fetchedHistory || []);
+
     // Sort history by timestamp descending (newest first)
-    const history = lead.lead_history
-        ? [...lead.lead_history].reverse()
-        : [];
+    const history = [...rawHistory].reverse();
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -47,7 +79,12 @@ export function LeadHistoryDialog({ open, onOpenChange, lead }: LeadHistoryDialo
 
                 <ScrollArea className="flex-1 pr-4 -mr-4">
                     <div className="space-y-6 p-1">
-                        {history.length > 0 ? (
+                        {isLoading && !hasEmbeddedHistory ? (
+                            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground gap-2">
+                                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                                <p className="text-sm">Loading history...</p>
+                            </div>
+                        ) : history.length > 0 ? (
                             <div className="relative border-l border-muted ml-3 space-y-6">
                                 {history.map((entry, index) => {
                                     const details = formatLeadHistoryEntry(entry, members);

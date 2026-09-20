@@ -26,7 +26,7 @@ interface ReportPrintableTemplateProps {
     topSegment: string;
     avgDealSize: number;
   };
-  leads: Lead[];
+  leads?: Lead[];
   leadStatuses: CompanyLeadStatus[];
   customColumns?: CustomColumn[];
   ownersMap?: Record<string, string>;
@@ -42,9 +42,10 @@ export const ReportPrintableTemplate = React.forwardRef<HTMLDivElement, ReportPr
       logoUrl,
       generatedBy,
       currencySymbol = '₹',
+      groupSummary = [],
       groupByLabel = 'Segment',
       kpiStats,
-      leads,
+      leads = [],
       leadStatuses,
       customColumns = [],
       ownersMap = {},
@@ -57,48 +58,53 @@ export const ReportPrintableTemplate = React.forwardRef<HTMLDivElement, ReportPr
     const cellMetric = config.cellMetric || 'count';
 
     // Helper to get dimension item for lead
-    const getLeadDimItem = (lead: Lead, dimension: string) => {
-      if (dimension === 'owner') {
-        const key = lead.sales_owner_id || 'unassigned';
-        const label = ownersMap[lead.sales_owner_id || ''] || lead.sales_owner?.full_name || 'Unassigned';
-        return { key, label };
-      }
-      if (dimension === 'status') {
-        const key = lead.status || 'unknown';
-        const stObj = leadStatuses.find((s) => s.value === lead.status);
-        const label = stObj ? stObj.label : lead.status ? lead.status.replace(/_/g, ' ') : 'Unknown';
-        return { key, label, color: stObj?.color || '#3B82F6' };
-      }
-      if (dimension === 'source') {
-        const key = (lead.lead_source || 'direct').trim().toLowerCase();
-        const label = lead.lead_source?.trim() || 'Direct / Organic';
-        return { key, label };
-      }
-      if (dimension === 'product') {
-        const key = (lead.product_purchased || 'unspecified').trim().toLowerCase();
-        const label = lead.product_purchased?.trim() || 'General Inquiry';
-        return { key, label };
-      }
-      if (dimension === 'priority') {
-        const score = lead.priority_score || 0;
-        const level = score >= 70 ? 'hot' : score >= 40 ? 'warm' : 'cold';
-        return { key: level, label: level === 'hot' ? 'Hot' : level === 'warm' ? 'Warm' : 'Cold' };
-      }
-      if (dimension === 'date_month' || dimension === 'date') {
-        if (lead.created_at) {
-          const d = new Date(lead.created_at);
-          return { key: format(d, 'yyyy-MM'), label: format(d, 'MMMM yyyy') };
+    const getLeadDimItem = React.useCallback(
+      (lead: Lead, dimension: string) => {
+        if (dimension === 'owner') {
+          const key = lead.sales_owner_id || 'unassigned';
+          const label = ownersMap[lead.sales_owner_id || ''] || lead.sales_owner?.full_name || 'Unassigned';
+          return { key, label };
         }
-        return { key: 'no-date', label: 'No Date' };
-      }
-      if (dimension.startsWith('custom:')) {
-        const colId = dimension.replace('custom:', '');
-        const val = (lead as any)[colId] ?? (lead as any).custom_data?.[colId] ?? '';
-        const str = String(val).trim();
-        return { key: str.toLowerCase() || 'empty', label: str || '(Empty)' };
-      }
-      return { key: 'other', label: 'Other' };
-    };
+        if (dimension === 'status') {
+          const key = lead.status || 'unknown';
+          const stObj = leadStatuses.find((s) => s.value === lead.status);
+          const label = stObj ? stObj.label : lead.status ? lead.status.replace(/_/g, ' ') : 'Unknown';
+          return { key, label, color: stObj?.color || '#3B82F6' };
+        }
+        if (dimension === 'source') {
+          const key = (lead.lead_source || 'direct').trim().toLowerCase();
+          const label = lead.lead_source?.trim() || 'Direct / Organic';
+          return { key, label };
+        }
+        if (dimension === 'product') {
+          const key = (lead.product_purchased || 'unspecified').trim().toLowerCase();
+          const label = lead.product_purchased?.trim() || 'General Inquiry';
+          return { key, label };
+        }
+        if (dimension === 'priority') {
+          const score = lead.priority_score || 0;
+          const level = score >= 70 ? 'hot' : score >= 40 ? 'warm' : 'cold';
+          return { key: level, label: level === 'hot' ? 'Hot' : level === 'warm' ? 'Warm' : 'Cold' };
+        }
+        if (dimension === 'date_month' || dimension === 'date') {
+          if (lead.created_at) {
+            const d = new Date(lead.created_at);
+            return { key: format(d, 'yyyy-MM'), label: format(d, 'MMMM yyyy') };
+          }
+          return { key: 'no-date', label: 'No Date' };
+        }
+        if (dimension.startsWith('custom:')) {
+          const colId = dimension.replace('custom:', '');
+          const leadObj = lead as unknown as Record<string, unknown>;
+          const customData = lead.custom_data as Record<string, unknown> | undefined;
+          const val = leadObj[colId] ?? customData?.[colId] ?? '';
+          const str = String(val).trim();
+          return { key: str.toLowerCase() || 'empty', label: str || '(Empty)' };
+        }
+        return { key: 'other', label: 'Other' };
+      },
+      [ownersMap, leadStatuses]
+    );
 
     const getDimTitle = (dim: string) => {
       if (dim === 'owner') return 'Sales Owner';
@@ -133,10 +139,31 @@ export const ReportPrintableTemplate = React.forwardRef<HTMLDivElement, ReportPr
         if (!map.has(item.key)) map.set(item.key, item);
       });
       return Array.from(map.values()).slice(0, 10);
-    }, [colDim, leadStatuses, leads]);
+    }, [colDim, leadStatuses, leads, getLeadDimItem]);
 
     // Matrix rows
     const matrixRows = React.useMemo(() => {
+      if ((!leads || leads.length === 0) && groupSummary && groupSummary.length > 0) {
+        return groupSummary.map((g) => {
+          const cells: Record<string, { count: number; revenue: number }> = {};
+          colItems.forEach((c) => {
+            const count = g.statusCounts?.[c.key] || 0;
+            cells[c.key] = {
+              count,
+              revenue: c.key === 'paid' ? g.revenue : 0,
+            };
+          });
+          return {
+            key: g.key,
+            name: g.name,
+            total: g.total,
+            revenue: g.revenue,
+            paid: g.paid,
+            cells,
+          };
+        });
+      }
+
       const rowMap: Record<
         string,
         {
@@ -149,7 +176,7 @@ export const ReportPrintableTemplate = React.forwardRef<HTMLDivElement, ReportPr
         }
       > = {};
 
-      leads.forEach((l) => {
+      (leads || []).forEach((l) => {
         const rItem = getLeadDimItem(l, rowDim);
         const cItem = getLeadDimItem(l, colDim);
 
@@ -177,7 +204,7 @@ export const ReportPrintableTemplate = React.forwardRef<HTMLDivElement, ReportPr
       });
 
       return Object.values(rowMap).sort((a, b) => b.total - a.total);
-    }, [leads, rowDim, colDim]);
+    }, [leads, rowDim, colDim, groupSummary, colItems, getLeadDimItem]);
 
     return (
       <div
