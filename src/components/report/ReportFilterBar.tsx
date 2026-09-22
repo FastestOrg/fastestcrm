@@ -73,6 +73,8 @@ interface ReportFilterBarProps {
   customColumns: CustomColumn[];
   totalLeadsCount: number;
   filteredLeadsCount: number;
+  canViewAll?: boolean;
+  isIndividual?: boolean;
 }
 
 export function ReportFilterBar({
@@ -85,6 +87,8 @@ export function ReportFilterBar({
   customColumns,
   totalLeadsCount,
   filteredLeadsCount,
+  canViewAll = true,
+  isIndividual = false,
 }: ReportFilterBarProps) {
   const [selectedCustomCol, setSelectedCustomCol] = useState<string>('');
   const [customColValue, setCustomColValue] = useState<string>('');
@@ -249,14 +253,16 @@ export function ReportFilterBar({
           >
             Hot Priority
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => applyPreset('unassigned')}
-            className="text-xs h-8 px-2.5 bg-background/60 hover:bg-blue-500/10 hover:text-blue-500 hover:border-blue-500/40"
-          >
-            Unassigned
-          </Button>
+          {canViewAll && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => applyPreset('unassigned')}
+              className="text-xs h-8 px-2.5 bg-background/60 hover:bg-blue-500/10 hover:text-blue-500 hover:border-blue-500/40"
+            >
+              Unassigned
+            </Button>
+          )}
 
           {activeFiltersCount > 0 && (
             <Button
@@ -347,56 +353,75 @@ export function ReportFilterBar({
         </Popover>
 
         {/* 3. Sales Owner Dropdown Multi-Select */}
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              size="sm"
-              className={`h-9 text-xs justify-between px-3 bg-background/80 border-border/70 font-normal ${
-                filters.owners.length > 0 ? 'border-primary/60 text-primary' : ''
-              }`}
-            >
-              <div className="flex items-center gap-1.5 truncate">
-                <User className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                <span className="truncate">
-                  {filters.owners.length === 0
-                    ? 'All Owners'
-                    : `${filters.owners.length} Owners`}
-                </span>
-              </div>
-              <ChevronDown className="h-3 w-3 opacity-50 shrink-0" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-56 p-2 bg-popover border-border max-h-64 overflow-y-auto" align="start">
-            <div className="text-xs font-semibold text-muted-foreground mb-2 px-2">Filter by Sales Rep</div>
-            <div className="space-y-1">
-              <button
-                onClick={() => toggleArrayFilter('owners', 'unassigned')}
-                className={`w-full flex items-center justify-between text-left px-2 py-1.5 rounded text-xs transition-colors ${
-                  filters.owners.includes('unassigned') ? 'bg-primary/15 text-primary font-medium' : 'hover:bg-muted text-foreground'
+        {isIndividual ? (
+          <Button
+            variant="outline"
+            size="sm"
+            disabled
+            className="h-9 text-xs justify-between px-3 bg-muted/40 border-border/70 opacity-80 cursor-not-allowed font-normal"
+            title="Individual reps only view their own leads"
+          >
+            <div className="flex items-center gap-1.5 truncate">
+              <User className="h-3.5 w-3.5 text-primary shrink-0" />
+              <span className="truncate font-medium text-foreground">My Leads (Self)</span>
+            </div>
+          </Button>
+        ) : (
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className={`h-9 text-xs justify-between px-3 bg-background/80 border-border/70 font-normal ${
+                  filters.owners.length > 0 ? 'border-primary/60 text-primary' : ''
                 }`}
               >
-                <span>Unassigned Leads</span>
-                {filters.owners.includes('unassigned') && <X className="h-3 w-3 text-primary shrink-0" />}
-              </button>
-              {teamMembers.map((m) => {
-                const checked = filters.owners.includes(m.id);
-                return (
+                <div className="flex items-center gap-1.5 truncate">
+                  <User className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  <span className="truncate">
+                    {filters.owners.length === 0
+                      ? canViewAll ? 'All Owners' : 'My Team'
+                      : `${filters.owners.length} Owners`}
+                  </span>
+                </div>
+                <ChevronDown className="h-3 w-3 opacity-50 shrink-0" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-56 p-2 bg-popover border-border max-h-64 overflow-y-auto" align="start">
+              <div className="text-xs font-semibold text-muted-foreground mb-2 px-2">
+                {canViewAll ? 'Filter by Sales Rep' : 'Filter by Team Member'}
+              </div>
+              <div className="space-y-1">
+                {canViewAll && (
                   <button
-                    key={m.id}
-                    onClick={() => toggleArrayFilter('owners', m.id)}
+                    onClick={() => toggleArrayFilter('owners', 'unassigned')}
                     className={`w-full flex items-center justify-between text-left px-2 py-1.5 rounded text-xs transition-colors ${
-                      checked ? 'bg-primary/15 text-primary font-medium' : 'hover:bg-muted text-foreground'
+                      filters.owners.includes('unassigned') ? 'bg-primary/15 text-primary font-medium' : 'hover:bg-muted text-foreground'
                     }`}
                   >
-                    <span className="truncate">{m.name}</span>
-                    {checked && <X className="h-3 w-3 text-primary shrink-0" />}
+                    <span>Unassigned Leads</span>
+                    {filters.owners.includes('unassigned') && <X className="h-3 w-3 text-primary shrink-0" />}
                   </button>
-                );
-              })}
-            </div>
-          </PopoverContent>
-        </Popover>
+                )}
+                {teamMembers.map((m) => {
+                  const checked = filters.owners.includes(m.id);
+                  return (
+                    <button
+                      key={m.id}
+                      onClick={() => toggleArrayFilter('owners', m.id)}
+                      className={`w-full flex items-center justify-between text-left px-2 py-1.5 rounded text-xs transition-colors ${
+                        checked ? 'bg-primary/15 text-primary font-medium' : 'hover:bg-muted text-foreground'
+                      }`}
+                    >
+                      <span className="truncate">{m.name}</span>
+                      {checked && <X className="h-3 w-3 text-primary shrink-0" />}
+                    </button>
+                  );
+                })}
+              </div>
+            </PopoverContent>
+          </Popover>
+        )}
 
         {/* 4. Lead Source Dropdown Multi-Select */}
         <Popover>

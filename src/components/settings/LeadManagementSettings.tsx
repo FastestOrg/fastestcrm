@@ -20,7 +20,7 @@ import { useOrgClient } from '@/hooks/useOrgClient';
 import { useLeadsTable } from '@/hooks/useLeadsTable';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
-import { Loader2, Fingerprint, Merge, Phone, Mail, ShieldCheck, Info, CheckCircle2, Trash2, AlertTriangle, Zap } from 'lucide-react';
+import { Loader2, Fingerprint, Merge, Phone, Mail, ShieldCheck, Info, CheckCircle2, Trash2, AlertTriangle, Zap, StopCircle } from 'lucide-react';
 
 export default function LeadManagementSettings() {
   const {
@@ -31,8 +31,10 @@ export default function LeadManagementSettings() {
     isToggling,
     mergeDuplicates,
     isMerging,
+    cancelMerge,
     mergeResult,
     progressMsg,
+    mergedStats,
   } = useLeadDedup();
 
   const { company } = useCompany();
@@ -347,7 +349,7 @@ export default function LeadManagementSettings() {
             </div>
           ) : (
             <>
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 <Button
                   onClick={() => setShowMergeDialog(true)}
                   disabled={isMerging}
@@ -366,15 +368,39 @@ export default function LeadManagementSettings() {
                     </>
                   )}
                 </Button>
+
+                {isMerging && (
+                  <Button
+                    onClick={cancelMerge}
+                    variant="ghost"
+                    size="sm"
+                    className="gap-1.5 text-destructive hover:text-destructive hover:bg-destructive/10 border border-destructive/20"
+                  >
+                    <StopCircle className="h-4 w-4" />
+                    Stop Merge
+                  </Button>
+                )}
+
                 <p className="text-sm text-muted-foreground">
                   This will find and merge all leads with duplicate {isPhoneUnique && isEmailUnique ? 'phone numbers or emails' : isPhoneUnique ? 'phone numbers' : 'emails'}.
                 </p>
               </div>
 
-              {isMerging && progressMsg && (
-                <div className="flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
-                  <Loader2 className="h-4 w-4 animate-spin shrink-0 text-blue-500" />
-                  <span>{progressMsg}</span>
+              {isMerging && (
+                <div className="p-4 rounded-xl border border-blue-500/20 bg-blue-500/10 space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="flex items-center gap-2 font-medium text-blue-700 dark:text-blue-300">
+                      <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+                      {progressMsg || 'Processing duplicate leads...'}
+                    </span>
+                    <Badge variant="secondary" className="bg-blue-500/20 text-blue-700 dark:text-blue-300 border-blue-500/30 font-mono text-xs">
+                      Batch #{mergedStats.batchCount || 1}
+                    </Badge>
+                  </div>
+                  <div className="flex gap-4 text-xs text-muted-foreground pt-1 border-t border-blue-500/10">
+                    <span>Groups merged: <strong className="text-foreground">{mergedStats.mergedGroups.toLocaleString()}</strong></span>
+                    <span>Redundant leads removed: <strong className="text-foreground">{mergedStats.deletedRecords.toLocaleString()}</strong></span>
+                  </div>
                 </div>
               )}
 
@@ -382,11 +408,11 @@ export default function LeadManagementSettings() {
                 <div className="flex gap-3 p-4 rounded-xl border border-green-500/20 bg-green-500/5">
                   <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0 mt-0.5" />
                   <div className="text-sm">
-                    <p className="font-medium text-green-700 dark:text-green-400">Merge Complete</p>
+                    <p className="font-medium text-green-700 dark:text-green-400">
+                      {mergeResult.wasAborted ? 'Merge Paused' : 'Merge Complete'}
+                    </p>
                     <p className="text-muted-foreground">
-                      {mergeResult.merged_groups > 0
-                        ? `Merged ${mergeResult.merged_groups} duplicate group(s), removed ${mergeResult.deleted_records} duplicate record(s).`
-                        : 'No duplicates found — your leads are clean!'}
+                      {mergeResult.message}
                     </p>
                   </div>
                 </div>

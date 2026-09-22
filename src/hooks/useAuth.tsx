@@ -9,8 +9,6 @@ import {
 } from 'react';
 import { User, Session, AuthError } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
-
 import Cookies from 'js-cookie';
 
 // ─── Session helpers (kept for cross-domain usage) ──────────────────────────
@@ -52,6 +50,9 @@ export interface Profile {
   company_id: string | null;
   is_deactivated?: boolean | null;
   company?: Record<string, unknown> | null;
+  is_partner?: boolean | null;
+  partner_category?: string | null;
+  partner_referral_code?: string | null;
   [key: string]: unknown;
 }
 

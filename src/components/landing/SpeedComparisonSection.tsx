@@ -51,27 +51,34 @@ export function SpeedComparisonSection() {
             Built for <span className="gradient-text">Pure Speed</span>, Not Bloat
           </h2>
           <p className="text-muted-foreground text-sm md:text-base max-w-xl mx-auto px-2">
-            Legacy CRMs were architected in 2005 for administrative reporting. FastestCRM is designed for modern, high-velocity revenue closers.
+            Legacy CRMs were architected in 2005 for administrative reporting. FastestCRM is engineered for modern, high-velocity revenue teams.
           </p>
         </div>
 
         {/* ── Desktop View (Full Responsive Table) ── */}
         <div className="hidden md:block">
           <Card3D maxTilt={4} className="w-full">
-            <div className="glass-panel-3d rounded-3xl p-6 lg:p-8 border border-white/10 bg-gradient-to-b from-card/90 via-card/75 to-background/90 backdrop-blur-2xl">
-              <table className="w-full text-left border-collapse">
+            <div className="rounded-3xl p-6 lg:p-8 border border-white/10 bg-slate-950/80 backdrop-blur-2xl shadow-2xl relative overflow-hidden">
+              <div className="absolute top-0 right-1/3 w-96 h-96 bg-primary/5 blur-[100px] pointer-events-none rounded-full" />
+
+              <table className="w-full text-left border-collapse relative z-10">
                 <thead>
                   <tr className="border-b border-white/[0.08]">
-                    <th className="py-4 px-5 text-xs font-bold uppercase tracking-wider text-muted-foreground w-2/5">
+                    <th className="py-4 px-5 text-xs font-bold uppercase tracking-wider text-muted-foreground w-2/5 font-mono">
                       Feature & Capability
                     </th>
-                    <th className="py-4 px-5 text-xs font-bold uppercase tracking-wider text-primary w-2/5 bg-primary/10 rounded-t-2xl border-t border-x border-primary/20">
-                      <div className="flex items-center gap-2">
-                        <Zap className="h-4 w-4 text-primary" />
-                        <span>FastestCRM (AI Engine)</span>
+                    <th className="py-4 px-5 text-xs font-bold uppercase tracking-wider text-primary w-2/5 bg-primary/10 rounded-t-2xl border-t-2 border-x-2 border-primary/30 relative">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Zap className="h-4 w-4 text-primary" />
+                          <span>FastestCRM (AI Engine)</span>
+                        </div>
+                        <span className="text-[10px] font-mono font-extrabold px-2 py-0.5 rounded-full bg-primary text-slate-950">
+                          RECOMMENDED
+                        </span>
                       </div>
                     </th>
-                    <th className="py-4 px-5 text-xs font-bold uppercase tracking-wider text-muted-foreground/70 w-1/5">
+                    <th className="py-4 px-5 text-xs font-bold uppercase tracking-wider text-muted-foreground/70 w-1/5 font-mono">
                       Traditional CRMs
                     </th>
                   </tr>
@@ -80,20 +87,24 @@ export function SpeedComparisonSection() {
                   {COMPARISON_ROWS.map((row) => (
                     <tr
                       key={row.feature}
-                      className={`hover:bg-white/[0.03] transition-colors ${row.highlight ? 'bg-primary/[0.04]' : ''}`}
+                      className={`hover:bg-white/[0.02] transition-colors ${row.highlight ? 'bg-primary/[0.03]' : ''}`}
                     >
                       <td className="py-4 px-5 font-semibold text-foreground">
                         {row.feature}
                       </td>
-                      <td className="py-4 px-5 font-bold text-emerald-400 bg-primary/10 border-x border-primary/20">
-                        <div className="flex items-center gap-2">
-                          <Check className="h-4 w-4 text-primary shrink-0" />
+                      <td className="py-4 px-5 font-semibold text-emerald-300 bg-primary/10 border-x-2 border-primary/30">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-5 h-5 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center shrink-0">
+                            <Check className="h-3 w-3 text-emerald-400" />
+                          </div>
                           <span>{row.fastest}</span>
                         </div>
                       </td>
                       <td className="py-4 px-5 text-muted-foreground">
-                        <div className="flex items-center gap-2">
-                          <X className="h-4 w-4 text-rose-400/80 shrink-0" />
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-5 h-5 rounded-full bg-rose-500/10 border border-rose-500/30 flex items-center justify-center shrink-0">
+                            <X className="h-3 w-3 text-rose-400" />
+                          </div>
                           <span>{row.traditional}</span>
                         </div>
                       </td>
@@ -110,9 +121,9 @@ export function SpeedComparisonSection() {
           {COMPARISON_ROWS.map((row) => (
             <div
               key={row.feature}
-              className={`p-4 rounded-2xl glass-panel-3d border ${
-                row.highlight ? 'border-primary/40 bg-primary/[0.03]' : 'border-white/10'
-              } space-y-3`}
+              className={`p-4 rounded-2xl border ${
+                row.highlight ? 'border-primary/40 bg-slate-950/90' : 'border-white/10 bg-slate-950/70'
+              } space-y-3 shadow-lg`}
             >
               <h4 className="text-sm font-bold text-foreground tracking-tight">
                 {row.feature}
@@ -120,13 +131,15 @@ export function SpeedComparisonSection() {
 
               <div className="space-y-2 text-xs">
                 {/* FastestCRM */}
-                <div className="p-3 rounded-xl bg-primary/10 border border-primary/25 flex items-start gap-2.5">
-                  <Check className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                <div className="p-3 rounded-xl bg-primary/10 border border-primary/30 flex items-start gap-2.5">
+                  <div className="w-5 h-5 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center shrink-0 mt-0.5">
+                    <Check className="h-3 w-3 text-emerald-400" />
+                  </div>
                   <div>
                     <span className="text-[10px] font-bold text-primary uppercase block tracking-wider font-mono">
                       FastestCRM
                     </span>
-                    <span className="font-bold text-emerald-300 block mt-0.5">
+                    <span className="font-semibold text-emerald-300 block mt-0.5">
                       {row.fastest}
                     </span>
                   </div>
@@ -134,7 +147,9 @@ export function SpeedComparisonSection() {
 
                 {/* Traditional */}
                 <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] flex items-start gap-2.5">
-                  <X className="h-4 w-4 text-rose-400/80 shrink-0 mt-0.5" />
+                  <div className="w-5 h-5 rounded-full bg-rose-500/10 border border-rose-500/30 flex items-center justify-center shrink-0 mt-0.5">
+                    <X className="h-3 w-3 text-rose-400" />
+                  </div>
                   <div>
                     <span className="text-[10px] font-bold text-muted-foreground uppercase block tracking-wider font-mono">
                       Traditional CRMs

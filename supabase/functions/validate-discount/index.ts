@@ -26,45 +26,75 @@ serve(async (req) => {
             throw new Error('Amount is required')
         }
 
+        const cleanCode = String(code).trim().toUpperCase()
+
+        // 1. Check standard discount_codes table
         const { data: codeData } = await supabaseAdmin
             .from('discount_codes')
             .select('*')
-            .eq('code', code)
+            .ilike('code', cleanCode)
             .eq('active', true)
             .maybeSingle()
 
-        if (!codeData) {
+        if (codeData) {
+            if (codeData.valid_until && new Date(codeData.valid_until) < new Date()) {
+                return new Response(
+                    JSON.stringify({ valid: false, message: 'Code expired' }),
+                    { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+                )
+            }
+
+            if (codeData.total_uses && codeData.uses_count >= codeData.total_uses) {
+                return new Response(
+                    JSON.stringify({ valid: false, message: 'Usage limit reached' }),
+                    { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+                )
+            }
+
+            const discountAmount = Math.round((amount * codeData.discount_percentage) / 100)
+            const finalAmount = Math.max(0, amount - discountAmount)
+
             return new Response(
-                JSON.stringify({ valid: false, message: 'Invalid or inactive code' }),
+                JSON.stringify({
+                    valid: true,
+                    discount_percentage: codeData.discount_percentage,
+                    discount_amount: discountAmount,
+                    final_amount: finalAmount,
+                    message: `Code applied: ${codeData.discount_percentage}% Off`
+                }),
                 { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             )
         }
 
-        if (codeData.valid_until && new Date(codeData.valid_until) < new Date()) {
+        // 2. Check partner referral codes (10% first recharge discount)
+        const { data: partnerData } = await supabaseAdmin
+            .from('partners')
+            .select('id, referral_code, status, full_name')
+            .ilike('referral_code', cleanCode)
+            .eq('status', 'active')
+            .maybeSingle()
+
+        if (partnerData) {
+            const discountPercentage = 10;
+            const discountAmount = Math.round((amount * discountPercentage) / 100)
+            const finalAmount = Math.max(0, amount - discountAmount)
+
             return new Response(
-                JSON.stringify({ valid: false, message: 'Code expired' }),
+                JSON.stringify({
+                    valid: true,
+                    is_partner_code: true,
+                    partner_id: partnerData.id,
+                    discount_percentage: discountPercentage,
+                    discount_amount: discountAmount,
+                    final_amount: finalAmount,
+                    message: `Partner Referral: ${discountPercentage}% Off First Topup`
+                }),
                 { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             )
         }
-
-        if (codeData.total_uses && codeData.uses_count >= codeData.total_uses) {
-            return new Response(
-                JSON.stringify({ valid: false, message: 'Usage limit reached' }),
-                { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-            )
-        }
-
-        const discountAmount = (amount * codeData.discount_percentage) / 100
-        const finalAmount = amount - discountAmount
 
         return new Response(
-            JSON.stringify({
-                valid: true,
-                discount_percentage: codeData.discount_percentage,
-                discount_amount: discountAmount,
-                final_amount: finalAmount,
-                message: `Code applied: ${codeData.discount_percentage}% Off`
-            }),
+            JSON.stringify({ valid: false, message: 'Invalid or inactive code' }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
 

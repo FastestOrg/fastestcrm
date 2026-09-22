@@ -12,6 +12,7 @@ interface RegisterRequest {
   adminEmail: string;
   adminPassword: string;
   adminFullName: string;
+  referral_code?: string;
 }
 
 function generateSlug(name: string): string {
@@ -35,7 +36,7 @@ serve(async (req) => {
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
 
     const body: RegisterRequest = await req.json()
-    const { companyName, industry, adminEmail, adminPassword, adminFullName } = body
+    const { companyName, industry, adminEmail, adminPassword, adminFullName, referral_code } = body
 
     // Validation
     if (!companyName || companyName.trim().length < 2) {
@@ -142,6 +143,65 @@ serve(async (req) => {
 
     if (roleError) {
       console.error('Error assigning role:', roleError)
+    }
+
+    // Attribute partner referral (Check Deal Protection first, then referral_code)
+    try {
+      // 1. Check if there is an active deal registration matching this adminEmail
+      const { data: protectedDeal } = await supabaseAdmin
+        .from('partner_referrals')
+        .select('id, partner_id')
+        .ilike('admin_email', adminEmail.trim())
+        .is('referred_company_id', null)
+        .order('registered_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (protectedDeal) {
+        // Lock the protected deal with the newly registered company and user
+        await supabaseAdmin
+          .from('partner_referrals')
+          .update({
+            referred_company_id: companyData.id,
+            referred_user_id: userId,
+            company_name: companyName.trim()
+          })
+          .eq('id', protectedDeal.id);
+        console.log('Linked protected deal to partner:', protectedDeal.partner_id);
+      } else if (referral_code) {
+        // 2. Attribute via referral code
+        const cleanRef = referral_code.trim();
+        const { data: partnerData } = await supabaseAdmin
+          .from('partners')
+          .select('id, referral_code, category')
+          .ilike('referral_code', cleanRef)
+          .maybeSingle();
+
+        if (partnerData) {
+          // Check if already attributed to prevent duplicate records
+          const { data: existingRef } = await supabaseAdmin
+            .from('partner_referrals')
+            .select('id')
+            .eq('referred_company_id', companyData.id)
+            .maybeSingle();
+
+          if (!existingRef) {
+            await supabaseAdmin.from('partner_referrals').insert({
+              partner_id: partnerData.id,
+              referred_company_id: companyData.id,
+              referred_user_id: userId,
+              company_name: companyName.trim(),
+              admin_name: adminFullName.trim(),
+              admin_email: adminEmail.trim(),
+              plan_type: 'quarterly',
+              is_paid: false
+            });
+            console.log('Attributed partner referral to:', partnerData.referral_code);
+          }
+        }
+      }
+    } catch (refErr) {
+      console.error('Failed to attribute partner referral:', refErr);
     }
 
     console.log('Company registration complete')

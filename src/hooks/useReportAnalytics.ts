@@ -74,6 +74,7 @@ export interface UseReportAnalyticsOptions {
   products?: string[];
   revenueStatus?: 'all' | 'with_revenue' | 'zero_revenue';
   search?: string;
+  enabled?: boolean;
 }
 
 export function useReportAnalytics({
@@ -85,6 +86,7 @@ export function useReportAnalytics({
   products,
   revenueStatus = 'all',
   search,
+  enabled,
 }: UseReportAnalyticsOptions = {}) {
   const { company } = useCompany();
   const { orgClient } = useOrgClient();
@@ -154,7 +156,7 @@ export function useReportAnalytics({
 
       return data as MasterReportData;
     },
-    enabled: !!company?.id,
+    enabled: enabled !== undefined ? (enabled && !!company?.id) : !!company?.id,
     staleTime: 60_000, // Cache for 1 minute
     refetchOnWindowFocus: false,
   });

@@ -63,27 +63,62 @@ serve(async (req) => {
         let payableAmount = amount;
         let discountApplied = 0;
         let appliedCode = null;
+        let isPartnerDiscount = false;
 
+        // 1. Check if user supplied a discount code
         if (discount_code) {
-            const { data: codeData, error: codeError } = await supabaseAdmin
+            const cleanCode = String(discount_code).trim().toUpperCase();
+
+            // Check standard discount_codes table
+            const { data: codeData } = await supabaseAdmin
                 .from('discount_codes')
                 .select('*')
-                .eq('code', discount_code)
+                .ilike('code', cleanCode)
                 .eq('active', true)
                 .maybeSingle()
 
             if (codeData) {
-                // Check validity
                 if (codeData.valid_until && new Date(codeData.valid_until) < new Date()) {
                     // Expired
                 } else if (codeData.total_uses && codeData.uses_count >= codeData.total_uses) {
                     // Usage limit reached
                 } else {
-                    // Apply discount
-                    discountApplied = (amount * codeData.discount_percentage) / 100
-                    payableAmount = amount - discountApplied
-                    appliedCode = discount_code
+                    discountApplied = Math.round((amount * codeData.discount_percentage) / 100)
+                    payableAmount = Math.max(0, amount - discountApplied)
+                    appliedCode = codeData.code
                 }
+            } else {
+                // Check if it's a partner referral code (10% first recharge discount)
+                const { data: partnerData } = await supabaseAdmin
+                    .from('partners')
+                    .select('id, referral_code, status')
+                    .ilike('referral_code', cleanCode)
+                    .eq('status', 'active')
+                    .maybeSingle()
+
+                if (partnerData) {
+                    discountApplied = Math.round((amount * 10) / 100)
+                    payableAmount = Math.max(0, amount - discountApplied)
+                    appliedCode = partnerData.referral_code
+                    isPartnerDiscount = true
+                }
+            }
+        }
+
+        // 2. Auto-detect if company was referred by a partner and has not made first topup yet
+        if (discountApplied === 0) {
+            const { data: refRecord } = await supabaseAdmin
+                .from('partner_referrals')
+                .select('id, partner:partners(referral_code)')
+                .eq('referred_company_id', companyId)
+                .eq('is_paid', false)
+                .maybeSingle()
+
+            if (refRecord) {
+                discountApplied = Math.round((amount * 10) / 100)
+                payableAmount = Math.max(0, amount - discountApplied)
+                appliedCode = (refRecord.partner as any)?.referral_code || 'PARTNER-FIRST-10'
+                isPartnerDiscount = true
             }
         }
 
@@ -111,7 +146,9 @@ serve(async (req) => {
                     company_id: companyId,
                     type: 'wallet_recharge',
                     credit_amount: amount, // Amount to be credited
-                    discount_code: appliedCode
+                    discount_code: appliedCode,
+                    discount_amount: discountApplied,
+                    is_partner_discount: isPartnerDiscount
                 }
             })
         })
@@ -129,18 +166,17 @@ serve(async (req) => {
             .from('wallet_transactions')
             .insert({
                 wallet_id: companyId,
-                amount: amount, // We credit the FULL requested amount, even if they paid less? 
-                // Plan said: "Usage of discount code applies to the RECHARGE"
-                // e.g. Recharge 1000, 10% off -> Pay 900, Get 1000 credits. Correct.
+                amount: amount, // We credit the FULL requested amount, user pays discounted payableAmount
                 type: 'credit_recharge',
-                description: `Wallet Recharge via Razorpay${appliedCode ? ` (Code: ${appliedCode})` : ''}`,
+                description: `Wallet Recharge via Razorpay${appliedCode ? ` (Code: ${appliedCode}${isPartnerDiscount ? ' - 10% Partner Referral' : ''})` : ''}`,
                 reference_id: order.id,
                 status: 'pending',
                 metadata: {
                     payable_amount: payableAmount,
                     discount_code: appliedCode,
                     discount_amount: discountApplied,
-                    razorpay_order_id: order.id
+                    razorpay_order_id: order.id,
+                    is_partner_discount: isPartnerDiscount
                 }
             })
 
@@ -156,7 +192,9 @@ serve(async (req) => {
                 currency: 'INR',
                 key_id: rzpKeyId,
                 credit_amount: amount,
-                discount_applied: discountApplied
+                discount_applied: discountApplied,
+                discount_code: appliedCode,
+                is_partner_discount: isPartnerDiscount
             }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )

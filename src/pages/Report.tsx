@@ -7,6 +7,7 @@ import { useLeadStatuses, CompanyLeadStatus } from '@/hooks/useLeadStatuses';
 import { useCustomColumns } from '@/hooks/useCustomColumns';
 import { useCompany } from '@/hooks/useCompany';
 import { useAuth } from '@/hooks/useAuth';
+import { useHierarchy } from '@/hooks/useHierarchy';
 import { ReportSkeleton } from '@/components/report/ReportSkeleton';
 import {
   BarChart,
@@ -90,7 +91,7 @@ export default function Report() {
   // 1. Master Filter State
   const [filters, setFilters] = useState<ReportFilterState>({
     search: '',
-    datePreset: 'all',
+    datePreset: 'this_month',
     customStartDate: '',
     customEndDate: '',
     statuses: [],
@@ -182,6 +183,32 @@ export default function Report() {
     };
   }, [filters.datePreset, filters.customStartDate, filters.customEndDate]);
 
+  const { members, loading: teamLoading } = useTeam();
+  const { products } = useProducts();
+  const { statuses: leadStatuses, isLoading: statusesLoading } = useLeadStatuses();
+  const { customColumns, loading: customColumnsLoading } = useCustomColumns('leads');
+  const { company } = useCompany();
+  const { user } = useAuth();
+  const { accessibleUserIds, canViewAll, loading: hierarchyLoading } = useHierarchy();
+
+  const isIndividual = !canViewAll && accessibleUserIds.length <= 1;
+
+  // Determine effective owners for hierarchy & scoping
+  const effectiveOwners = useMemo(() => {
+    if (canViewAll) {
+      return filters.owners;
+    }
+    if (accessibleUserIds.length <= 1) {
+      return user?.id ? [user.id] : [];
+    }
+    // Manager: if user selected specific accessible owners, use those; otherwise use all accessibleUserIds
+    if (filters.owners.length > 0) {
+      const filtered = filters.owners.filter((id) => accessibleUserIds.includes(id));
+      return filtered.length > 0 ? filtered : accessibleUserIds;
+    }
+    return accessibleUserIds;
+  }, [canViewAll, accessibleUserIds, filters.owners, user?.id]);
+
   // ─── ⚡ Master Server-Side Analytics Engine (Single-pass PostgreSQL RPC) ────
   const {
     analytics,
@@ -198,41 +225,45 @@ export default function Report() {
   } = useReportAnalytics({
     startDate,
     endDate,
-    owners: filters.owners,
+    owners: effectiveOwners,
     statuses: filters.statuses,
     sources: filters.sources,
     products: filters.products,
     revenueStatus: filters.revenueStatus,
     search: filters.search,
+    enabled: !hierarchyLoading && !!company?.id,
   });
 
-  const { members, loading: teamLoading } = useTeam();
-  const { products } = useProducts();
-  const { statuses: leadStatuses, isLoading: statusesLoading } = useLeadStatuses();
-  const { customColumns, loading: customColumnsLoading } = useCustomColumns('leads');
-  const { company } = useCompany();
-  const { user } = useAuth();
-
-  const isInitialLoading = analyticsLoading && !analytics;
+  const isInitialLoading = (analyticsLoading || hierarchyLoading) && !analytics;
 
   // Currency symbol
   const currencySymbol = company?.default_currency === 'USD' ? '$' : '₹';
 
-  // Team members lookup
-  const teamMembers = useMemo(() => {
-    return (members || []).map((m) => ({
+  // Team members lookup filtered by hierarchy
+  const visibleTeamMembers = useMemo(() => {
+    const list = (members || []).map((m) => ({
       id: m.id,
       name: m.full_name || m.email?.split('@')[0] || 'Unknown Member',
     }));
-  }, [members]);
+
+    if (canViewAll) return list;
+    const filtered = list.filter((m) => accessibleUserIds.includes(m.id));
+    if (filtered.length === 0 && user?.id) {
+      return [{
+        id: user.id,
+        name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'My Performance',
+      }];
+    }
+    return filtered;
+  }, [members, canViewAll, accessibleUserIds, user]);
 
   const ownersMap = useMemo(() => {
     const map: Record<string, string> = {};
-    teamMembers.forEach((m) => {
+    visibleTeamMembers.forEach((m) => {
       map[m.id] = m.name;
     });
     return map;
-  }, [teamMembers]);
+  }, [visibleTeamMembers]);
 
   // Unique lead sources - combines server analytics across ALL leads + defaults
   const availableSources = useMemo(() => {
@@ -605,12 +636,14 @@ export default function Report() {
         filters={filters}
         onFilterChange={setFilters}
         leadStatuses={leadStatuses}
-        teamMembers={teamMembers}
+        teamMembers={visibleTeamMembers}
         productsList={productsList}
         availableSources={availableSources}
         customColumns={customColumns}
         totalLeadsCount={kpiStats.totalLeads}
         filteredLeadsCount={kpiStats.totalLeads}
+        canViewAll={canViewAll}
+        isIndividual={isIndividual}
       />
 
       {/* ─── Main Tabs Navigation ─── */}
@@ -622,7 +655,7 @@ export default function Report() {
           </TabsTrigger>
           <TabsTrigger value="team" className="gap-1.5 text-xs">
             <Users className="h-3.5 w-3.5" />
-            Team Performance
+            {isIndividual ? 'My Performance' : 'Team Performance'}
           </TabsTrigger>
           <TabsTrigger value="activity" className="gap-1.5 text-xs">
             <Activity className="h-3.5 w-3.5 text-emerald-500" />
@@ -945,9 +978,13 @@ export default function Report() {
         <TabsContent value="team" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Team Member Scorecard & Conversion Matrix</CardTitle>
+              <CardTitle>
+                {isIndividual ? 'My Performance Scorecard & Conversion Matrix' : 'Team Member Scorecard & Conversion Matrix'}
+              </CardTitle>
               <CardDescription>
-                Individual performance breakdown across leads assigned, progression, won revenue, and close rate.
+                {isIndividual
+                  ? 'Your individual performance breakdown across leads assigned, progression, won revenue, and close rate.'
+                  : 'Individual performance breakdown across leads assigned, progression, won revenue, and close rate.'}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -955,7 +992,7 @@ export default function Report() {
                 <Table>
                   <TableHeader>
                     <TableRow className="text-xs">
-                      <TableHead>Employee Name</TableHead>
+                      <TableHead>{isIndividual ? 'User Name' : 'Employee Name'}</TableHead>
                       <TableHead className="text-right">Total Leads</TableHead>
                       {leadStatuses.map((st) => (
                         <TableHead key={st.value} className="text-right whitespace-nowrap px-3 font-semibold">
@@ -974,7 +1011,7 @@ export default function Report() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {teamMembers.map((member) => {
+                    {visibleTeamMembers.map((member) => {
                       const ownerData = rpcOwnerBreakdown.find((o) => o.owner_id === member.id);
                       const total = ownerData ? ownerData.total_leads : 0;
                       const revenue = ownerData ? ownerData.revenue : 0;
@@ -1032,6 +1069,7 @@ export default function Report() {
 
                     {/* Dynamic Unassigned Leads Row */}
                     {(() => {
+                      if (!canViewAll) return null;
                       const unassigned = rpcOwnerBreakdown.find((o) => !o.owner_id || o.owner_id === 'unassigned');
                       if (!unassigned || unassigned.total_leads === 0) return null;
                       return (

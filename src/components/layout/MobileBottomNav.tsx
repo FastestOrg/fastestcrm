@@ -1,7 +1,7 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Users, UserCheck, CreditCard, Settings,
-  Phone, Brain, FileText, Menu, X, BarChart3, Workflow, Link2, Calendar, CheckSquare
+  Phone, Brain, FileText, Menu, X, BarChart3, Workflow, Link2, Calendar, CheckSquare, Handshake
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -19,6 +19,7 @@ const primaryNavItems = [
 
 const allNavItems = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
+  { icon: Handshake, label: 'Partner Program', path: '/dashboard/partner' },
   { icon: BarChart3, label: 'LG Dashboard', path: '/dashboard/lg' },
   { icon: Users, label: 'All Leads', path: '/dashboard/leads' },
   { icon: UserCheck, label: 'Interested', path: '/dashboard/interested' },

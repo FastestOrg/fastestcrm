@@ -46,8 +46,10 @@ export function ROICalculator() {
         </div>
 
         <Card3D maxTilt={5} className="w-full">
-          <div className="glass-panel-3d rounded-3xl p-6 md:p-10 border border-white/10 bg-gradient-to-b from-card/90 via-card/75 to-background/90 backdrop-blur-2xl">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+          <div className="rounded-3xl p-6 md:p-10 border border-white/10 bg-slate-950/80 backdrop-blur-2xl shadow-2xl relative overflow-hidden">
+            <div className="absolute top-1/2 left-0 w-72 h-72 bg-primary/5 blur-[120px] pointer-events-none rounded-full" />
+            
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center relative z-10">
               {/* Sliders Column */}
               <div className="lg:col-span-6 space-y-8">
                 {/* Slider 1: Team Size */}
@@ -56,7 +58,7 @@ export function ROICalculator() {
                     <label htmlFor="team-size-slider" className="text-sm font-bold text-foreground">
                       Sales Team Size (Reps)
                     </label>
-                    <span className="text-base font-extrabold text-primary font-mono bg-primary/10 px-3 py-1 rounded-xl border border-primary/20">
+                    <span className="text-sm font-bold text-primary font-mono bg-primary/10 px-3 py-1 rounded-xl border border-primary/20">
                       {teamSize} {teamSize === 1 ? 'Rep' : 'Reps'}
                     </span>
                   </div>
@@ -82,7 +84,7 @@ export function ROICalculator() {
                     <label htmlFor="deal-value-slider" className="text-sm font-bold text-foreground">
                       Average Deal Value (₹)
                     </label>
-                    <span className="text-base font-extrabold text-primary font-mono bg-primary/10 px-3 py-1 rounded-xl border border-primary/20">
+                    <span className="text-sm font-bold text-primary font-mono bg-primary/10 px-3 py-1 rounded-xl border border-primary/20">
                       {formatCurrency(avgDealSize)}
                     </span>
                   </div>
@@ -102,44 +104,44 @@ export function ROICalculator() {
                   </div>
                 </div>
 
-                <div className="p-4 rounded-2xl bg-black/40 border border-white/[0.06] text-xs text-muted-foreground space-y-2">
-                  <p className="flex items-center gap-2">
+                <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/[0.08] text-xs text-muted-foreground space-y-2.5">
+                  <p className="flex items-center gap-2.5">
                     <Zap className="h-4 w-4 text-primary shrink-0" />
-                    <span><strong className="text-foreground">10x Speed Advantage:</strong> Reaching leads in &lt;5 mins boosts connect rates by 21x.</span>
+                    <span><strong className="text-foreground">Speed Advantage:</strong> Calling leads within 5 minutes yields a 21x higher connect rate.</span>
                   </p>
-                  <p className="flex items-center gap-2">
+                  <p className="flex items-center gap-2.5">
                     <Clock className="h-4 w-4 text-indigo-400 shrink-0" />
-                    <span><strong className="text-foreground">Zero Manual Entry:</strong> Auto-logged call notes save 22 hours per rep every month.</span>
+                    <span><strong className="text-foreground">Automated AI Logging:</strong> Voice transcription saves 22+ administrative hours per rep/month.</span>
                   </p>
                 </div>
               </div>
 
               {/* Output Metrics Column */}
-              <div className="lg:col-span-6 bg-black/50 p-6 md:p-8 rounded-2xl border border-white/10 space-y-6">
+              <div className="lg:col-span-6 bg-black/60 p-6 md:p-8 rounded-2xl border border-white/10 space-y-6 shadow-xl">
                 <div className="text-xs font-bold uppercase tracking-wider text-primary flex items-center gap-2 font-mono">
                   <TrendingUp className="h-4 w-4" /> ESTIMATED MONTHLY IMPACT
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.06]">
-                    <span className="text-[11px] text-muted-foreground block mb-1">Time Reclaimed / Mo</span>
+                    <span className="text-[11px] text-muted-foreground block mb-1 font-medium">Time Reclaimed / Mo</span>
                     <span className="text-2xl md:text-3xl font-extrabold text-foreground font-mono">
                       {hoursSavedPerMonth} <span className="text-xs text-primary font-sans font-bold">hrs</span>
                     </span>
-                    <span className="text-[10px] text-emerald-400 block mt-1">Directly for closing calls</span>
+                    <span className="text-[10px] text-emerald-400 block mt-1 font-medium">Reallocated to closing</span>
                   </div>
 
                   <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.06]">
-                    <span className="text-[11px] text-muted-foreground block mb-1">Software Cost Saved</span>
+                    <span className="text-[11px] text-muted-foreground block mb-1 font-medium">Software Cost Saved</span>
                     <span className="text-2xl md:text-3xl font-extrabold text-foreground font-mono">
                       {formatCurrency(softwareSavingsMonthly)}
                     </span>
-                    <span className="text-[10px] text-muted-foreground block mt-1">vs Legacy CRM + Plugins</span>
+                    <span className="text-[10px] text-muted-foreground block mt-1">vs Legacy CRM stack</span>
                   </div>
                 </div>
 
                 <div className="p-5 rounded-2xl bg-gradient-to-br from-primary/20 via-primary/5 to-transparent border border-primary/30">
-                  <span className="text-xs font-semibold text-foreground/80 block mb-1">
+                  <span className="text-xs font-semibold text-foreground/90 block mb-1">
                     Estimated Extra Revenue Unlocked
                   </span>
                   <span className="text-3xl md:text-4xl font-black text-primary font-mono block tracking-tight">
@@ -147,7 +149,7 @@ export function ROICalculator() {
                     <span className="text-xs text-muted-foreground font-sans font-normal ml-1.5">/ month</span>
                   </span>
                   <span className="text-xs text-muted-foreground mt-1.5 block">
-                    Based on +{additionalDealsPerMonth} additional deals won from instantaneous lead response.
+                    Based on +{additionalDealsPerMonth} additional deals won from instant lead assignment.
                   </span>
                 </div>
 

@@ -80,19 +80,44 @@ export function useTaskLeads(): TaskLeadsResult {
             const targetUrl = (orgClient as any)?.supabaseUrl || 'default';
             const isDefaultHost = targetUrl.includes('api.fastestcrm.com') || targetUrl.includes('uykdyqdeyilpulaqlqip');
 
-            let leadQuery = orgClient
-                .from(tableName as any)
-                .select(selectQuery)
-                .not('reminder_at', 'is', null) // Server-side filter — key for performance
-                .order('reminder_at', { ascending: true });
+            // Fetch all leads with reminder_at set using chunked pagination (PostgREST caps single queries at 1,000 rows)
+            let allLeads: any[] = [];
+            let from = 0;
+            const CHUNK_SIZE = 1000;
+            const MAX_CHUNKS = 15; // Safety cap: up to 15,000 tasks
+            let chunkIndex = 0;
+            let hasMore = true;
 
-            if (isDefaultHost) {
-                leadQuery = leadQuery.eq('company_id', companyId);
+            while (hasMore && chunkIndex < MAX_CHUNKS) {
+                chunkIndex++;
+                let leadQuery = orgClient
+                    .from(tableName as any)
+                    .select(selectQuery)
+                    .not('reminder_at', 'is', null) // Server-side filter — key for performance
+                    .order('reminder_at', { ascending: true })
+                    .range(from, from + CHUNK_SIZE - 1);
+
+                if (isDefaultHost) {
+                    leadQuery = leadQuery.eq('company_id', companyId);
+                }
+
+                const { data: chunk, error: leadsError } = await leadQuery;
+
+                if (leadsError) {
+                    console.error('[useTaskLeads] Chunk query error:', leadsError);
+                    throw leadsError;
+                }
+
+                if (chunk && chunk.length > 0) {
+                    allLeads.push(...chunk);
+                    from += CHUNK_SIZE;
+                    if (chunk.length < CHUNK_SIZE) {
+                        hasMore = false;
+                    }
+                } else {
+                    hasMore = false;
+                }
             }
-
-            const { data: leadsData, error: leadsError } = await leadQuery;
-
-            if (leadsError) throw leadsError;
 
             // Fetch calendar events/bookings starting from today start to prevent past meetings cluttering tasks
             const { todayStart } = getDateBoundaries();
@@ -101,29 +126,41 @@ export function useTaskLeads(): TaskLeadsResult {
             const fallbackTable = isDefaultHost ? 'calendar_bookings' : 'calendar_events';
 
             let eventsData: any[] = [];
-            const { data: pData, error: pErr } = await orgClient
-                .from(primaryTable as any)
-                .select('*')
-                .eq('company_id', companyId)
-                .gte('start_time', todayStart.toISOString())
-                .neq('status', 'cancelled')
-                .order('start_time', { ascending: true });
+            let eventsFrom = 0;
+            let eventsHasMore = true;
+            let eventsChunkIndex = 0;
+            let usedFallback = false;
 
-            if (!pErr && pData) {
-                eventsData = pData;
-            } else {
-                const { data: fbData } = await orgClient
-                    .from(fallbackTable as any)
+            while (eventsHasMore && eventsChunkIndex < 20) {
+                eventsChunkIndex++;
+                const targetEventTable = usedFallback ? fallbackTable : primaryTable;
+                const { data: eData, error: eErr } = await orgClient
+                    .from(targetEventTable as any)
                     .select('*')
                     .eq('company_id', companyId)
                     .gte('start_time', todayStart.toISOString())
                     .neq('status', 'cancelled')
-                    .order('start_time', { ascending: true });
+                    .order('start_time', { ascending: true })
+                    .range(eventsFrom, eventsFrom + CHUNK_SIZE - 1);
 
-                if (fbData) eventsData = fbData;
+                if (eErr && !usedFallback && eventsFrom === 0) {
+                    usedFallback = true;
+                    eventsChunkIndex = 0;
+                    continue;
+                }
+
+                if (!eErr && eData && eData.length > 0) {
+                    eventsData.push(...eData);
+                    eventsFrom += CHUNK_SIZE;
+                    if (eData.length < CHUNK_SIZE) {
+                        eventsHasMore = false;
+                    }
+                } else {
+                    eventsHasMore = false;
+                }
             }
 
-            const mappedLeads: TaskLead[] = (leadsData || []).map((lead: any) => ({
+            const mappedLeads: TaskLead[] = allLeads.map((lead: any) => ({
                 ...lead,
                 isMeeting: false,
             }));
@@ -157,8 +194,11 @@ export function useTaskLeads(): TaskLeadsResult {
             return combined;
         },
         enabled: !tableLoading && !!companyId,
-        staleTime: 30_000, // 30 seconds fresh
-        retry: 2,
+        staleTime: 5 * 60 * 1000, // 5 minutes fresh — ensures zero background refetches while navigating between CRM tabs
+        gcTime: 10 * 60 * 1000, // Keep in memory for 10 minutes
+        refetchOnWindowFocus: false, // Prevent background refetches when switching browser tabs or windows
+        refetchOnReconnect: false,
+        retry: 1,
     });
 
     // Partition the flat list into buckets — runs only when data changes

@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -6,7 +6,8 @@ import {
   Users, Phone, CreditCard, Workflow,
   Brain, ArrowRight, Zap, Target, TrendingUp, Menu, X,
   Star, CheckCircle2, MessageSquare, Quote, Newspaper, Shield, Sparkles, PhoneCall,
-  Clock, Award, ChevronRight, Check, Bot
+  Clock, Award, ChevronRight, Check, Bot, Building2, GraduationCap, BookOpen, Plane,
+  Landmark, Layers, Stethoscope, Briefcase
 } from 'lucide-react';
 import SEO from '@/components/SEO';
 import { SoftwareAppSchema, OrganizationSchema, LocalBusinessBengaluruSchema, LocalBusinessSFSchema } from '@/components/SchemaMarkup';
@@ -14,8 +15,7 @@ import FAQSection from '@/components/features/FAQSection';
 import AuthorityFooter from '@/components/layout/AuthorityFooter';
 import { isAndroidWebView } from '@/lib/platform';
 
-// ─── 3D & Interactive Components (Lazy-load heavy WebGL) ─────────────────────
-const ThreeHeroScene = lazy(() => import('@/components/landing/ThreeHeroScene'));
+// ─── Interactive Landing Components ─────────────────────
 import Card3D from '@/components/landing/Card3D';
 import InteractiveProductConsole from '@/components/landing/InteractiveProductConsole';
 import LiveDealTicker from '@/components/landing/LiveDealTicker';
@@ -26,6 +26,7 @@ import ScrollFloatingCTA from '@/components/landing/ScrollFloatingCTA';
 import { ScrollReveal, ScrollRevealItem } from '@/components/landing/ScrollReveal';
 import AIAgentHUD from '@/components/landing/AIAgentHUD';
 import AICommandPrompt from '@/components/landing/AICommandPrompt';
+import LandingScrollShowcase from '@/components/landing/LandingScrollShowcase';
 
 const features = [
   {
@@ -88,15 +89,16 @@ const testimonials = [
 ];
 
 const industries = [
-  { name: 'Real Estate', icon: '🏢', path: '/crm-for-real-estate' },
-  { name: 'EdTech', icon: '🎓', path: '/crm-for-edtech' },
-  { name: 'Training Institutes', icon: '📚', path: '/solutions/bangalore' },
-  { name: 'Travel & Hospitality', icon: '✈️', path: '/solutions/mumbai' },
-  { name: 'Finance & Loans', icon: '💰', path: '/solutions/delhi' },
-  { name: 'SaaS & B2B', icon: '💻', path: '/crm-for-saas' },
-  { name: 'Healthcare & Clinics', icon: '🏥', path: '/crm-for-healthcare' },
-  { name: 'Consultancy', icon: '🤝', path: '/solutions/hyderabad' }
+  { name: 'Real Estate', icon: Building2, path: '/crm-for-real-estate' },
+  { name: 'EdTech', icon: GraduationCap, path: '/crm-for-edtech' },
+  { name: 'Training Institutes', icon: BookOpen, path: '/solutions/bangalore' },
+  { name: 'Travel & Hospitality', icon: Plane, path: '/solutions/mumbai' },
+  { name: 'Finance & Loans', icon: Landmark, path: '/solutions/delhi' },
+  { name: 'SaaS & B2B', icon: Layers, path: '/crm-for-saas' },
+  { name: 'Healthcare & Clinics', icon: Stethoscope, path: '/crm-for-healthcare' },
+  { name: 'Consultancy', icon: Briefcase, path: '/solutions/hyderabad' }
 ];
+
 
 const faqs = [
   { q: 'Is there a free trial or free tier?', a: 'Yes! FastestCRM provides a completely free 1-seat starter account so you can test all features with zero risk. Team plans start at just ₹999/month/rep.' },
@@ -242,28 +244,19 @@ export default function Landing() {
       </nav>
 
       {/* ── 3D Hero Section with AI-First Architecture ── */}
-      <section className="relative pt-36 md:pt-44 pb-20 px-4 md:px-6 overflow-hidden" aria-labelledby="hero-heading">
-        {/* Three.js Interactive 3D WebGL Canvas (Lazy Loaded) */}
-        <Suspense fallback={<div className="absolute inset-0 bg-transparent pointer-events-none" />}>
-          <ThreeHeroScene />
-        </Suspense>
+      <section className="relative pt-32 md:pt-40 pb-20 px-4 md:px-6 overflow-hidden" aria-labelledby="hero-heading">
 
         {/* Ambient Glow Orbs */}
-        <div className="absolute top-20 left-1/2 -translate-x-1/2 -z-10 w-[700px] h-[400px] bg-primary/15 blur-[120px] rounded-full pointer-events-none" />
-        <div className="absolute top-80 right-10 -z-10 w-96 h-96 bg-cyan-500/10 blur-[100px] rounded-full pointer-events-none" />
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 -z-10 w-[750px] h-[450px] bg-primary/15 blur-[140px] rounded-full pointer-events-none" />
+        <div className="absolute top-80 right-10 -z-10 w-96 h-96 bg-cyan-500/10 blur-[120px] rounded-full pointer-events-none" />
 
         <div className="container mx-auto text-center max-w-5xl relative z-10">
-          <ScrollReveal staggerDelay={0.12}>
-            {/* Live Deal Ticker */}
+          <ScrollReveal staggerDelay={0.1}>
+            {/* AI First Announcement Badge */}
             <ScrollRevealItem className="mb-6 flex justify-center">
-              <LiveDealTicker />
-            </ScrollRevealItem>
-
-            {/* AI First Badge */}
-            <ScrollRevealItem className="mb-4 flex justify-center">
-              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full glass border border-emerald-500/30 shadow-lg shadow-emerald-500/10 bg-emerald-500/[0.08]">
-                <Bot className="h-4 w-4 text-emerald-400 animate-pulse" />
-                <span className="text-xs font-extrabold uppercase tracking-wider text-emerald-300 font-mono">
+              <div className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/[0.08] shadow-lg shadow-emerald-500/10 backdrop-blur-xl">
+                <Bot className="h-3.5 w-3.5 text-emerald-400 animate-pulse" />
+                <span className="text-xs font-bold text-emerald-300 font-mono tracking-tight">
                   Autonomous FastAI Engine v2.4 · Self-Driving Sales CRM
                 </span>
               </div>
@@ -273,11 +266,11 @@ export default function Landing() {
             <ScrollRevealItem>
               <h1
                 id="hero-heading"
-                className="text-4xl sm:text-6xl md:text-7xl lg:text-8xl font-black mb-6 tracking-tight leading-[1.08] text-foreground"
+                className="text-4xl sm:text-6xl md:text-7xl lg:text-8xl font-black mb-6 tracking-tight leading-[1.06] text-foreground"
               >
                 The World's First <br className="hidden sm:inline" />
                 <span className="gradient-text">Autonomous AI CRM</span>
-                <span className="block mt-2 text-foreground">
+                <span className="block mt-2 text-foreground font-extrabold text-3xl sm:text-5xl md:text-6xl lg:text-7xl">
                   That Ingests, Dials & Closes 24/7
                 </span>
               </h1>
@@ -285,33 +278,18 @@ export default function Landing() {
 
             {/* Subtitle */}
             <ScrollRevealItem>
-              <p className="text-base sm:text-lg md:text-xl text-muted-foreground mb-8 max-w-3xl mx-auto leading-relaxed font-normal">
-                Deploy self-driving AI agents that ingest leads in 300ms, predict high-intent buyers, auto-dial prospects with live speech transcription, and settle Razorpay WhatsApp payments instantly.
+              <p className="text-base sm:text-lg md:text-xl text-slate-300 mb-8 max-w-2xl mx-auto leading-relaxed font-normal">
+                Deploy self-driving AI agents that ingest leads in 300ms, predict high-intent buyers, auto-dial prospects with live speech transcription, and settle payments instantly.
               </p>
             </ScrollRevealItem>
 
-            {/* Live Floating AI Agent Telemetry HUD */}
+            {/* Primary & Secondary Action CTAs */}
             <ScrollRevealItem>
-              <AIAgentHUD />
-            </ScrollRevealItem>
-
-            {/* Pricing & Value Pill */}
-            <ScrollRevealItem>
-              <div className="inline-flex items-center gap-2 px-5 py-2 rounded-full glass border border-primary/25 mb-8 shadow-md">
-                <Sparkles className="h-4 w-4 text-primary animate-pulse" />
-                <span className="text-xs md:text-sm font-semibold text-foreground/90">
-                  Free 1-Seat Starter · Startup plans at <span className="text-primary font-bold">₹999/month/rep</span> ☕
-                </span>
-              </div>
-            </ScrollRevealItem>
-
-            {/* CTAs */}
-            <ScrollRevealItem>
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-4">
                 <Link to="/register-company" className="w-full sm:w-auto">
                   <Button
                     size="lg"
-                    className="w-full sm:w-auto h-14 px-10 text-base rounded-full gradient-primary shimmer-overlay font-bold text-slate-950 shadow-2xl hover:shadow-primary/30 hover:scale-105 active:scale-95 transition-all"
+                    className="w-full sm:w-auto h-14 px-10 text-base rounded-full gradient-primary shimmer-overlay font-bold text-slate-950 shadow-[0_10px_35px_rgba(20,184,166,0.35)] hover:scale-[1.02] active:scale-[0.98] transition-all"
                   >
                     Deploy Your AI CRM Free
                     <ArrowRight className="ml-2 h-5 w-5" />
@@ -321,20 +299,38 @@ export default function Landing() {
                   <Button
                     size="lg"
                     variant="outline"
-                    className="w-full sm:w-auto h-14 px-10 text-base rounded-full border-primary/40 hover:bg-primary/10 hover:text-primary hover:border-primary transition-all font-semibold"
+                    className="w-full sm:w-auto h-14 px-10 text-base rounded-full border-white/20 hover:border-primary/50 hover:bg-white/[0.05] transition-all font-semibold"
                   >
-                    Launch Live Sandbox
+                    Explore Live Sandbox
                   </Button>
                 </Link>
               </div>
             </ScrollRevealItem>
 
-            {/* AI Command Prompt Tester */}
+            {/* Micro Trust Indicators */}
             <ScrollRevealItem>
-              <AICommandPrompt />
+              <div className="flex flex-wrap justify-center items-center gap-4 sm:gap-6 text-xs text-muted-foreground mb-6">
+                <span className="flex items-center gap-1.5">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-primary" /> Free 1-seat starter
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-primary" /> No credit card required
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-primary" /> 3-minute instant setup
+                </span>
+                <span className="hidden sm:flex items-center gap-1.5">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-primary" /> Team plan at ₹999/mo
+                </span>
+              </div>
             </ScrollRevealItem>
 
-            {/* Interactive 3D Product Simulator Centerpiece with 3D Parallax Scroll */}
+            {/* Live Deal Ticker */}
+            <ScrollRevealItem className="mb-8 flex justify-center">
+              <LiveDealTicker />
+            </ScrollRevealItem>
+
+            {/* Interactive 3D Product Simulator Centerpiece */}
             <ScrollRevealItem>
               <motion.div
                 style={{
@@ -343,49 +339,68 @@ export default function Landing() {
                   opacity: heroConsoleOpacity,
                   transformPerspective: 1200
                 }}
-                className="relative mt-8"
+                className="relative mt-4"
               >
                 <InteractiveProductConsole />
               </motion.div>
+            </ScrollRevealItem>
+
+            {/* Live Floating AI Agent Telemetry HUD */}
+            <ScrollRevealItem className="mt-8">
+              <AIAgentHUD />
+            </ScrollRevealItem>
+
+            {/* AI Command Prompt Tester */}
+            <ScrollRevealItem>
+              <AICommandPrompt />
             </ScrollRevealItem>
           </ScrollReveal>
         </div>
       </section>
 
       {/* ── Social Proof / Press Section ── */}
-      <section className="py-12 md:py-14 px-4 sm:px-6 border-y border-white/[0.08] bg-black/30 overflow-hidden">
+      <section className="py-10 md:py-12 px-4 sm:px-6 border-y border-white/[0.08] bg-slate-950/60 overflow-hidden">
         <div className="container mx-auto max-w-5xl">
-          <ScrollReveal staggerDelay={0.1}>
+          <ScrollReveal staggerDelay={0.08}>
             <ScrollRevealItem>
-              <p className="text-center text-[11px] font-bold uppercase tracking-widest text-muted-foreground mb-8 font-mono">
-                Trusted by Forward-Thinking Sales Teams & Featured On
+              <p className="text-center text-[11px] font-bold uppercase tracking-widest text-muted-foreground mb-6 font-mono">
+                Trusted by Forward-Thinking Sales Teams & Featured In
               </p>
             </ScrollRevealItem>
 
             <ScrollRevealItem>
-              <div className="flex flex-wrap justify-center items-center gap-6 sm:gap-8 md:gap-20 opacity-60 grayscale hover:grayscale-0 hover:opacity-100 transition-all duration-500">
+              <div className="flex flex-wrap justify-center items-center gap-8 sm:gap-12 md:gap-16 opacity-75 hover:opacity-100 transition-opacity duration-300">
                 <a
                   href="https://www.producthunt.com/products/fastest-crm"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-2 hover:text-primary transition-colors"
+                  className="flex items-center gap-2 text-foreground/80 hover:text-[#DA552F] transition-colors"
                 >
-                  <img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=fastest-crm&theme=light" alt="Product Hunt" className="h-8" />
+                  <div className="w-7 h-7 rounded-full bg-[#DA552F] flex items-center justify-center text-white font-bold text-xs">
+                    P
+                  </div>
+                  <span className="font-bold text-base tracking-tight">Product Hunt</span>
                 </a>
-                <div className="flex items-center gap-2 font-bold text-xl text-foreground/80">
-                  <Newspaper className="h-5 w-5 text-primary" /> YourStory
+                <div className="flex items-center gap-2 font-bold text-base tracking-tight text-foreground/80">
+                  <Newspaper className="h-4 w-4 text-primary" /> YourStory
                 </div>
-                <div className="flex items-center gap-1 font-bold text-xl text-foreground/80">
+                <div className="font-bold text-base tracking-tight text-foreground/80">
                   Inc42 Media
                 </div>
-                <div className="flex items-center gap-1 font-bold text-xl text-foreground/80">
+                <div className="font-bold text-base tracking-tight text-foreground/80">
                   TechCrunch
+                </div>
+                <div className="font-bold text-base tracking-tight text-foreground/80">
+                  Forbes India
                 </div>
               </div>
             </ScrollRevealItem>
           </ScrollReveal>
         </div>
       </section>
+
+      {/* ── 3D Container Scroll Animation Showcase ── */}
+      <LandingScrollShowcase />
 
       {/* ── 3D Bento Feature Grid with Staggered Scroll Reveal ── */}
       <section className="py-20 md:py-24 px-4 sm:px-6 relative overflow-hidden" aria-labelledby="features-heading">
@@ -411,11 +426,11 @@ export default function Landing() {
                 const Icon = feature.icon;
                 return (
                   <ScrollRevealItem key={feature.title}>
-                    <Card3D maxTilt={8} className="h-full">
-                      <div className="h-full p-6 sm:p-7 rounded-2xl glass-panel-3d border border-white/10 hover:border-primary/40 transition-colors flex flex-col justify-between group bg-gradient-to-b from-card/90 to-background/90">
+                    <Card3D maxTilt={6} className="h-full">
+                      <div className="h-full p-6 sm:p-7 rounded-2xl border border-white/10 hover:border-primary/40 transition-colors flex flex-col justify-between group bg-slate-950/75 backdrop-blur-xl shadow-xl">
                         <div>
                           <div className="flex items-center justify-between mb-5">
-                            <div className="w-12 h-12 rounded-2xl bg-primary/10 border border-primary/30 flex items-center justify-center text-primary group-hover:scale-110 group-hover:bg-primary group-hover:text-slate-950 transition-all duration-300">
+                            <div className="w-12 h-12 rounded-2xl bg-primary/10 border border-primary/25 flex items-center justify-center text-primary group-hover:scale-110 group-hover:bg-primary group-hover:text-slate-950 transition-all duration-300 shadow-sm">
                               <Icon className="h-6 w-6" />
                             </div>
                             <span className="text-[11px] font-bold font-mono px-2.5 py-1 rounded-full bg-primary/10 text-primary border border-primary/20">
@@ -473,21 +488,24 @@ export default function Landing() {
             </ScrollRevealItem>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              {industries.map((ind) => (
-                <ScrollRevealItem key={ind.name}>
-                  <Link
-                    to={ind.path}
-                    className="p-4 sm:p-5 rounded-2xl glass border border-white/[0.08] hover:border-primary/50 hover:bg-primary/5 transition-all text-center group card-hover flex flex-col items-center justify-center h-full"
-                  >
-                    <span className="text-3xl mb-2.5 group-hover:scale-125 transition-transform duration-300 block" role="img" aria-label={ind.name}>
-                      {ind.icon}
-                    </span>
-                    <span className="text-xs md:text-sm font-bold text-foreground/90 group-hover:text-primary transition-colors">
-                      {ind.name}
-                    </span>
-                  </Link>
-                </ScrollRevealItem>
-              ))}
+              {industries.map((ind) => {
+                const Icon = ind.icon;
+                return (
+                  <ScrollRevealItem key={ind.name}>
+                    <Link
+                      to={ind.path}
+                      className="p-5 sm:p-6 rounded-2xl border border-white/10 bg-slate-950/70 hover:border-primary/50 hover:bg-slate-900/90 transition-all text-center group flex flex-col items-center justify-center h-full shadow-lg"
+                    >
+                      <div className="w-12 h-12 rounded-2xl bg-primary/10 border border-primary/25 flex items-center justify-center text-primary group-hover:scale-110 group-hover:bg-primary group-hover:text-slate-950 transition-all duration-300 mb-3.5 shadow-sm">
+                        <Icon className="h-6 w-6" />
+                      </div>
+                      <span className="text-xs md:text-sm font-bold text-foreground/90 group-hover:text-primary transition-colors tracking-tight">
+                        {ind.name}
+                      </span>
+                    </Link>
+                  </ScrollRevealItem>
+                );
+              })}
             </div>
           </ScrollReveal>
         </div>
@@ -513,7 +531,7 @@ export default function Landing() {
               {testimonials.map((t) => (
                 <ScrollRevealItem key={t.author} className="h-full">
                   <Card3D maxTilt={6} className="h-full">
-                    <div className="p-6 sm:p-7 rounded-2xl glass-panel-3d border border-white/10 h-full flex flex-col justify-between bg-gradient-to-b from-card/90 to-background/90">
+                    <div className="p-6 sm:p-7 rounded-2xl border border-white/10 h-full flex flex-col justify-between bg-slate-950/75 backdrop-blur-xl shadow-xl hover:border-primary/30 transition-colors">
                       <div>
                         <div className="flex items-center gap-1 text-amber-400 mb-4">
                           {[...Array(5)].map((_, i) => (
@@ -549,13 +567,13 @@ export default function Landing() {
 
       {/* ── Final 3D Call to Action ── */}
       <section className="py-20 md:py-24 px-4 sm:px-6 relative overflow-hidden">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 -z-10 w-[600px] h-[300px] bg-primary/20 blur-[120px] rounded-full pointer-events-none" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 -z-10 w-[600px] h-[300px] bg-primary/15 blur-[140px] rounded-full pointer-events-none" />
 
         <div className="container mx-auto max-w-4xl">
           <ScrollReveal>
             <ScrollRevealItem>
-              <Card3D maxTilt={5}>
-                <div className="glass-panel-3d rounded-3xl p-8 md:p-16 text-center border border-primary/30 shadow-2xl relative overflow-hidden bg-gradient-to-b from-card/95 via-card/85 to-background/95">
+              <Card3D maxTilt={4}>
+                <div className="rounded-3xl p-8 md:p-16 text-center border border-primary/30 shadow-2xl relative overflow-hidden bg-slate-950/90 backdrop-blur-2xl">
                   <div className="absolute -top-10 -right-10 w-40 h-40 bg-primary/20 rounded-full blur-2xl pointer-events-none" />
                   
                   <h2
@@ -572,7 +590,7 @@ export default function Landing() {
                     <Link to="/register-company" className="w-full sm:w-auto">
                       <Button
                         size="lg"
-                        className="w-full sm:w-auto h-14 px-12 text-base rounded-full gradient-primary font-bold text-slate-950 shadow-2xl hover:scale-105 active:scale-95 transition-all"
+                        className="w-full sm:w-auto h-14 px-12 text-base rounded-full gradient-primary font-bold text-slate-950 shadow-[0_10px_35px_rgba(20,184,166,0.35)] hover:scale-[1.02] active:scale-[0.98] transition-all"
                       >
                         Get Started Free (1 Seat Included)
                         <ArrowRight className="ml-2 h-5 w-5" />
@@ -580,7 +598,7 @@ export default function Landing() {
                     </Link>
                   </div>
 
-                  <div className="mt-6 flex flex-wrap justify-center items-center gap-4 text-xs text-muted-foreground">
+                  <div className="mt-6 flex flex-wrap justify-center items-center gap-4 sm:gap-6 text-xs text-muted-foreground">
                     <span className="flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 text-primary" /> No credit card required</span>
                     <span className="flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 text-primary" /> Free starter tier</span>
                     <span className="flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 text-primary" /> Instant 3-minute setup</span>

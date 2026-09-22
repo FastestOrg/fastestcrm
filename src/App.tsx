@@ -17,6 +17,13 @@ import { usePlatformAdmin } from "@/hooks/usePlatformAdmin";
 import { Loader2 } from "lucide-react";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { FullDashboardSkeleton } from "@/components/dashboard/DashboardSkeleton";
+import { ThemeProvider } from "next-themes";
+import { useReferralTracker } from "@/hooks/useReferralTracker";
+import { useCompany } from "@/hooks/useCompany";
+import { solutionsData } from "./data/solutions";
+import { comparisonsData } from "./data/comparisons";
+import { citiesData } from "./data/cities";
+import { isAndroidWebView } from "@/lib/platform";
 
 // ─── Public & Auth Pages (Lazy Loaded with Auto-Retry) ────────────────────────
 const Landing = lazy(() => import("./pages/Landing"));
@@ -103,13 +110,13 @@ const LandingPages = lazy(() => import("./pages/LandingPages"));
 const LandingPageBuilder = lazy(() => import("./pages/LandingPageBuilder"));
 const PublicLandingPage = lazy(() => import("./pages/PublicLandingPage"));
 const About = lazy(() => import("./pages/About"));
-
-import { useCompany } from "@/hooks/useCompany";
-import { solutionsData } from "./data/solutions";
-import { comparisonsData } from "./data/comparisons";
-import { citiesData } from "./data/cities";
-
-import { isAndroidWebView } from "@/lib/platform";
+const Partnership = lazy(() => import("./pages/Partnership"));
+const PartnershipAgency = lazy(() => import("./pages/PartnershipAgency"));
+const PartnershipAffiliate = lazy(() => import("./pages/PartnershipAffiliate"));
+const PartnershipWhiteLabel = lazy(() => import("./pages/PartnershipWhiteLabel"));
+const ReferralRedirect = lazy(() => import("./pages/ReferralRedirect"));
+const PartnerDashboard = lazy(() => import("./pages/PartnerDashboard"));
+const PlatformPartners = lazy(() => import("./pages/PlatformPartners"));
 
 // ─── Query client ─────────────────────────────────────────────────────────────
 const queryClient = new QueryClient({
@@ -165,11 +172,20 @@ const RouteFallback = () => {
 
 /** Redirect already-logged-in users. Redirect logic centrally managed here. */
 function AuthRoute() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
   const { data: isPlatformAdmin, isLoading: isCheckingAdmin } = usePlatformAdmin();
+  const location = useLocation();
 
   if (user) {
     if (isCheckingAdmin) return <FullDashboardSkeleton />;
+    const fromPath = (location.state as any)?.from?.pathname;
+    if (fromPath && fromPath !== '/auth') {
+      return <Navigate to={fromPath} replace />;
+    }
+    // If user has partner attribute and no tenant company, navigate directly to Partner Cockpit
+    if (profile?.is_partner && !profile?.company_id && !isPlatformAdmin) {
+      return <Navigate to="/dashboard/partner" replace />;
+    }
     return <Navigate to={isPlatformAdmin ? '/platform' : '/dashboard'} replace />;
   }
   return <Auth />;
@@ -210,6 +226,9 @@ function AppRoutes() {
   const { isMainDomain } = useSubdomainContext();
   const isWebView = isAndroidWebView();
 
+  // Track partner referrals across all incoming traffic (?ref=...)
+  useReferralTracker();
+
   return (
     <Suspense fallback={<RouteFallback />}>
       <Routes>
@@ -238,6 +257,14 @@ function AppRoutes() {
         <Route path="/crm-for-saas" element={<SaasCRM />} />
         <Route path="/crm-for-healthcare" element={<IndustrySolutionTemplate {...solutionsData.healthcare} />} />
         <Route path="/crm-for-education" element={<IndustrySolutionTemplate {...solutionsData.education} />} />
+
+        {/* SaaS Partnership Program Ecosystem */}
+        <Route path="/partnership" element={<Partnership />} />
+        <Route path="/partnership/agency" element={<PartnershipAgency />} />
+        <Route path="/partnership/affiliate" element={<PartnershipAffiliate />} />
+        <Route path="/partnership/white-label" element={<PartnershipWhiteLabel />} />
+        <Route path="/partnership/whitelabel" element={<PartnershipWhiteLabel />} />
+        <Route path="/r/:code" element={<ReferralRedirect />} />
         
         {/* Comparison Pages */}
         <Route path="/vs/zoho" element={<ComparisonTemplate {...comparisonsData.zoho} />} />
@@ -264,6 +291,7 @@ function AppRoutes() {
 
         {/* Platform Admin */}
         <Route path="/platform" element={<Protected><PlatformAdmin /></Protected>} />
+        <Route path="/platform/partners" element={<Protected><PlatformPartners /></Protected>} />
 
         {/* Dashboard Routes — Wrapped in Layout & Guards */}
         <Route element={<Protected><SubdomainAccessGuard><AppLayout /></SubdomainAccessGuard></Protected>}>
@@ -322,6 +350,7 @@ function AppRoutes() {
           <Route path="/dashboard/invoices/new" element={<InvoiceBuilder />} />
           <Route path="/dashboard/invoices/:id" element={<InvoiceBuilder />} />
           <Route path="/dashboard/invoice-settings" element={<InvoiceSettings />} />
+          <Route path="/dashboard/partner" element={<PartnerDashboard />} />
         </Route>
 
         <Route path="/lp/:companySlug/:pageSlug" element={<PublicLandingPage />} />
@@ -331,8 +360,6 @@ function AppRoutes() {
     </Suspense>
   );
 }
-
-import { ThemeProvider } from "next-themes";
 
 const App = () => (
   <ErrorBoundary>

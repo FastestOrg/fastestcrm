@@ -208,6 +208,51 @@ const LEADS_NO_HISTORY_COLUMNS = [
     query = query.gt('revenue_received', 0);
   }
 
+  // ── High-Performance Server-Side Search RPC ────────────────────────────
+  // When search query is present on large tables (e.g. leads_efficacy with 2.3M+ rows),
+  // standard PostgREST queries with order=created_at.desc hit 57014 statement timeouts.
+  // The search_leads_fast RPC executes GIN trigram BitmapOr scans in <50ms.
+  if (search && search.trim() !== '') {
+    try {
+      const cleanSearch = search.trim();
+      const statusArr = statusFilter
+        ? (Array.isArray(statusFilter) ? statusFilter : statusFilter === 'all' ? null : [statusFilter])
+        : null;
+      const ownerArr = ownerFilter && ownerFilter.length > 0 ? ownerFilter : null;
+      const productArr = productFilter && productFilter.length > 0 ? productFilter : null;
+      const accessibleArr = !canViewAll && accessibleUserIds && accessibleUserIds.length > 0 ? accessibleUserIds : null;
+      const limitVal = fetchAll ? (limit && limit > 0 ? limit : 1000) : pageSize;
+      const offsetVal = fetchAll ? 0 : (page - 1) * pageSize;
+
+      const { data: rpcData, error: rpcError } = await (dbClient as any).rpc('search_leads_fast', {
+        p_table_name: tableName,
+        p_company_id: companyId,
+        p_search: cleanSearch,
+        p_status_filter: statusArr,
+        p_owner_filter: ownerArr,
+        p_product_filter: productArr,
+        p_accessible_user_ids: accessibleArr,
+        p_dynamic_filters: dynamicFilters || null,
+        p_pending_payment_only: !!pendingPaymentOnly,
+        p_exclude_history: excludeHistory ?? true,
+        p_limit: limitVal,
+        p_offset: offsetVal,
+      });
+
+      if (!rpcError && rpcData && typeof rpcData === 'object' && Array.isArray(rpcData.leads)) {
+        return {
+          leads: (rpcData.leads as unknown as Lead[]) || [],
+          count: Number(rpcData.total_count ?? rpcData.leads.length)
+        };
+      }
+      if (rpcError) {
+        console.warn('[useLeads] search_leads_fast RPC failed, falling back to direct query:', rpcError);
+      }
+    } catch (searchErr) {
+      console.warn('[useLeads] Exception calling search_leads_fast RPC:', searchErr);
+    }
+  }
+
   if (search) {
     query = query.or(
       `name.ilike.%${search}%,email.ilike.%${search}%,phone.ilike.%${search}%,college.ilike.%${search}%`

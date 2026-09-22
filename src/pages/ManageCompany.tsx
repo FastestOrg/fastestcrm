@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { useSubscriptionStatus } from '@/hooks/useSubscriptionStatus';
+import { getReferralCode } from '@/hooks/useReferralTracker';
 
 interface Company {
   id: string;
@@ -211,6 +212,32 @@ export default function ManageCompany() {
       fetchCompanyData();
     }
   }, [user]);
+
+  // Auto-prefill partner discount code for referred companies
+  useEffect(() => {
+    if (addCreditOpen && company?.id && !discountCode) {
+      const checkPartnerCode = async () => {
+        try {
+          const { data: refRecord } = await supabase
+            .from('partner_referrals')
+            .select('partner:partners(referral_code)')
+            .eq('referred_company_id', company.id)
+            .eq('is_paid', false)
+            .maybeSingle();
+
+          if (refRecord?.partner && (refRecord.partner as any).referral_code) {
+            setDiscountCode((refRecord.partner as any).referral_code);
+          } else {
+            const savedCode = getReferralCode();
+            if (savedCode) setDiscountCode(savedCode);
+          }
+        } catch (e) {
+          console.error('Error prefilling partner code:', e);
+        }
+      };
+      checkPartnerCode();
+    }
+  }, [addCreditOpen, company?.id]);
 
   const fetchCompanyData = async () => {
     try {
@@ -540,6 +567,51 @@ export default function ManageCompany() {
             toast({ title: 'Recharge Successful', description: `Wallet credited with ₹${data.credit_amount}` });
             setAddCreditOpen(false);
             fetchCompanyData();
+
+            // Track partner referral commission if eligible
+            try {
+              if (company?.id) {
+                const { data: refRecord } = await supabase
+                  .from('partner_referrals')
+                  .select('id, partner_id, is_paid, partner:partners(category, commission_rate)')
+                  .eq('referred_company_id', company.id)
+                  .maybeSingle();
+
+                if (refRecord && !refRecord.is_paid) {
+                  let comm = 0;
+                  const cat = (refRecord.partner as any)?.category;
+                  if (cat === 'agency') {
+                    comm = Math.round(amount * 0.40);
+                  } else if (cat === 'affiliate') {
+                    comm = Math.round(amount * 0.33); // 1 month of quarterly
+                  }
+
+                  await supabase.from('partner_referrals').update({
+                    is_paid: true,
+                    first_topup_amount: amount,
+                    first_topup_discount: Math.round(amount * 0.10),
+                    total_revenue_generated: amount,
+                    commission_earned: comm,
+                    paid_at: new Date().toISOString()
+                  }).eq('id', refRecord.id);
+
+                  const { data: pData } = await supabase
+                    .from('partners')
+                    .select('total_earnings, pending_earnings')
+                    .eq('id', refRecord.partner_id)
+                    .single();
+
+                  if (pData) {
+                    await supabase.from('partners').update({
+                      total_earnings: (pData.total_earnings || 0) + comm,
+                      pending_earnings: (pData.pending_earnings || 0) + comm
+                    }).eq('id', refRecord.partner_id);
+                  }
+                }
+              }
+            } catch (pErr) {
+              console.error('Failed to log partner referral payment:', pErr);
+            }
           } catch (vErr: any) {
             toast({ title: 'Verification Failed', description: vErr.message, variant: 'destructive' });
           }

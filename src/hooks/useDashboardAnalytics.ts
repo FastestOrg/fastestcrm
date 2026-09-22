@@ -72,11 +72,26 @@ interface RpcClient {
   rpc: (fn: string, args: Record<string, unknown>) => Promise<{ data: RpcResponse | null; error: Error | null }>;
 }
 
-export function useDashboardAnalytics() {
+export interface UseDashboardAnalyticsOptions {
+  userId?: string | null;
+  userIds?: string[] | null;
+  enabled?: boolean;
+}
+
+export function useDashboardAnalytics(options?: UseDashboardAnalyticsOptions) {
   const { company } = useCompany();
   const { orgClient } = useOrgClient();
 
-  const queryKey = ['dashboard-analytics', company?.id];
+  const userId = options?.userId ?? null;
+  const userIds = options?.userIds ?? null;
+  const isEnabled = (options?.enabled ?? true) && !!company?.id;
+
+  const queryKey = [
+    'dashboard-analytics', 
+    company?.id,
+    userId,
+    userIds ? [...userIds].sort().join(',') : null
+  ];
 
   const query = useQuery<DashboardAnalyticsData>({
     queryKey,
@@ -96,6 +111,8 @@ export function useDashboardAnalytics() {
       const { data, error } = await client.rpc('get_dashboard_analytics', {
         p_company_id: company.id,
         p_limit_recent: 5,
+        p_user_id: userId,
+        p_user_ids: userIds,
       });
 
       if (error) {
@@ -121,7 +138,7 @@ export function useDashboardAnalytics() {
         table_name: data?.table_name || 'leads',
       };
     },
-    enabled: !!company?.id,
+    enabled: isEnabled,
     staleTime: 1000 * 60,       // Cache for 60 seconds — fast navigation without redundant fetches
     gcTime: 1000 * 60 * 5,      // Retain in memory for 5 minutes
     refetchOnWindowFocus: false, // Prevent background refetches when switching tabs
@@ -137,3 +154,4 @@ export function useDashboardAnalytics() {
     actionLeads: query.data?.action_leads || [],
   };
 }
+

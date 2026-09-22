@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { motion } from 'framer-motion';
 import { 
@@ -6,7 +6,8 @@ import {
 } from 'recharts';
 import {
   Users, Brain, TrendingUp, DollarSign, Target, BarChart3, CreditCard,
-  Phone, MessageSquare, ExternalLink, ArrowUpRight, Sparkles, Zap, RefreshCw
+  Phone, MessageSquare, ExternalLink, ArrowUpRight, Sparkles, Zap, RefreshCw,
+  Building2, UserCheck, User
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Lead } from '@/hooks/useLeads';
@@ -14,8 +15,21 @@ import { format } from 'date-fns';
 import { ActionCenter } from '@/components/dashboard/ActionCenter';
 import { LeadDetailsDialog } from '@/components/leads/LeadDetailsDialog';
 import { useAuth } from '@/hooks/useAuth';
+import { useCompany } from '@/hooks/useCompany';
+import { useHierarchy } from '@/hooks/useHierarchy';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { useDashboardAnalytics } from '@/hooks/useDashboardAnalytics';
 import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectSeparator,
+  SelectTrigger,
+} from '@/components/ui/select';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -63,8 +77,88 @@ const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
 
 export default function Dashboard() {
   const { user, profile } = useAuth();
+  const { company } = useCompany();
+  const { accessibleUserIds, canViewAll, loading: hierarchyLoading } = useHierarchy();
+
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+
+  // Active team members
+  const { data: teamMembers = [] } = useQuery({
+    queryKey: ['dashboard-team-members', company?.id],
+    queryFn: async () => {
+      if (!company?.id) return [];
+      const { data: profiles, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, email, avatar_url')
+        .eq('company_id', company.id)
+        .not('full_name', 'is', null);
+
+      if (error) {
+        console.error('[Dashboard] Error fetching team members:', error);
+        return [];
+      }
+
+      const activeProfiles = profiles || [];
+      if (activeProfiles.length > 0) {
+        const ids = activeProfiles.map(p => p.id);
+        const { data: rolesData } = await supabase
+          .from('user_roles')
+          .select('user_id')
+          .in('user_id', ids);
+        const activeSet = new Set(rolesData?.map(r => r.user_id));
+        return activeProfiles.filter(p => activeSet.has(p.id));
+      }
+      return activeProfiles;
+    },
+    enabled: !!company?.id,
+    staleTime: 1000 * 60 * 5,
+  });
+
+  // Filter allowed team members based on hierarchy scoping
+  const visibleTeamMembers = useMemo(() => {
+    if (canViewAll) return teamMembers;
+    if (accessibleUserIds && accessibleUserIds.length > 0) {
+      const allowedSet = new Set(accessibleUserIds);
+      return teamMembers.filter(m => allowedSet.has(m.id));
+    }
+    return user?.id ? teamMembers.filter(m => m.id === user.id) : [];
+  }, [canViewAll, accessibleUserIds, teamMembers, user?.id]);
+
+  // Selected Scope:
+  // Non-admins start on 'my_report' (individual report) and are restricted.
+  // Admins start on 'company' and can switch between company & any rep.
+  const [selectedScope, setSelectedScope] = useState<string>('my_report');
+
+  // Sync initial scope once hierarchy resolves
+  useEffect(() => {
+    if (!hierarchyLoading) {
+      if (canViewAll) {
+        setSelectedScope('company');
+      } else {
+        setSelectedScope('my_report');
+      }
+    }
+  }, [canViewAll, hierarchyLoading]);
+
+  // Determine effective user ID for analytics scoping
+  const effectiveUserId = useMemo(() => {
+    if (!canViewAll) {
+      // Non-admin can only inspect themselves or accessible subordinates
+      if (selectedScope && selectedScope !== 'company' && selectedScope !== 'my_report') {
+        if (accessibleUserIds.includes(selectedScope)) {
+          return selectedScope;
+        }
+      }
+      return user?.id || null;
+    }
+    // Admin
+    if (selectedScope === 'company') return null;
+    if (selectedScope === 'my_report') return user?.id || null;
+    return selectedScope;
+  }, [canViewAll, selectedScope, user?.id, accessibleUserIds]);
+
+  const isIndividualMode = !canViewAll || selectedScope !== 'company';
 
   // High-performance pushdown PostgreSQL analytics hook (sub-25ms response, ~1.5KB payload)
   const { 
@@ -76,9 +170,25 @@ export default function Dashboard() {
     isLoading, 
     isFetching,
     refetch 
-  } = useDashboardAnalytics();
+  } = useDashboardAnalytics({
+    userId: effectiveUserId,
+    enabled: !hierarchyLoading,
+  });
 
-  const greeting = React.useMemo(() => {
+  const selectedMember = useMemo(() => {
+    if (!effectiveUserId) return null;
+    if (effectiveUserId === user?.id) {
+      return {
+        id: user.id,
+        full_name: profile?.full_name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'You',
+        isMe: true,
+      };
+    }
+    const found = teamMembers.find(m => m.id === effectiveUserId);
+    return found ? { ...found, isMe: false } : null;
+  }, [effectiveUserId, user, profile, teamMembers]);
+
+  const greeting = useMemo(() => {
     const hour = new Date().getHours();
     if (hour < 12) return 'Good Morning';
     if (hour < 17) return 'Good Afternoon';
@@ -87,20 +197,46 @@ export default function Dashboard() {
 
   const userName = profile?.full_name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Sales Champ';
 
-  const stats = React.useMemo(() => [
-    { label: 'Daily Sales', value: kpis.paid_today.toString(), icon: Target, trend: 'Today' },
-    { label: 'Revenue Today', value: `₹${kpis.revenue_today.toLocaleString()}`, icon: DollarSign, trend: 'Today' },
-    { label: 'Projected Revenue', value: `₹${kpis.projected_revenue.toLocaleString()}`, icon: TrendingUp, trend: 'Total' },
-    { label: 'Lifetime Payments', value: `₹${kpis.total_revenue.toLocaleString()}`, icon: CreditCard, trend: 'Total' },
+  const stats = useMemo(() => [
     { 
-      label: 'Total Revenue', 
+      label: isIndividualMode ? 'My Closed Sales' : 'Daily Sales', 
+      value: kpis.paid_today.toString(), 
+      icon: Target, 
+      trend: 'Today' 
+    },
+    { 
+      label: isIndividualMode ? 'My Revenue Today' : 'Revenue Today', 
+      value: `₹${kpis.revenue_today.toLocaleString()}`, 
+      icon: DollarSign, 
+      trend: 'Today' 
+    },
+    { 
+      label: isIndividualMode ? 'My Projected Revenue' : 'Projected Revenue', 
+      value: `₹${kpis.projected_revenue.toLocaleString()}`, 
+      icon: TrendingUp, 
+      trend: 'Total' 
+    },
+    { 
+      label: isIndividualMode ? 'My Lifetime Payments' : 'Lifetime Payments', 
+      value: `₹${kpis.total_revenue.toLocaleString()}`, 
+      icon: CreditCard, 
+      trend: 'Total' 
+    },
+    { 
+      label: isIndividualMode ? 'My Total Revenue' : 'Total Revenue', 
       value: `₹${kpis.total_revenue.toLocaleString()}`, 
       icon: BarChart3, 
       trend: 'Total',
-      subLabel: `₹${kpis.total_incentive.toLocaleString()}`
+      subLabel: `₹${kpis.total_incentive.toLocaleString()}`,
+      subLabelTitle: isIndividualMode ? 'My Incentive' : 'Incentive Share',
     },
-    { label: 'Pipeline Value', value: `₹${kpis.pipeline_value.toLocaleString()}`, icon: Brain, trend: 'Forecast' },
-  ], [kpis]);
+    { 
+      label: isIndividualMode ? 'My Pipeline Value' : 'Pipeline Value', 
+      value: `₹${kpis.pipeline_value.toLocaleString()}`, 
+      icon: Brain, 
+      trend: 'Forecast' 
+    },
+  ], [kpis, isIndividualMode]);
 
   const chartData = intakeTrend;
   const statusChartData = statusDistribution;
@@ -113,12 +249,88 @@ export default function Dashboard() {
       <div className="absolute bottom-[10%] left-[5%] w-[450px] h-[450px] bg-indigo-500/5 rounded-full blur-[120px] pointer-events-none z-0" />
 
       <header className="sticky top-0 bg-background/60 backdrop-blur-xl border-b border-border/40 px-6 md:px-8 py-4 z-20">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold tracking-tight" style={{ fontFamily: "'Syne', sans-serif" }}>Dashboard</h1>
-            <p className="text-muted-foreground text-xs md:text-sm">Real-time pipeline metrics & AI revenue intelligence.</p>
+            <p className="text-muted-foreground text-xs md:text-sm">
+              {isIndividualMode ? 'Individual revenue & sales intelligence.' : 'Real-time company pipeline metrics & revenue intelligence.'}
+            </p>
           </div>
-          <div className="flex items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-2.5">
+            {/* View Selector for Admins and Managers */}
+            {(canViewAll || visibleTeamMembers.length > 1) ? (
+              <div className="min-w-[190px] sm:min-w-[230px]">
+                <Select
+                  value={selectedScope}
+                  onValueChange={(val) => setSelectedScope(val)}
+                >
+                  <SelectTrigger className="h-8 text-xs bg-card/60 backdrop-blur-md border-border/50 hover:bg-card/90">
+                    <div className="flex items-center gap-1.5 truncate">
+                      {selectedScope === 'company' ? (
+                        <>
+                          <Building2 className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                          <span className="truncate font-medium">🏢 Full Company</span>
+                        </>
+                      ) : (
+                        <>
+                          <UserCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                          <span className="truncate font-medium">
+                            {selectedMember?.isMe ? '👤 My Individual Report' : `👤 ${selectedMember?.full_name || 'Individual'}`}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent align="end" className="w-[240px]">
+                    <SelectGroup>
+                      {canViewAll && (
+                        <>
+                          <SelectItem value="company" className="text-xs font-medium cursor-pointer">
+                            <div className="flex items-center gap-2">
+                              <Building2 className="w-3.5 h-3.5 text-purple-400" />
+                              <span>Full Company Report</span>
+                            </div>
+                          </SelectItem>
+                          <SelectSeparator />
+                        </>
+                      )}
+                      <SelectItem value="my_report" className="text-xs font-medium cursor-pointer">
+                        <div className="flex items-center gap-2">
+                          <User className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>My Individual Report</span>
+                        </div>
+                      </SelectItem>
+                    </SelectGroup>
+                    {visibleTeamMembers.filter(m => m.id !== user?.id).length > 0 && (
+                      <SelectGroup>
+                        <SelectSeparator />
+                        <SelectLabel className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                          {canViewAll ? 'All Sales Reps' : 'Team Members'}
+                        </SelectLabel>
+                        {visibleTeamMembers
+                          .filter(m => m.id !== user?.id)
+                          .map((member) => (
+                            <SelectItem key={member.id} value={member.id} className="text-xs cursor-pointer">
+                              <div className="flex items-center gap-2 truncate">
+                                <span className="w-4 h-4 rounded-full bg-primary/20 text-primary text-[10px] flex items-center justify-center font-bold shrink-0">
+                                  {member.full_name ? member.full_name[0].toUpperCase() : 'U'}
+                                </span>
+                                <span className="truncate">{member.full_name}</span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                      </SelectGroup>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                <UserCheck className="w-3.5 h-3.5" />
+                <span>My Individual Report</span>
+              </div>
+            )}
+
             <Button
               variant="outline"
               size="sm"
@@ -131,7 +343,7 @@ export default function Dashboard() {
             </Button>
             <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              Live DB Analytics
+              Live DB
             </div>
           </div>
         </div>
@@ -149,14 +361,31 @@ export default function Dashboard() {
             <Sparkles className="w-32 h-32 text-purple-400 animate-pulse" />
           </div>
           <div className="max-w-3xl space-y-2">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-purple-500/10 text-purple-300 border border-purple-500/20">
-              <Zap className="w-3.5 h-3.5" /> FastestAI Connected
-            </span>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-purple-500/10 text-purple-300 border border-purple-500/20">
+                <Zap className="w-3.5 h-3.5" /> FastestAI Connected
+              </span>
+              {isIndividualMode ? (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  <UserCheck className="w-3.5 h-3.5" />
+                  {selectedMember?.isMe ? 'Personal Sales Report' : `${selectedMember?.full_name}'s Report`}
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-purple-500/10 text-purple-300 border border-purple-500/20">
+                  <Building2 className="w-3.5 h-3.5" /> Company-Wide Overview
+                </span>
+              )}
+            </div>
             <h2 className="text-3xl font-extrabold tracking-tight mt-2 text-foreground" style={{ fontFamily: "'Syne', sans-serif" }}>
-              {greeting}, {userName}!
+              {isIndividualMode && !selectedMember?.isMe ? `${selectedMember?.full_name}'s Sales Overview` : `${greeting}, ${userName}!`}
             </h2>
             <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl">
-              Welcome back to your command center. FastestAI has completed auditing your active pipelines. Today's collections stand at <span className="text-emerald-400 font-semibold">₹{kpis.revenue_today.toLocaleString()}</span>, with a total forecast value of <span className="text-primary font-semibold">₹{kpis.pipeline_value.toLocaleString()}</span> waiting in your conversion funnel.
+              {isIndividualMode
+                ? (selectedMember?.isMe
+                    ? `Welcome to your personal command center. Here is your individual closed revenue, daily sales, active conversion funnel, and assigned lead pipeline.`
+                    : `Showing individual sales and revenue report for ${selectedMember?.full_name}. Collections today stand at ₹${kpis.revenue_today.toLocaleString()}, with ₹${kpis.pipeline_value.toLocaleString()} in active pipeline.`)
+                : `Welcome back to your company command center. FastestAI has completed auditing company pipelines. Today's collections stand at ₹${kpis.revenue_today.toLocaleString()}, with a total forecast value of ₹${kpis.pipeline_value.toLocaleString()} waiting in your conversion funnel.`
+              }
             </p>
           </div>
         </motion.div>
@@ -212,7 +441,9 @@ export default function Dashboard() {
                         <p className="text-xs text-muted-foreground font-medium">{stat.label}</p>
                         {'subLabel' in stat && stat.subLabel && (
                           <div className="mt-4 pt-3 border-t border-border/20 flex justify-between items-center text-xs">
-                            <span className="text-muted-foreground font-medium flex items-center gap-1">Incentive Share</span>
+                            <span className="text-muted-foreground font-medium flex items-center gap-1">
+                              {'subLabelTitle' in stat && stat.subLabelTitle ? (stat.subLabelTitle as string) : 'Incentive Share'}
+                            </span>
                             <span className="font-bold text-emerald-400">₹{stat.subLabel}</span>
                           </div>
                         )}
@@ -239,7 +470,9 @@ export default function Dashboard() {
                 <CardTitle className="text-base font-bold flex items-center gap-2">
                   <TrendingUp className="w-4 h-4 text-purple-400" /> Weekly Intake Trend
                 </CardTitle>
-                <CardDescription className="text-xs">Leads and revenue registered over the last 7 days</CardDescription>
+                <CardDescription className="text-xs">
+                  {isIndividualMode ? 'Your lead intake and daily activity over the last 7 days' : 'Leads and revenue registered over the last 7 days'}
+                </CardDescription>
               </div>
               <span className="text-xs text-muted-foreground font-medium flex items-center gap-1 bg-purple-500/10 text-purple-300 border border-purple-500/20 px-2 py-0.5 rounded-full">
                 Live Data
@@ -283,7 +516,9 @@ export default function Dashboard() {
               <CardTitle className="text-base font-bold flex items-center gap-2">
                 <BarChart3 className="w-4 h-4 text-teal-400" /> Lead Status Mix
               </CardTitle>
-              <CardDescription className="text-xs">Current lead statuses breakdown</CardDescription>
+              <CardDescription className="text-xs">
+                {isIndividualMode ? 'Status distribution of your assigned leads' : 'Current lead statuses breakdown'}
+              </CardDescription>
             </CardHeader>
             <CardContent className="h-72 flex items-center justify-center">
               {isLoading ? (
@@ -326,7 +561,9 @@ export default function Dashboard() {
                 <CardTitle className="text-base font-bold flex items-center gap-2">
                   <Users className="w-4.5 h-4.5 text-primary" /> Recent Lead Activity
                 </CardTitle>
-                <CardDescription className="text-xs">Manage and interact with recently added leads</CardDescription>
+                <CardDescription className="text-xs">
+                  {isIndividualMode ? 'Manage and interact with your recently assigned leads' : 'Manage and interact with recently added leads'}
+                </CardDescription>
               </div>
               <button 
                 onClick={() => setSelectedLead(null)}

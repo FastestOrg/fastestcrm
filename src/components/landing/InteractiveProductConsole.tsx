@@ -73,7 +73,7 @@ export function InteractiveProductConsole() {
   };
 
   return (
-    <div className="w-full max-w-5xl mx-auto glass-panel-3d rounded-2xl md:rounded-3xl border border-white/10 shadow-2xl relative overflow-hidden text-left bg-gradient-to-b from-card/90 via-card/70 to-background/90 backdrop-blur-2xl">
+    <div className="w-full max-w-5xl mx-auto rounded-2xl md:rounded-3xl border border-white/10 shadow-[0_25px_80px_rgba(0,0,0,0.85),0_0_35px_rgba(20,184,166,0.12)] relative overflow-hidden text-left bg-slate-950/90 backdrop-blur-2xl">
       {/* Top Window Header Chrome (macOS Style) */}
       <div className="px-5 py-3.5 border-b border-white/[0.08] bg-white/[0.02] flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -88,7 +88,7 @@ export function InteractiveProductConsole() {
 
         <div className="flex items-center gap-3 text-xs font-mono text-muted-foreground">
           <span className="hidden md:inline text-[11px] text-primary/90 font-medium">● Latency: 1.2ms</span>
-          <span className="px-2.5 py-0.5 rounded-md bg-primary/10 text-primary text-[10px] font-bold border border-primary/20">
+          <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 text-[10px] font-bold border border-emerald-500/25">
             LIVE SIMULATION
           </span>
         </div>
@@ -101,19 +101,19 @@ export function InteractiveProductConsole() {
           <div>
             <div className="flex items-center gap-2 mb-1">
               <Sparkles className="h-4 w-4 text-primary" />
-              <span className="text-xs font-bold uppercase tracking-wider text-primary">Interactive AI Sandbox</span>
+              <span className="text-xs font-bold uppercase tracking-wider text-primary font-mono">Interactive AI Sandbox</span>
             </div>
             <h3 className="text-lg md:text-xl font-bold text-foreground tracking-tight">
               Test Real-Time Sales Workflows
             </h3>
           </div>
 
-          <div className="flex flex-wrap items-center gap-1.5 bg-black/30 p-1.5 rounded-xl border border-white/10 backdrop-blur-md">
+          <div className="flex flex-wrap items-center gap-1 bg-black/50 p-1 rounded-xl border border-white/10 backdrop-blur-md">
             <button
               onClick={() => setActiveTab('qualifier')}
               className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs md:text-sm font-semibold transition-all ${
                 activeTab === 'qualifier'
-                  ? 'bg-primary text-slate-950 shadow-lg shadow-primary/20 scale-[1.02]'
+                  ? 'bg-primary text-slate-950 shadow-md font-bold'
                   : 'text-muted-foreground hover:text-foreground hover:bg-white/[0.05]'
               }`}
             >
@@ -124,7 +124,7 @@ export function InteractiveProductConsole() {
               onClick={() => setActiveTab('dialer')}
               className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs md:text-sm font-semibold transition-all ${
                 activeTab === 'dialer'
-                  ? 'bg-primary text-slate-950 shadow-lg shadow-primary/20 scale-[1.02]'
+                  ? 'bg-primary text-slate-950 shadow-md font-bold'
                   : 'text-muted-foreground hover:text-foreground hover:bg-white/[0.05]'
               }`}
             >
@@ -135,7 +135,7 @@ export function InteractiveProductConsole() {
               onClick={() => setActiveTab('payment')}
               className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs md:text-sm font-semibold transition-all ${
                 activeTab === 'payment'
-                  ? 'bg-primary text-slate-950 shadow-lg shadow-primary/20 scale-[1.02]'
+                  ? 'bg-primary text-slate-950 shadow-md font-bold'
                   : 'text-muted-foreground hover:text-foreground hover:bg-white/[0.05]'
               }`}
             >
@@ -146,7 +146,7 @@ export function InteractiveProductConsole() {
               onClick={() => setActiveTab('routing')}
               className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs md:text-sm font-semibold transition-all ${
                 activeTab === 'routing'
-                  ? 'bg-primary text-slate-950 shadow-lg shadow-primary/20 scale-[1.02]'
+                  ? 'bg-primary text-slate-950 shadow-md font-bold'
                   : 'text-muted-foreground hover:text-foreground hover:bg-white/[0.05]'
               }`}
             >

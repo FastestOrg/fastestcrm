@@ -1,9 +1,11 @@
-import { useState, Suspense } from 'react';
+import { useState, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { format, isToday, isPast, isFuture } from 'date-fns';
 import {
     AlertTriangle,
     Calendar,
+    Check,
+    ChevronLeft,
     ChevronRight,
     Clock,
     Phone,
@@ -12,9 +14,22 @@ import {
     UserPlus,
     CheckSquare,
     Video,
+    Search,
+    X,
 } from 'lucide-react';
 import { toast } from '@/components/ui/sonner';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
+import { cn } from '@/lib/utils';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useTaskLeads, TaskLead, TaskBucket } from '@/hooks/useTaskLeads';
@@ -89,6 +104,9 @@ function LeadTaskCard({
     lead,
     bucket,
     owners = [],
+    isSelected = false,
+    selectable = false,
+    onToggleSelect,
     onView,
     onEdit,
     onAssign,
@@ -97,6 +115,9 @@ function LeadTaskCard({
     lead: TaskLead;
     bucket: TaskBucket;
     owners?: { label: string; value: string }[];
+    isSelected?: boolean;
+    selectable?: boolean;
+    onToggleSelect?: (lead: TaskLead) => void;
     onView: (lead: TaskLead) => void;
     onEdit: (lead: TaskLead) => void;
     onAssign: (lead: TaskLead) => void;
@@ -118,19 +139,50 @@ function LeadTaskCard({
 
     return (
         <Card
-            className="group cursor-pointer hover:shadow-lg hover:border-primary/50 transition-all duration-200 bg-card border border-border"
+            className={cn(
+                "group cursor-pointer hover:shadow-lg transition-all duration-200 bg-card border",
+                isSelected
+                    ? "border-primary ring-1 ring-primary/40 bg-primary/[0.04]"
+                    : "border-border hover:border-primary/50"
+            )}
             onClick={() => onView(lead)}
         >
             <CardContent className="p-4">
                 {/* Header row */}
                 <div className="flex items-start justify-between gap-3 mb-3">
-                    <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-sm text-foreground truncate group-hover:text-primary transition-colors">
-                            {lead.name}
-                        </h3>
-                        {lead.college && (
-                            <p className="text-xs text-muted-foreground truncate mt-0.5">{lead.college}</p>
+                    <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                        {selectable && showAssign && (
+                            <button
+                                type="button"
+                                role="checkbox"
+                                aria-checked={isSelected}
+                                aria-label={`Select ${lead.name}`}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onToggleSelect?.(lead);
+                                }}
+                                className="pt-0.5 shrink-0 p-1 -m-1 rounded-full cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary group/select"
+                            >
+                                <div
+                                    className={cn(
+                                        "h-4 w-4 rounded-full border transition-all flex items-center justify-center",
+                                        isSelected
+                                            ? "bg-primary border-primary text-primary-foreground shadow-xs"
+                                            : "border-muted-foreground/40 group-hover/select:border-primary group-hover/select:bg-muted/40"
+                                    )}
+                                >
+                                    {isSelected && <Check className="h-2.5 w-2.5 stroke-[3]" />}
+                                </div>
+                            </button>
                         )}
+                        <div className="flex-1 min-w-0">
+                            <h3 className="font-semibold text-sm text-foreground truncate group-hover:text-primary transition-colors">
+                                {lead.name}
+                            </h3>
+                            {lead.college && (
+                                <p className="text-xs text-muted-foreground truncate mt-0.5">{lead.college}</p>
+                            )}
+                        </div>
                     </div>
                     {/* Status badge */}
                     <Badge
@@ -348,8 +400,136 @@ export default function Tasks() {
     const currentLeads = activeBucketLeads[activeTabId];
     const currentTab = TABS.find((t) => t.id === activeTabId)!;
 
+    const [searchQuery, setSearchQuery] = useState('');
+    const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState<number | 'all'>(48);
+    const [selectedLeadIds, setSelectedLeadIds] = useState<Set<string>>(new Set());
+    const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+
     const setTab = (tab: TaskBucket) => {
         setSearchParams({ tab }, { replace: true });
+        setPage(1);
+        setSelectedLeadIds(new Set());
+    };
+
+    const getLeadTargetId = (lead: TaskLead) => {
+        return lead.isMeeting ? (lead.lead_id || null) : lead.id;
+    };
+
+    const handleToggleSelect = (lead: TaskLead) => {
+        const targetId = getLeadTargetId(lead);
+        if (!targetId) {
+            toast.info("Meeting not linked to a lead cannot be assigned");
+            return;
+        }
+        setSelectedLeadIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(targetId)) {
+                next.delete(targetId);
+            } else {
+                next.add(targetId);
+            }
+            return next;
+        });
+    };
+
+    const handleSelectAllFiltered = () => {
+        const next = new Set<string>();
+        filteredLeads.forEach((l) => {
+            const targetId = getLeadTargetId(l);
+            if (targetId) next.add(targetId);
+        });
+        setSelectedLeadIds(next);
+    };
+
+    const handleClearSelection = () => {
+        setSelectedLeadIds(new Set());
+    };
+
+    const handleSingleAssign = (lead: TaskLead) => {
+        const targetId = getLeadTargetId(lead);
+        if (targetId) {
+            setSelectedLeadIds(new Set([targetId]));
+            setAssignDialogOpen(true);
+        } else {
+            toast.error("Meeting not linked to a lead cannot be assigned");
+        }
+    };
+
+    const handleBulkAssign = () => {
+        if (selectedLeadIds.size === 0) {
+            toast.error("Please select at least one lead to assign");
+            return;
+        }
+        setAssignDialogOpen(true);
+    };
+
+    const activeSelectedIds = useMemo(() => Array.from(selectedLeadIds), [selectedLeadIds]);
+
+    const filteredLeads = useMemo(() => {
+        if (!searchQuery.trim()) return currentLeads;
+        const q = searchQuery.toLowerCase().trim();
+        return currentLeads.filter((lead) => {
+            return (
+                (lead.name && lead.name.toLowerCase().includes(q)) ||
+                (lead.phone && lead.phone.includes(q)) ||
+                (lead.email && lead.email.toLowerCase().includes(q)) ||
+                (lead.college && lead.college.toLowerCase().includes(q))
+            );
+        });
+    }, [currentLeads, searchQuery]);
+
+    const totalFiltered = filteredLeads.length;
+    const totalPages = pageSize === 'all' ? 1 : Math.max(1, Math.ceil(totalFiltered / pageSize));
+    const safePage = Math.min(page, totalPages);
+
+    const displayedLeads = useMemo(() => {
+        if (pageSize === 'all') return filteredLeads;
+        const start = (safePage - 1) * pageSize;
+        return filteredLeads.slice(start, start + pageSize);
+    }, [filteredLeads, safePage, pageSize]);
+
+    const selectableDisplayedLeads = useMemo(() => {
+        return displayedLeads.filter((l) => !l.isMeeting || !!l.lead_id);
+    }, [displayedLeads]);
+
+    const isAllPageSelected =
+        selectableDisplayedLeads.length > 0 &&
+        selectableDisplayedLeads.every((l) => {
+            const tid = getLeadTargetId(l);
+            return tid ? selectedLeadIds.has(tid) : false;
+        });
+
+    const isSomePageSelected =
+        !isAllPageSelected &&
+        selectableDisplayedLeads.some((l) => {
+            const tid = getLeadTargetId(l);
+            return tid ? selectedLeadIds.has(tid) : false;
+        });
+
+    const handleToggleSelectAllPage = () => {
+        setSelectedLeadIds((prev) => {
+            const next = new Set(prev);
+            const allSelected =
+                selectableDisplayedLeads.length > 0 &&
+                selectableDisplayedLeads.every((l) => {
+                    const tid = getLeadTargetId(l);
+                    return tid ? next.has(tid) : false;
+                });
+
+            if (allSelected) {
+                selectableDisplayedLeads.forEach((l) => {
+                    const tid = getLeadTargetId(l);
+                    if (tid) next.delete(tid);
+                });
+            } else {
+                selectableDisplayedLeads.forEach((l) => {
+                    const tid = getLeadTargetId(l);
+                    if (tid) next.add(tid);
+                });
+            }
+            return next;
+        });
     };
 
     return (
@@ -367,45 +547,136 @@ export default function Tasks() {
                 </div>
             </div>
 
-            {/* Tab bar */}
-            <div className="flex gap-2 flex-wrap">
-                {TABS.map((tab) => {
-                    const Icon = tab.icon;
-                    const isActive = tab.id === activeTabId;
-                    const count = counts[tab.id];
-                    return (
+            {/* Controls row: Tab bar + Search input */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                {/* Tab bar */}
+                <div className="flex gap-2 flex-wrap">
+                    {TABS.map((tab) => {
+                        const Icon = tab.icon;
+                        const isActive = tab.id === activeTabId;
+                        const count = counts[tab.id];
+                        return (
+                            <button
+                                key={tab.id}
+                                onClick={() => setTab(tab.id)}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 border ${isActive
+                                    ? tab.id === 'urgent'
+                                        ? 'bg-red-500/15 border-red-500/40 text-red-400'
+                                        : tab.id === 'today'
+                                            ? 'bg-amber-500/15 border-amber-500/40 text-amber-400'
+                                            : 'bg-blue-500/15 border-blue-500/40 text-blue-400'
+                                    : 'bg-card border-border text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+                                    }`}
+                            >
+                                <Icon className="h-4 w-4" />
+                                {tab.label}
+                                {!isLoading && count > 0 && (
+                                    <span
+                                        className={`ml-0.5 text-xs font-bold px-1.5 py-0.5 rounded-full ${isActive
+                                            ? tab.id === 'urgent'
+                                                ? 'bg-red-500 text-white'
+                                                : tab.id === 'today'
+                                                    ? 'bg-amber-500 text-white'
+                                                    : 'bg-blue-500 text-white'
+                                            : 'bg-muted text-muted-foreground'
+                                            }`}
+                                    >
+                                        {count}
+                                    </span>
+                                )}
+                            </button>
+                        );
+                    })}
+                </div>
+
+                {/* Search input */}
+                <div className="relative w-full sm:w-64">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        type="text"
+                        placeholder="Search tasks..."
+                        value={searchQuery}
+                        onChange={(e) => {
+                            setSearchQuery(e.target.value);
+                            setPage(1);
+                        }}
+                        className="pl-9 pr-8 h-9 text-xs"
+                    />
+                    {searchQuery && (
                         <button
-                            key={tab.id}
-                            onClick={() => setTab(tab.id)}
-                            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 border ${isActive
-                                ? tab.id === 'urgent'
-                                    ? 'bg-red-500/15 border-red-500/40 text-red-400'
-                                    : tab.id === 'today'
-                                        ? 'bg-amber-500/15 border-amber-500/40 text-amber-400'
-                                        : 'bg-blue-500/15 border-blue-500/40 text-blue-400'
-                                : 'bg-card border-border text-muted-foreground hover:bg-muted/50 hover:text-foreground'
-                                }`}
+                            onClick={() => {
+                                setSearchQuery('');
+                                setPage(1);
+                            }}
+                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                         >
-                            <Icon className="h-4 w-4" />
-                            {tab.label}
-                            {!isLoading && count > 0 && (
-                                <span
-                                    className={`ml-0.5 text-xs font-bold px-1.5 py-0.5 rounded-full ${isActive
-                                        ? tab.id === 'urgent'
-                                            ? 'bg-red-500 text-white'
-                                            : tab.id === 'today'
-                                                ? 'bg-amber-500 text-white'
-                                                : 'bg-blue-500 text-white'
-                                        : 'bg-muted text-muted-foreground'
-                                        }`}
-                                >
-                                    {count}
-                                </span>
-                            )}
+                            <X className="h-3.5 w-3.5" />
                         </button>
-                    );
-                })}
+                    )}
+                </div>
             </div>
+
+            {/* Bulk actions bar for Urgent tab */}
+            {activeTabId === 'urgent' && totalFiltered > 0 && (
+                <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-lg bg-card border border-border">
+                    <div className="flex items-center gap-3">
+                        <Checkbox
+                            id="select-all-page"
+                            checked={
+                                isAllPageSelected
+                                    ? true
+                                    : isSomePageSelected
+                                    ? 'indeterminate'
+                                    : false
+                            }
+                            onCheckedChange={() => handleToggleSelectAllPage()}
+                            className="cursor-pointer"
+                        />
+                        <label
+                            htmlFor="select-all-page"
+                            className="text-xs font-medium text-foreground cursor-pointer select-none"
+                        >
+                            Select page ({selectableDisplayedLeads.length})
+                        </label>
+
+                        {selectedLeadIds.size > 0 && (
+                            <Badge variant="secondary" className="text-xs font-semibold px-2 py-0.5">
+                                {selectedLeadIds.size} selected
+                            </Badge>
+                        )}
+
+                        {selectedLeadIds.size > 0 && selectedLeadIds.size < filteredLeads.length && (
+                            <button
+                                onClick={handleSelectAllFiltered}
+                                className="text-xs text-primary hover:underline font-medium cursor-pointer"
+                            >
+                                Select all {filteredLeads.length} urgent tasks
+                            </button>
+                        )}
+                    </div>
+
+                    {selectedLeadIds.size > 0 && (
+                        <div className="flex items-center gap-2">
+                            <Button
+                                size="sm"
+                                onClick={handleBulkAssign}
+                                className="h-8 text-xs gap-1.5 font-medium shadow-sm"
+                            >
+                                <UserPlus className="h-3.5 w-3.5" />
+                                Assign {selectedLeadIds.size} {selectedLeadIds.size === 1 ? 'Lead' : 'Leads'}
+                            </Button>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={handleClearSelection}
+                                className="h-8 text-xs text-muted-foreground hover:text-foreground"
+                            >
+                                Clear
+                            </Button>
+                        </div>
+                    )}
+                </div>
+            )}
 
             {/* Content */}
             {isLoading ? (
@@ -423,21 +694,100 @@ export default function Tasks() {
                 </div>
             ) : currentLeads.length === 0 ? (
                 <EmptyState tab={currentTab} />
-            ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {currentLeads.map((lead) => (
-                        <LeadTaskCard
-                            key={lead.id}
-                            lead={lead}
-                            bucket={activeTabId}
-                            owners={owners || []}
-                            onView={handleViewLead}
-                            onEdit={setEditingLead}
-                            onAssign={setAssigningLead}
-                            onReschedule={setReschedulingLead}
-                        />
-                    ))}
+            ) : filteredLeads.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                    <Search className="h-10 w-10 text-muted-foreground mb-3 opacity-50" />
+                    <h3 className="text-base font-semibold text-foreground mb-1">No tasks matching "{searchQuery}"</h3>
+                    <p className="text-sm text-muted-foreground max-w-sm mb-4">Try searching with a different name, phone, or email.</p>
+                    <Button variant="outline" size="sm" onClick={() => { setSearchQuery(''); setPage(1); }}>
+                        Clear Search
+                    </Button>
                 </div>
+            ) : (
+                <>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {displayedLeads.map((lead) => {
+                            const targetId = getLeadTargetId(lead);
+                            return (
+                                <LeadTaskCard
+                                    key={lead.id}
+                                    lead={lead}
+                                    bucket={activeTabId}
+                                    owners={owners || []}
+                                    selectable={activeTabId === 'urgent'}
+                                    isSelected={!!(targetId && selectedLeadIds.has(targetId))}
+                                    onToggleSelect={handleToggleSelect}
+                                    onView={handleViewLead}
+                                    onEdit={setEditingLead}
+                                    onAssign={handleSingleAssign}
+                                    onReschedule={setReschedulingLead}
+                                />
+                            );
+                        })}
+                    </div>
+
+                    {/* Pagination footer */}
+                    {totalFiltered > 0 && (
+                        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4 px-2 border-t border-border mt-6">
+                            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                                <div>
+                                    Showing {pageSize === 'all' ? 1 : (safePage - 1) * pageSize + 1} to{' '}
+                                    {pageSize === 'all' ? totalFiltered : Math.min(safePage * pageSize, totalFiltered)} of {totalFiltered} tasks
+                                    {totalFiltered !== currentLeads.length && ` (filtered from ${currentLeads.length})`}
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                    <span>Per page:</span>
+                                    <Select
+                                        value={pageSize.toString()}
+                                        onValueChange={(val) => {
+                                            setPageSize(val === 'all' ? 'all' : Number(val));
+                                            setPage(1);
+                                        }}
+                                    >
+                                        <SelectTrigger className="h-7 w-[72px] text-xs">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="24">24</SelectItem>
+                                            <SelectItem value="48">48</SelectItem>
+                                            <SelectItem value="96">96</SelectItem>
+                                            <SelectItem value="240">240</SelectItem>
+                                            <SelectItem value="all">All</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+
+                            {pageSize !== 'all' && totalPages > 1 && (
+                                <div className="flex items-center gap-2">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setPage((p) => Math.max(1, p - 1))}
+                                        disabled={safePage === 1}
+                                        className="h-8 text-xs"
+                                    >
+                                        <ChevronLeft className="h-3.5 w-3.5 mr-1" />
+                                        Previous
+                                    </Button>
+                                    <div className="text-xs font-medium px-2 text-muted-foreground">
+                                        Page <span className="text-foreground font-semibold">{safePage}</span> of {totalPages}
+                                    </div>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                                        disabled={safePage >= totalPages}
+                                        className="h-8 text-xs"
+                                    >
+                                        Next
+                                        <ChevronRight className="h-3.5 w-3.5 ml-1" />
+                                    </Button>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </>
             )}
 
             {/* Dialogs */}
@@ -484,69 +834,75 @@ export default function Tasks() {
                     lead={editingLead as unknown as Tables<'leads'>}
                 />
             )}
-            {assigningLead && company?.industry?.toLowerCase() === 'real_estate' && (
+            {assignDialogOpen && company?.industry?.toLowerCase() === 'real_estate' && (
                 <RealEstateAssignLeadsDialog
-                    open={!!assigningLead}
-                    onOpenChange={(open) => !open && setAssigningLead(null)}
-                    selectedLeadIds={[assigningLead.isMeeting ? assigningLead.lead_id! : assigningLead.id]}
+                    open={assignDialogOpen}
+                    onOpenChange={(open) => !open && setAssignDialogOpen(false)}
+                    selectedLeadIds={activeSelectedIds}
                     onSuccess={() => {
                         refetch();
-                        setAssigningLead(null);
+                        setSelectedLeadIds(new Set());
+                        setAssignDialogOpen(false);
                     }}
                 />
             )}
-            {assigningLead && company?.industry?.toLowerCase() === 'saas' && (
+            {assignDialogOpen && company?.industry?.toLowerCase() === 'saas' && (
                 <SaaSAssignLeadsDialog
-                    open={!!assigningLead}
-                    onOpenChange={(open) => !open && setAssigningLead(null)}
-                    selectedLeadIds={[assigningLead.isMeeting ? assigningLead.lead_id! : assigningLead.id]}
+                    open={assignDialogOpen}
+                    onOpenChange={(open) => !open && setAssignDialogOpen(false)}
+                    selectedLeadIds={activeSelectedIds}
                     onSuccess={() => {
                         refetch();
-                        setAssigningLead(null);
+                        setSelectedLeadIds(new Set());
+                        setAssignDialogOpen(false);
                     }}
                 />
             )}
-            {assigningLead && company?.industry?.toLowerCase() === 'healthcare' && (
+            {assignDialogOpen && company?.industry?.toLowerCase() === 'healthcare' && (
                 <HealthcareAssignLeadsDialog
-                    open={!!assigningLead}
-                    onOpenChange={(open) => !open && setAssigningLead(null)}
-                    selectedLeadIds={[assigningLead.isMeeting ? assigningLead.lead_id! : assigningLead.id]}
+                    open={assignDialogOpen}
+                    onOpenChange={(open) => !open && setAssignDialogOpen(false)}
+                    selectedLeadIds={activeSelectedIds}
                     onSuccess={() => {
                         refetch();
-                        setAssigningLead(null);
+                        setSelectedLeadIds(new Set());
+                        setAssignDialogOpen(false);
                     }}
                 />
             )}
-            {assigningLead && company?.industry?.toLowerCase() === 'insurance' && (
+            {assignDialogOpen && company?.industry?.toLowerCase() === 'insurance' && (
                 <InsuranceAssignLeadsDialog
-                    open={!!assigningLead}
-                    onOpenChange={(open) => !open && setAssigningLead(null)}
-                    selectedLeadIds={[assigningLead.isMeeting ? assigningLead.lead_id! : assigningLead.id]}
+                    open={assignDialogOpen}
+                    onOpenChange={(open) => !open && setAssignDialogOpen(false)}
+                    selectedLeadIds={activeSelectedIds}
                     onSuccess={() => {
                         refetch();
-                        setAssigningLead(null);
+                        setSelectedLeadIds(new Set());
+                        setAssignDialogOpen(false);
                     }}
                 />
             )}
-            {assigningLead && company?.industry?.toLowerCase() === 'travel' && (
+            {assignDialogOpen && company?.industry?.toLowerCase() === 'travel' && (
                 <TravelAssignLeadsDialog
-                    open={!!assigningLead}
-                    onOpenChange={(open) => !open && setAssigningLead(null)}
-                    selectedLeadIds={[assigningLead.isMeeting ? assigningLead.lead_id! : assigningLead.id]}
+                    open={assignDialogOpen}
+                    onOpenChange={(open) => !open && setAssignDialogOpen(false)}
+                    selectedLeadIds={activeSelectedIds}
                     onSuccess={() => {
                         refetch();
-                        setAssigningLead(null);
+                        setSelectedLeadIds(new Set());
+                        setAssignDialogOpen(false);
                     }}
                 />
             )}
-            {assigningLead && !['real_estate', 'saas', 'healthcare', 'insurance', 'travel'].includes(company?.industry?.toLowerCase() || '') && (
+            {assignDialogOpen && !['real_estate', 'saas', 'healthcare', 'insurance', 'travel'].includes(company?.industry?.toLowerCase() || '') && (
                 <AssignLeadsDialog
-                    open={!!assigningLead}
-                    onOpenChange={(open) => !open && setAssigningLead(null)}
-                    selectedLeadIds={[assigningLead.isMeeting ? assigningLead.lead_id! : assigningLead.id]}
+                    open={assignDialogOpen}
+                    onOpenChange={(open) => !open && setAssignDialogOpen(false)}
+                    selectedLeadIds={activeSelectedIds}
                     onSuccess={() => {
                         refetch();
-                        setAssigningLead(null);
+                        setSelectedLeadIds(new Set());
+                        setAssignDialogOpen(false);
                     }}
                 />
             )}

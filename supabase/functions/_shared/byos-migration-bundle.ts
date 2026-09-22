@@ -1123,6 +1123,187 @@ END;
 $$;
 GRANT EXECUTE ON FUNCTION public.get_distinct_column_values(text, text, uuid) TO authenticated, service_role, anon;
 
+-- ─── Faceted Filter Options RPC for Cascading Dropdowns ───────────────────
+CREATE OR REPLACE FUNCTION public.get_faceted_filter_options(
+    p_table_name text,
+    p_company_id uuid,
+    p_target_columns text[],
+    p_filters jsonb,
+    p_accessible_user_ids uuid[] DEFAULT NULL
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+STABLE
+SET search_path = public
+AS $$
+DECLARE
+    v_col text;
+    v_filter_key text;
+    v_filter_vals jsonb;
+    v_where_clauses text[];
+    v_where_sql text;
+    v_col_query text;
+    v_col_vals text[];
+    v_result jsonb := '{}'::jsonb;
+    v_quoted_vals text;
+    v_valid_cols text[];
+    v_has_other_filters boolean;
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.tables 
+        WHERE table_schema = 'public' AND table_name = p_table_name
+    ) THEN
+        RETURN '{}'::jsonb;
+    END IF;
+
+    SELECT array_agg(column_name::text) INTO v_valid_cols
+    FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = p_table_name;
+
+    IF v_valid_cols IS NULL THEN
+        RETURN '{}'::jsonb;
+    END IF;
+
+    FOREACH v_col IN ARRAY p_target_columns
+    LOOP
+        IF NOT (v_col = ANY(v_valid_cols)) THEN
+            CONTINUE;
+        END IF;
+
+        v_has_other_filters := false;
+        FOR v_filter_key, v_filter_vals IN SELECT * FROM jsonb_each(p_filters)
+        LOOP
+            IF v_filter_key <> v_col 
+               AND NOT (v_filter_key = 'owner' AND v_col = 'sales_owner_id')
+               AND NOT (v_filter_key = 'sales_owner_id' AND v_col = 'owner')
+               AND NOT (v_filter_key = 'product' AND v_col = 'product_purchased')
+               AND NOT (v_filter_key = 'product_purchased' AND v_col = 'product')
+            THEN
+                IF jsonb_typeof(v_filter_vals) = 'array' AND jsonb_array_length(v_filter_vals) > 0 THEN
+                    v_has_other_filters := true;
+                    EXIT;
+                END IF;
+            END IF;
+        END LOOP;
+
+        IF NOT v_has_other_filters THEN
+            CONTINUE;
+        END IF;
+
+        v_where_clauses := ARRAY[
+            format('%I IS NOT NULL', v_col),
+            format('%I::text <> %L', v_col, '')
+        ];
+
+        IF p_company_id IS NOT NULL THEN
+            v_where_clauses := array_append(v_where_clauses, format('company_id = %L', p_company_id));
+        END IF;
+
+        IF p_accessible_user_ids IS NOT NULL AND array_length(p_accessible_user_ids, 1) > 0 THEN
+            v_where_clauses := array_append(
+                v_where_clauses,
+                format('sales_owner_id = ANY(%L::uuid[])', p_accessible_user_ids)
+            );
+        END IF;
+
+        FOR v_filter_key, v_filter_vals IN SELECT * FROM jsonb_each(p_filters)
+        LOOP
+            IF v_filter_key = v_col 
+               OR (v_filter_key = 'owner' AND v_col = 'sales_owner_id')
+               OR (v_filter_key = 'sales_owner_id' AND v_col = 'owner')
+               OR (v_filter_key = 'product' AND v_col = 'product_purchased')
+               OR (v_filter_key = 'product_purchased' AND v_col = 'product')
+            THEN
+                CONTINUE;
+            END IF;
+
+            DECLARE
+                v_db_col text := v_filter_key;
+                v_has_unassigned boolean := false;
+                v_real_ids text[] := ARRAY[]::text[];
+                v_arr_elem jsonb;
+            BEGIN
+                IF v_filter_key = 'owner' THEN
+                    v_db_col := 'sales_owner_id';
+                ELSIF v_filter_key = 'product' THEN
+                    v_db_col := 'product_purchased';
+                END IF;
+
+                IF NOT (v_db_col = ANY(v_valid_cols)) THEN
+                    CONTINUE;
+                END IF;
+
+                IF jsonb_typeof(v_filter_vals) = 'array' AND jsonb_array_length(v_filter_vals) > 0 THEN
+                    IF v_db_col = 'sales_owner_id' THEN
+                        FOR v_arr_elem IN SELECT * FROM jsonb_array_elements(v_filter_vals)
+                        LOOP
+                            IF v_arr_elem #>> '{}' = 'unassigned' THEN
+                                v_has_unassigned := true;
+                            ELSE
+                                v_real_ids := array_append(v_real_ids, v_arr_elem #>> '{}');
+                            END IF;
+                        END LOOP;
+
+                        IF v_has_unassigned AND array_length(v_real_ids, 1) > 0 THEN
+                            v_where_clauses := array_append(
+                                v_where_clauses,
+                                format('(sales_owner_id IS NULL OR sales_owner_id = ANY(%L::uuid[]))', v_real_ids)
+                            );
+                        ELSIF v_has_unassigned THEN
+                            v_where_clauses := array_append(v_where_clauses, 'sales_owner_id IS NULL');
+                        ELSIF array_length(v_real_ids, 1) > 0 THEN
+                            v_where_clauses := array_append(
+                                v_where_clauses,
+                                format('sales_owner_id = ANY(%L::uuid[])', v_real_ids)
+                            );
+                        END IF;
+                    ELSE
+                        SELECT string_agg(quote_literal(x.val), ', ') INTO v_quoted_vals
+                        FROM (SELECT jsonb_array_elements_text(v_filter_vals) AS val) x;
+
+                        IF v_quoted_vals IS NOT NULL AND v_quoted_vals <> '' THEN
+                            v_where_clauses := array_append(
+                                v_where_clauses,
+                                format('%I::text IN (%s)', v_db_col, v_quoted_vals)
+                            );
+                        END IF;
+                    END IF;
+                END IF;
+            END;
+        END LOOP;
+
+        v_where_sql := array_to_string(v_where_clauses, ' AND ');
+
+        BEGIN
+            v_col_query := format(
+                'SELECT ARRAY(
+                    SELECT DISTINCT %I::text 
+                    FROM public.%I 
+                    WHERE %s 
+                    ORDER BY %I::text ASC 
+                    LIMIT 250
+                )',
+                v_col, p_table_name, v_where_sql, v_col
+            );
+            EXECUTE v_col_query INTO v_col_vals;
+
+            v_result := jsonb_set(
+                v_result, 
+                ARRAY[v_col], 
+                COALESCE(to_jsonb(v_col_vals), '[]'::jsonb)
+            );
+        EXCEPTION WHEN OTHERS THEN
+            v_result := jsonb_set(v_result, ARRAY[v_col], '[]'::jsonb);
+        END;
+    END LOOP;
+
+    RETURN v_result;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.get_faceted_filter_options(text, uuid, text[], jsonb, uuid[]) TO authenticated, service_role, anon;
+
+
 -- ─── Get Company Lead Columns ──────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION public.get_company_lead_columns(
   input_company_id uuid DEFAULT NULL
@@ -1241,6 +1422,350 @@ END;
 $$;
 GRANT EXECUTE ON FUNCTION public.toggle_lead_unique_constraint(uuid, text, boolean) TO authenticated, service_role;
 
-UPDATE public._byos_meta SET value = '1.1.0', updated_at = now() WHERE key = 'migration_version';
+-- ─── High-Performance Merge Duplicate Leads ──────────────────────────────────
+CREATE OR REPLACE FUNCTION public.merge_duplicate_leads(
+  input_company_id uuid,
+  batch_limit int DEFAULT 100
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_table_name text;
+  v_unique_constraints text[];
+  v_industry text;
+  v_constraint text;
+  v_total_merged int := 0;
+  v_total_deleted int := 0;
+  v_dup_record RECORD;
+  v_newest_id uuid;
+  v_effective_limit int := LEAST(COALESCE(batch_limit, 100), 200);
+  v_has_more boolean := false;
+BEGIN
+  SELECT custom_leads_table, unique_constraints, industry 
+  INTO v_table_name, v_unique_constraints, v_industry
+  FROM public.companies WHERE id = input_company_id;
+
+  IF v_unique_constraints IS NULL OR array_length(v_unique_constraints, 1) IS NULL THEN
+    RETURN jsonb_build_object('success', false, 'message', 'No unique identifier configured.');
+  END IF;
+
+  IF v_table_name IS NULL THEN
+    IF v_industry = 'real_estate' THEN v_table_name := 'leads_real_estate';
+    ELSIF v_industry = 'saas' THEN v_table_name := 'leads_saas';
+    ELSIF v_industry = 'healthcare' THEN v_table_name := 'leads_healthcare';
+    ELSIF v_industry = 'insurance' THEN v_table_name := 'leads_insurance';
+    ELSIF v_industry = 'travel' THEN v_table_name := 'leads_travel';
+    ELSE v_table_name := 'leads';
+    END IF;
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = v_table_name) THEN
+    RETURN jsonb_build_object('success', false, 'message', format('Table %s not found', v_table_name));
+  END IF;
+
+  FOREACH v_constraint IN ARRAY v_unique_constraints
+  LOOP
+    IF v_total_merged >= v_effective_limit THEN
+      v_has_more := true;
+      EXIT;
+    END IF;
+
+    FOR v_dup_record IN EXECUTE format('
+      SELECT %I as value, array_agg(id ORDER BY created_at DESC, id DESC) as ids
+      FROM %I
+      WHERE %I IS NOT NULL AND %I != '''' AND company_id = %L
+      GROUP BY %I
+      HAVING count(*) > 1
+      LIMIT %L
+    ', v_constraint, v_table_name, v_constraint, v_constraint, input_company_id, v_constraint, (v_effective_limit - v_total_merged))
+    LOOP
+      v_newest_id := v_dup_record.ids[1];
+
+      DECLARE
+        v_old_ids uuid[];
+        v_row_json jsonb;
+        v_merged_json jsonb := '{}'::jsonb;
+        v_key text;
+        v_val text;
+        v_set_parts text[] := '{}';
+      BEGIN
+        v_old_ids := v_dup_record.ids[2:array_length(v_dup_record.ids, 1)];
+
+        FOR v_row_json IN EXECUTE format('
+          SELECT to_jsonb(t) FROM %I t 
+          WHERE id = ANY(%L::uuid[]) 
+          ORDER BY created_at ASC, id ASC
+        ', v_table_name, v_dup_record.ids)
+        LOOP
+          v_merged_json := v_merged_json || jsonb_strip_nulls(v_row_json);
+        END LOOP;
+
+        v_merged_json := v_merged_json - 'id' - 'company_id' - 'created_at' - 'embedding';
+        v_merged_json := v_merged_json || jsonb_build_object('updated_at', NOW());
+
+        FOR v_key, v_val IN SELECT key, value FROM jsonb_each_text(v_merged_json)
+        LOOP
+          v_set_parts := array_append(v_set_parts, format('%I = %L', v_key, v_val));
+        END LOOP;
+
+        IF array_length(v_set_parts, 1) > 0 THEN
+          EXECUTE format('UPDATE %I SET %s WHERE id = %L', v_table_name, array_to_string(v_set_parts, ', '), v_newest_id);
+        END IF;
+
+        IF array_length(v_old_ids, 1) > 0 THEN
+          IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'lead_activity_log') THEN
+            UPDATE public.lead_activity_log SET lead_id = v_newest_id WHERE lead_id = ANY(v_old_ids);
+          END IF;
+
+          EXECUTE format('DELETE FROM %I WHERE id = ANY(%L::uuid[])', v_table_name, v_old_ids);
+          v_total_deleted := v_total_deleted + array_length(v_old_ids, 1);
+        END IF;
+
+        v_total_merged := v_total_merged + 1;
+
+        IF v_total_merged >= v_effective_limit THEN
+          v_has_more := true;
+          EXIT;
+        END IF;
+      END;
+    END LOOP;
+  END LOOP;
+
+  -- Sync the analytics snapshot so dashboard total_leads stays accurate
+  IF v_total_deleted > 0 THEN
+    UPDATE public.company_analytics_snapshots
+    SET total_leads = GREATEST(0, total_leads - v_total_deleted),
+        last_computed_at = NOW()
+    WHERE company_id = input_company_id;
+  END IF;
+
+  RETURN jsonb_build_object(
+    'success', true, 
+    'message', format('Merged %s duplicate group(s), removed %s redundant record(s)', v_total_merged, v_total_deleted),
+    'merged_groups', v_total_merged,
+    'deleted_records', v_total_deleted,
+    'has_more', v_has_more
+  );
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.merge_duplicate_leads(uuid, integer) TO authenticated, service_role;
+
+-- ─── High-Performance Server-Side Leads Search RPC ────────────────────────
+CREATE OR REPLACE FUNCTION public.search_leads_fast(
+    p_table_name text,
+    p_company_id uuid,
+    p_search text,
+    p_status_filter text[] DEFAULT NULL,
+    p_owner_filter text[] DEFAULT NULL,
+    p_product_filter text[] DEFAULT NULL,
+    p_accessible_user_ids uuid[] DEFAULT NULL,
+    p_dynamic_filters jsonb DEFAULT NULL,
+    p_pending_payment_only boolean DEFAULT false,
+    p_exclude_history boolean DEFAULT true,
+    p_limit int DEFAULT 25,
+    p_offset int DEFAULT 0
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+STABLE
+SET search_path = public
+AS $$
+DECLARE
+    v_clean_search text := trim(p_search);
+    v_phone_digits text := regexp_replace(v_clean_search, '\D', '', 'g');
+    v_where_clauses text[] := ARRAY['1=1'];
+    v_search_clauses text[] := ARRAY[]::text[];
+    v_where_sql text;
+    v_sql text;
+    v_count_sql text;
+    v_leads jsonb;
+    v_total_count bigint := 0;
+    v_valid_cols text[];
+    v_dyn_key text;
+    v_dyn_val jsonb;
+    v_is_uuid boolean := false;
+BEGIN
+    -- 1. Validate table exists in public schema
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.tables 
+        WHERE table_schema = 'public' AND table_name = p_table_name
+    ) THEN
+        RETURN jsonb_build_object('leads', '[]'::jsonb, 'total_count', 0);
+    END IF;
+
+    -- 2. Fetch list of all valid columns for this table
+    SELECT array_agg(column_name::text) INTO v_valid_cols
+    FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = p_table_name;
+
+    IF v_valid_cols IS NULL THEN
+        RETURN jsonb_build_object('leads', '[]'::jsonb, 'total_count', 0);
+    END IF;
+
+    -- 3. Company isolation
+    IF 'company_id' = ANY(v_valid_cols) AND p_company_id IS NOT NULL THEN
+        v_where_clauses := array_append(v_where_clauses, format('l.company_id = %L', p_company_id));
+    END IF;
+
+    -- 4. Search condition (combines GIN trigram indexes for <50ms response)
+    IF v_clean_search <> '' THEN
+        -- Check if search query is a UUID
+        IF v_clean_search ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN
+            v_is_uuid := true;
+            IF 'id' = ANY(v_valid_cols) THEN
+                v_search_clauses := array_append(v_search_clauses, format('l.id = %L::uuid', v_clean_search));
+            END IF;
+        END IF;
+
+        IF NOT v_is_uuid THEN
+            IF 'name' = ANY(v_valid_cols) THEN
+                v_search_clauses := array_append(v_search_clauses, format('l.name ILIKE %L', '%' || v_clean_search || '%'));
+            END IF;
+            IF 'email' = ANY(v_valid_cols) THEN
+                v_search_clauses := array_append(v_search_clauses, format('l.email ILIKE %L', '%' || v_clean_search || '%'));
+            END IF;
+            IF 'phone' = ANY(v_valid_cols) THEN
+                v_search_clauses := array_append(v_search_clauses, format('l.phone ILIKE %L', '%' || v_clean_search || '%'));
+                -- If phone digits provided (at least 6 digits), also match normalized digits
+                IF length(v_phone_digits) >= 6 AND v_phone_digits <> v_clean_search THEN
+                    v_search_clauses := array_append(v_search_clauses, format('l.phone ILIKE %L', '%' || v_phone_digits || '%'));
+                END IF;
+                -- If international phone number with country prefix (e.g. 61432530013 or 919876543210), match last 9 or 10 digits
+                IF length(v_phone_digits) >= 10 THEN
+                    v_search_clauses := array_append(v_search_clauses, format('l.phone ILIKE %L', '%' || right(v_phone_digits, 10) || '%'));
+                    v_search_clauses := array_append(v_search_clauses, format('l.phone ILIKE %L', '%' || right(v_phone_digits, 9) || '%'));
+                ELSIF length(v_phone_digits) = 10 AND starts_with(v_phone_digits, '0') THEN
+                    v_search_clauses := array_append(v_search_clauses, format('l.phone ILIKE %L', '%' || substring(v_phone_digits from 2) || '%'));
+                END IF;
+            END IF;
+            IF 'college' = ANY(v_valid_cols) THEN
+                v_search_clauses := array_append(v_search_clauses, format('l.college ILIKE %L', '%' || v_clean_search || '%'));
+            END IF;
+            IF 'property_name' = ANY(v_valid_cols) THEN
+                v_search_clauses := array_append(v_search_clauses, format('l.property_name ILIKE %L', '%' || v_clean_search || '%'));
+            END IF;
+        END IF;
+
+        IF array_length(v_search_clauses, 1) > 0 THEN
+            v_where_clauses := array_append(v_where_clauses, '(' || array_to_string(v_search_clauses, ' OR ') || ')');
+        END IF;
+    END IF;
+
+    -- 5. Status filter
+    IF p_status_filter IS NOT NULL AND array_length(p_status_filter, 1) > 0 AND 'status' = ANY(v_valid_cols) THEN
+        v_where_clauses := array_append(v_where_clauses, format('l.status::text = ANY(%L)', p_status_filter));
+    END IF;
+
+    -- 6. Owner filter
+    IF p_owner_filter IS NOT NULL AND array_length(p_owner_filter, 1) > 0 AND 'sales_owner_id' = ANY(v_valid_cols) THEN
+        DECLARE
+            v_has_unassigned boolean := 'unassigned' = ANY(p_owner_filter);
+            v_real_owners uuid[] := ARRAY[]::uuid[];
+            v_owner_str text;
+        BEGIN
+            FOREACH v_owner_str IN ARRAY p_owner_filter LOOP
+                IF v_owner_str <> 'unassigned' THEN
+                    BEGIN
+                        v_real_owners := array_append(v_real_owners, v_owner_str::uuid);
+                    EXCEPTION WHEN OTHERS THEN
+                        -- ignore non-uuids
+                    END;
+                END IF;
+            END LOOP;
+
+            IF v_has_unassigned AND array_length(v_real_owners, 1) > 0 THEN
+                v_where_clauses := array_append(v_where_clauses, format('(l.sales_owner_id IS NULL OR l.sales_owner_id = ANY(%L))', v_real_owners));
+            ELSIF v_has_unassigned THEN
+                v_where_clauses := array_append(v_where_clauses, 'l.sales_owner_id IS NULL');
+            ELSIF array_length(v_real_owners, 1) > 0 THEN
+                v_where_clauses := array_append(v_where_clauses, format('l.sales_owner_id = ANY(%L)', v_real_owners));
+            END IF;
+        END;
+    END IF;
+
+    -- 7. Product filter
+    IF p_product_filter IS NOT NULL AND array_length(p_product_filter, 1) > 0 AND 'product_purchased' = ANY(v_valid_cols) THEN
+        v_where_clauses := array_append(v_where_clauses, format('l.product_purchased = ANY(%L)', p_product_filter));
+    END IF;
+
+    -- 8. Hierarchy scoping (non-admin restrictions)
+    IF p_accessible_user_ids IS NOT NULL AND array_length(p_accessible_user_ids, 1) > 0 AND 'sales_owner_id' = ANY(v_valid_cols) THEN
+        v_where_clauses := array_append(v_where_clauses, format('l.sales_owner_id = ANY(%L)', p_accessible_user_ids));
+    END IF;
+
+    -- 9. Dynamic column filters
+    IF p_dynamic_filters IS NOT NULL AND p_dynamic_filters <> '{}'::jsonb THEN
+        FOR v_dyn_key, v_dyn_val IN SELECT * FROM jsonb_each(p_dynamic_filters) LOOP
+            IF v_dyn_key = ANY(v_valid_cols) THEN
+                IF jsonb_typeof(v_dyn_val) = 'array' THEN
+                    DECLARE
+                        v_str_arr text[] := ARRAY(SELECT jsonb_array_elements_text(v_dyn_val));
+                    BEGIN
+                        IF array_length(v_str_arr, 1) > 0 THEN
+                            v_where_clauses := array_append(v_where_clauses, format('l.%I::text = ANY(%L)', v_dyn_key, v_str_arr));
+                        END IF;
+                    END;
+                ELSE
+                    v_where_clauses := array_append(v_where_clauses, format('l.%I::text = %L', v_dyn_key, v_dyn_val #>> '{}'));
+                END IF;
+            END IF;
+        END LOOP;
+    END IF;
+
+    -- 10. Pending payment filter
+    IF p_pending_payment_only AND 'revenue_received' = ANY(v_valid_cols) THEN
+        v_where_clauses := array_append(v_where_clauses, 'l.revenue_received > 0');
+    END IF;
+
+    -- Assemble WHERE SQL
+    v_where_sql := array_to_string(v_where_clauses, ' AND ');
+
+    -- 11. Count total matching rows (uses GIN trigram index fast bitmap scan)
+    v_count_sql := format('SELECT count(*) FROM %I l WHERE %s', p_table_name, v_where_sql);
+    EXECUTE v_count_sql INTO v_total_count;
+
+    -- 12. Fetch paginated records with sales_owner full_name joined
+    v_sql := format($q$
+        SELECT coalesce(jsonb_agg(sub.lead_row), '[]'::jsonb)
+        FROM (
+            SELECT 
+                (CASE WHEN %s THEN to_jsonb(l.*) - 'lead_history' ELSE to_jsonb(l.*) END) || 
+                jsonb_build_object(
+                    'sales_owner', 
+                    CASE 
+                        WHEN p.id IS NOT NULL THEN jsonb_build_object('full_name', p.full_name)
+                        ELSE NULL 
+                    END
+                ) AS lead_row
+            FROM %I l
+            LEFT JOIN profiles p ON p.id = l.sales_owner_id
+            WHERE %s
+            ORDER BY l.created_at DESC, l.id DESC
+            LIMIT %s OFFSET %s
+        ) sub
+    $q$, 
+        (p_exclude_history AND 'lead_history' = ANY(v_valid_cols))::text,
+        p_table_name, 
+        v_where_sql, 
+        p_limit, 
+        p_offset
+    );
+
+    EXECUTE v_sql INTO v_leads;
+
+    RETURN jsonb_build_object(
+        'leads', coalesce(v_leads, '[]'::jsonb),
+        'total_count', v_total_count
+    );
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.search_leads_fast(
+    text, uuid, text, text[], text[], text[], uuid[], jsonb, boolean, boolean, int, int
+) TO authenticated, service_role, anon;
+
+UPDATE public._byos_meta SET value = '1.2.0', updated_at = now() WHERE key = 'migration_version';
 NOTIFY pgrst, 'reload schema';
 `;

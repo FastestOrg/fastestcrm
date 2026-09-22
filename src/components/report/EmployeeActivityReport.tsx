@@ -100,6 +100,8 @@ export function EmployeeActivityReport() {
     queryDurationMs,
     fetchEmployeeTimeline,
     getRelativeTime,
+    isIndividual,
+    canViewAll,
   } = useEmployeeActivityReport();
 
   // Active view: 'table' | 'chart'
@@ -247,7 +249,7 @@ export function EmployeeActivityReport() {
           <div className="flex items-center gap-2">
             <h3 className="text-lg font-bold tracking-tight text-foreground flex items-center gap-2">
               <Activity className="h-5 w-5 text-emerald-500" />
-              Employee Daily Activity & Workload Audit
+              {isIndividual ? 'My Daily Activity & Recency Audit' : 'Employee Daily Activity & Workload Audit'}
             </h3>
             {queryDurationMs > 0 && (
               <Badge variant="outline" className="text-[10px] font-mono border-emerald-500/30 text-emerald-400 bg-emerald-500/10">
@@ -256,7 +258,9 @@ export function EmployeeActivityReport() {
             )}
           </div>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Real-time audit of unique lead data edited, actions performed, and employee contact recency.
+            {isIndividual
+              ? 'Real-time audit of your unique lead data edited, actions performed, and contact recency.'
+              : 'Real-time audit of unique lead data edited, actions performed, and employee contact recency.'}
           </p>
         </div>
 
@@ -330,7 +334,7 @@ export function EmployeeActivityReport() {
           <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              Daily Data Worked On
+              {isIndividual ? 'My Leads Worked On' : 'Daily Data Worked On'}
             </CardTitle>
             <CheckCircle2 className="h-4 w-4 text-emerald-500" />
           </CardHeader>
@@ -353,7 +357,7 @@ export function EmployeeActivityReport() {
           <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-500/10 rounded-full blur-2xl pointer-events-none" />
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              Total Contact Actions
+              {isIndividual ? 'My Contact Actions' : 'Total Contact Actions'}
             </CardTitle>
             <Zap className="h-4 w-4 text-cyan-500" />
           </CardHeader>
@@ -376,7 +380,7 @@ export function EmployeeActivityReport() {
           <div className="absolute top-0 right-0 w-24 h-24 bg-violet-500/10 rounded-full blur-2xl pointer-events-none" />
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              Active Team Members
+              {isIndividual ? 'My Activity Status' : 'Active Team Members'}
             </CardTitle>
             <Users className="h-4 w-4 text-violet-500" />
           </CardHeader>
@@ -384,12 +388,18 @@ export function EmployeeActivityReport() {
             <div className="text-3xl font-extrabold text-foreground tracking-tight">
               {isLoading ? (
                 <Loader2 className="h-7 w-7 animate-spin text-muted-foreground" />
+              ) : isIndividual ? (
+                employees[0]?.last_activity?.status_badge === 'active_now' ? 'Active Now' : 'Idle'
               ) : (
                 `${summary?.active_employees_count || 0} / ${summary?.total_employees_count || 0}`
               )}
             </div>
             <div className="flex items-center gap-2 mt-1">
-              {(summary?.active_now_count || 0) > 0 ? (
+              {isIndividual ? (
+                <span className="text-[11px] text-muted-foreground">
+                  {employees[0]?.last_activity?.action ? `Last: ${formatLabel(employees[0].last_activity.action)}` : 'No recent actions'}
+                </span>
+              ) : (summary?.active_now_count || 0) > 0 ? (
                 <span className="inline-flex items-center gap-1 text-[11px] text-emerald-400 font-medium">
                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
                   {summary?.active_now_count} active right now
@@ -406,7 +416,7 @@ export function EmployeeActivityReport() {
           <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/10 rounded-full blur-2xl pointer-events-none" />
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              Top Workload Performer
+              {isIndividual ? 'Activity Summary' : 'Top Workload Performer'}
             </CardTitle>
             <Trophy className="h-4 w-4 text-amber-500" />
           </CardHeader>
@@ -414,12 +424,16 @@ export function EmployeeActivityReport() {
             <div className="text-xl font-extrabold text-foreground tracking-tight truncate">
               {isLoading ? (
                 <Loader2 className="h-7 w-7 animate-spin text-muted-foreground" />
+              ) : isIndividual ? (
+                `${employees[0]?.unique_leads_worked || 0} Leads Worked`
               ) : (
                 summary?.top_performer?.name || 'No Activity'
               )}
             </div>
             <p className="text-[11px] text-amber-400/90 font-medium mt-1">
-              {summary?.top_performer ? (
+              {isIndividual ? (
+                `${employees[0]?.total_actions || 0} actions recorded in range`
+              ) : summary?.top_performer ? (
                 `${summary.top_performer.unique_leads_worked} unique leads worked`
               ) : (
                 'Awaiting today\'s records'
@@ -436,7 +450,7 @@ export function EmployeeActivityReport() {
           <div className="relative w-[220px]">
             <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
             <Input
-              placeholder="Search employee..."
+              placeholder={isIndividual ? "Search my records..." : "Search employee..."}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="h-8 pl-8 text-xs bg-background"
@@ -534,7 +548,7 @@ export function EmployeeActivityReport() {
                 <Table>
                   <TableHeader>
                     <TableRow className="text-xs bg-muted/20">
-                      <TableHead className="w-[240px]">Employee</TableHead>
+                      <TableHead className="w-[240px]">{isIndividual ? 'User' : 'Employee'}</TableHead>
                       <TableHead className="w-[140px]">Live CRM Status</TableHead>
                       <TableHead className="text-right w-[190px]">Unique Data Worked On</TableHead>
                       <TableHead className="text-right w-[130px]">Total Actions</TableHead>

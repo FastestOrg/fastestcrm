@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 const ALLOWED_EXPIRED_PATHS = [
   '/dashboard/settings',
   '/dashboard/company',
+  '/dashboard/partner',
 ];
 
 /**

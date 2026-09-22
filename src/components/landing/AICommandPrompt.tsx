@@ -1,36 +1,38 @@
 import { useState } from 'react';
-import { Sparkles, ArrowRight, Bot, CheckCircle2, Zap, Terminal, CornerDownLeft } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Sparkles, Bot, Zap, Terminal, CreditCard, Brain, Check } from 'lucide-react';
 
 const PRESET_PROMPTS = [
   {
-    label: "⚡ Autonomous Lead Routing",
+    icon: Zap,
+    title: "Autonomous Lead Routing",
     prompt: "Ingest incoming Meta leads, score intent >90%, and auto-dial within 5 seconds",
-    logs: [
-      "[0.04s] FastAI Webhook Ingestion: 48 incoming leads parsed",
-      "[0.12s] FastAI Classifier: Intent scored at 96% (Budget ₹50L+)",
-      "[0.18s] Priority Routing: Dispatched to Senior Telecaller & WhatsApp Demo sent",
-      "[0.24s] Auto-Dialer Triggered: Connection active in 2.8s"
+    steps: [
+      { time: "0.04s", title: "FastAI Webhook Ingestion", detail: "48 incoming leads parsed and deduplicated" },
+      { time: "0.12s", title: "Neural Classifier", detail: "Intent scored at 96% (Budget ₹50L+ Commercial)" },
+      { time: "0.18s", title: "Priority Routing", detail: "Dispatched to Senior Telecaller & WhatsApp Demo sent" },
+      { time: "0.24s", title: "Auto-Dialer Triggered", detail: "Direct connection initiated in 2.8s" }
     ]
   },
   {
-    label: "💰 1-Click WhatsApp Razorpay Deal",
+    icon: CreditCard,
+    title: "1-Click WhatsApp Razorpay Deal",
     prompt: "Generate instant ₹1,50,000 payment link for Rajesh Mehta and auto-close lead upon payment",
-    logs: [
-      "[0.05s] Razorpay API: Dynamic payment link #RZP-984 created for ₹1,50,000",
-      "[0.11s] WhatsApp Cloud API: Sent payment card to +91 98450 XXXXX",
-      "[0.19s] Webhook Listener: Simulated payment capture verified (100% success)",
-      "[0.25s] FastAI CRM Sync: Lead status updated to WON, CA commission credited"
+    steps: [
+      { time: "0.05s", title: "Razorpay Native API", detail: "Dynamic link #RZP-984 generated for ₹1,50,000" },
+      { time: "0.11s", title: "WhatsApp Cloud API", detail: "Interactive payment card sent to +91 98450 XXXXX" },
+      { time: "0.19s", title: "Webhook Verification", detail: "Simulated payment captured (100% verified)" },
+      { time: "0.25s", title: "FastAI CRM Sync", detail: "Status marked WON, CA commission credited" }
     ]
   },
   {
-    label: "🧠 FastAI Objection Copilot",
+    icon: Brain,
+    title: "FastAI Objection Copilot",
     prompt: "Analyze live telecaller conversation and suggest closing objection pitches for commercial real estate",
-    logs: [
-      "[0.03s] Voice Stream: Speech-to-text live transcription active",
-      "[0.09s] Sentiment Analyzer: Detected buyer hesitation on Whitefield possession date",
-      "[0.17s] FastAI Copilot: Recommended pitch: 'Highlight RERA certified completion & zero GST'",
-      "[0.28s] Telecaller screen updated in real time"
+    steps: [
+      { time: "0.03s", title: "Voice Stream", detail: "Speech-to-text live transcription active" },
+      { time: "0.09s", title: "Sentiment Analyzer", detail: "Detected buyer hesitation on Whitefield possession date" },
+      { time: "0.17s", title: "FastAI Copilot", detail: "Recommended pitch: 'Highlight RERA certified completion & zero GST'" },
+      { time: "0.28s", title: "Screen Updated", detail: "Telecaller HUD refreshed in real time" }
     ]
   }
 ];
@@ -42,78 +44,89 @@ export function AICommandPrompt() {
   const handleSelect = (idx: number) => {
     setSelectedPrompt(idx);
     setIsRunning(true);
-    setTimeout(() => setIsRunning(false), 500);
+    setTimeout(() => setIsRunning(false), 400);
   };
+
+  const activePreset = PRESET_PROMPTS[selectedPrompt];
 
   return (
     <div className="w-full max-w-4xl mx-auto my-8 text-left">
-      <div className="glass-panel-3d rounded-2xl p-4 md:p-6 border border-emerald-500/30 shadow-2xl bg-gradient-to-b from-card/95 via-black/80 to-background/95 backdrop-blur-2xl">
+      <div className="rounded-2xl p-5 md:p-6 border border-emerald-500/25 shadow-2xl bg-slate-950/85 backdrop-blur-2xl">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-white/[0.08]">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-primary/15 border border-primary/30 flex items-center justify-center text-primary">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-white/[0.08]">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-primary/15 border border-primary/30 flex items-center justify-center text-primary">
               <Bot className="h-4 w-4" />
             </div>
             <div>
-              <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                FastAI Autonomous Sales Copilot
-                <span className="text-[10px] font-mono px-2 py-0.2 rounded-full bg-emerald-500/15 text-emerald-400 font-bold border border-emerald-500/30">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-bold text-foreground">
+                  FastAI Autonomous Sales Copilot
+                </span>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 font-bold border border-emerald-500/30">
                   ONLINE
                 </span>
-              </span>
+              </div>
+              <p className="text-[11px] text-muted-foreground">Prompt the AI engine to run autonomous revenue operations</p>
             </div>
           </div>
-          <span className="text-[11px] text-muted-foreground font-mono">
-            Prompt the AI to run any revenue operation
+          <span className="text-[11px] text-emerald-400 font-mono font-medium self-start sm:self-auto">
+            ● Mean Execution: 0.28s
           </span>
         </div>
 
         {/* Preset Prompt Pills */}
         <div className="flex flex-wrap gap-2 my-4">
-          {PRESET_PROMPTS.map((p, idx) => (
-            <button
-              key={p.label}
-              onClick={() => handleSelect(idx)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${
-                selectedPrompt === idx
-                  ? 'bg-primary text-slate-950 shadow-md font-bold'
-                  : 'bg-white/[0.03] text-muted-foreground hover:text-foreground border border-white/[0.06] hover:bg-white/[0.06]'
-              }`}
-            >
-              <span>{p.label}</span>
-            </button>
-          ))}
+          {PRESET_PROMPTS.map((p, idx) => {
+            const Icon = p.icon;
+            const isSelected = selectedPrompt === idx;
+            return (
+              <button
+                key={p.title}
+                onClick={() => handleSelect(idx)}
+                className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 ${
+                  isSelected
+                    ? 'bg-primary text-slate-950 shadow-md font-bold'
+                    : 'bg-white/[0.03] text-muted-foreground hover:text-foreground border border-white/[0.06] hover:bg-white/[0.06]'
+                }`}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                <span>{p.title}</span>
+              </button>
+            );
+          })}
         </div>
 
         {/* Active Prompt Bar */}
-        <div className="p-3.5 rounded-xl bg-black/60 border border-white/10 flex items-center gap-3 mb-4">
+        <div className="p-3.5 rounded-xl bg-black/50 border border-white/10 flex items-center gap-3 mb-4">
           <Sparkles className="h-4 w-4 text-primary shrink-0 animate-pulse" />
           <span className="text-xs md:text-sm font-medium text-foreground/90 flex-1 truncate font-mono">
-            {PRESET_PROMPTS[selectedPrompt].prompt}
+            {activePreset.prompt}
           </span>
           <span className="hidden sm:inline text-[10px] font-mono text-primary font-bold px-2 py-1 rounded bg-primary/10 border border-primary/20 shrink-0">
-            AUTONOMOUS EXECUTION
+            AUTONOMOUS
           </span>
         </div>
 
-        {/* Real-time AI Execution Terminal Logs */}
-        <div className="p-4 rounded-xl bg-black/80 border border-white/[0.06] font-mono text-[11px] md:text-xs space-y-1.5">
-          <div className="flex items-center justify-between text-[10px] text-muted-foreground pb-2 mb-2 border-b border-white/[0.06]">
-            <span className="flex items-center gap-1.5">
-              <Terminal className="h-3 w-3 text-primary" /> Autonomous Execution Stream
-            </span>
-            <span className="text-emerald-400 font-bold">FastAI Latency: 0.28s</span>
-          </div>
-
-          {PRESET_PROMPTS[selectedPrompt].logs.map((log, i) => (
+        {/* Real-time AI Execution Step Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          {activePreset.steps.map((step, i) => (
             <div
               key={i}
-              className={`flex items-start gap-2 transition-all ${
+              className={`p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] flex items-start gap-3 transition-opacity ${
                 isRunning ? 'opacity-40' : 'opacity-100'
-              } text-foreground/85`}
+              }`}
             >
-              <span className="text-emerald-400 shrink-0">✓</span>
-              <span>{log}</span>
+              <div className="w-5 h-5 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0 mt-0.5">
+                <Check className="h-3 w-3" />
+              </div>
+              <div className="text-xs overflow-hidden">
+                <div className="flex items-center justify-between gap-2 mb-0.5">
+                  <span className="font-bold text-foreground truncate">{step.title}</span>
+                  <span className="text-[10px] font-mono text-primary font-medium">{step.time}</span>
+                </div>
+                <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">{step.detail}</p>
+              </div>
             </div>
           ))}
         </div>

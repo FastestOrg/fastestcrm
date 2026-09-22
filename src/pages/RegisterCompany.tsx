@@ -7,9 +7,10 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, ArrowLeft, Building2, CheckCircle } from 'lucide-react';
+import { Loader2, ArrowLeft, Building2, CheckCircle, Sparkles, Tag } from 'lucide-react';
 import { z } from 'zod';
 import { INDUSTRIES } from '@/config/industries';
+import { useReferralTracker } from '@/hooks/useReferralTracker';
 
 const registerSchema = z.object({
   companyName: z.string().min(2, 'Company name must be at least 2 characters').max(100),
@@ -29,6 +30,7 @@ export default function RegisterCompany() {
   const [success, setSuccess] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  const referralCode = useReferralTracker();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -65,7 +67,8 @@ export default function RegisterCompany() {
           industry,
           adminEmail,
           adminPassword,
-          adminFullName
+          adminFullName,
+          referral_code: referralCode || undefined
         }
       });
 
@@ -75,6 +78,41 @@ export default function RegisterCompany() {
 
       if (data?.error) {
         throw new Error(data.error);
+      }
+
+      // Attribute referral to partner if referralCode is present
+      if (referralCode && data?.company?.id) {
+        try {
+          // Check if already attributed by register-company Edge Function
+          const { data: existingRef } = await supabase
+            .from('partner_referrals')
+            .select('id')
+            .eq('referred_company_id', data.company.id)
+            .maybeSingle();
+
+          if (!existingRef) {
+            const { data: partnerData } = await supabase
+              .from('partners')
+              .select('id, category')
+              .ilike('referral_code', referralCode.trim())
+              .maybeSingle();
+
+            if (partnerData) {
+              await supabase.from('partner_referrals').insert({
+                partner_id: partnerData.id,
+                referred_company_id: data.company.id,
+                referred_user_id: data.user?.id || null,
+                company_name: companyName.trim(),
+                admin_name: adminFullName.trim(),
+                admin_email: adminEmail.trim(),
+                plan_type: 'quarterly',
+                is_paid: false
+              });
+            }
+          }
+        } catch (partnerErr) {
+          console.error('Failed to attribute referral (non-blocking):', partnerErr);
+        }
       }
 
       setSuccess(true);
@@ -141,6 +179,21 @@ export default function RegisterCompany() {
             <CardDescription>
               Start managing leads with your own team workspace
             </CardDescription>
+
+            {referralCode && (
+              <div className="mt-4 p-3 rounded-xl bg-primary/10 border border-primary/25 flex items-center gap-3 text-left">
+                <Sparkles className="h-5 w-5 text-primary shrink-0 animate-pulse" />
+                <div className="text-xs">
+                  <p className="font-bold text-foreground flex items-center gap-1.5">
+                    <Tag className="h-3.5 w-3.5 text-primary" />
+                    Referral Code Applied: <span className="font-mono text-primary font-bold">{referralCode}</span>
+                  </p>
+                  <p className="text-muted-foreground mt-0.5">
+                    10% discount guaranteed on your first wallet recharge!
+                  </p>
+                </div>
+              </div>
+            )}
           </CardHeader>
 
           <CardContent>

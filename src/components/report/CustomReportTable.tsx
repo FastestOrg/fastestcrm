@@ -448,6 +448,59 @@ export function CustomReportTable({
     return rows.sort((a, b) => b.totalLeads - a.totalLeads);
   }, [leads, groupSummary, columnItems, rowDim, colDim, paidStatusSet, getDimensionItem]);
 
+  // ─── 3. Filtered Matrix Rows for in-table searching ──────────────────────
+  const filteredMatrixRows = useMemo(() => {
+    if (!matrixSearch.trim()) return matrixData;
+    const q = matrixSearch.toLowerCase();
+    return matrixData.filter((r) => (r.name || '').toLowerCase().includes(q));
+  }, [matrixData, matrixSearch]);
+
+  // ─── 4. Compute Totals for 2D Matrix (Footer and CSV) ────────────────────
+  const matrixTotals = useMemo(() => {
+    let totalLeads = 0;
+    let totalRevenue = 0;
+    let totalPaid = 0;
+    let totalScoreSum = 0;
+    const colTotals: Record<
+      string,
+      { count: number; revenue: number; pipeline: number }
+    > = {};
+
+    columnItems.forEach((c) => {
+      colTotals[c.key] = { count: 0, revenue: 0, pipeline: 0 };
+    });
+
+    matrixData.forEach((row) => {
+      totalLeads += row.totalLeads || 0;
+      totalRevenue += row.revenue || 0;
+      totalPaid += row.paid || 0;
+      totalScoreSum += (row.avgScore || 0) * (row.totalLeads || 0);
+
+      columnItems.forEach((c) => {
+        const cell = row.colCells?.[c.key];
+        if (cell) {
+          colTotals[c.key].count += cell.count || 0;
+          colTotals[c.key].revenue += cell.revenue || 0;
+          colTotals[c.key].pipeline += cell.pipeline || 0;
+        }
+      });
+    });
+
+    const avgConvRate =
+      totalLeads > 0 ? ((totalPaid / totalLeads) * 100).toFixed(1) : '0';
+    const overallAvgScore =
+      totalLeads > 0 ? Math.round(totalScoreSum / totalLeads) : 0;
+
+    return {
+      totalLeads,
+      totalRevenue,
+      totalPaid,
+      avgConvRate,
+      overallAvgScore,
+      colTotals,
+    };
+  }, [matrixData, columnItems]);
+
   // ─── 5. Export 2D Pivot Matrix to CSV ──────────────────────────────────────
   const handleExportMatrixCSV = () => {
     const rowTitle = getDimensionTitle(rowDim);

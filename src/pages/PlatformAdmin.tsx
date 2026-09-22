@@ -13,7 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import {
   Building2, Users, Search, Plus, Wallet, Gift, Tag,
   Loader2, ArrowLeft, CheckCircle, XCircle, Eye, RefreshCw,
-  Calendar, Clock, DollarSign, BarChart3, Download, Trash2, Edit, Megaphone, FileDown
+  Calendar, Clock, DollarSign, BarChart3, Download, Trash2, Edit, Megaphone, FileDown, Handshake
 } from 'lucide-react';
 import { AnalyticsTab } from '@/components/platform/AnalyticsTab';
 import { AnnouncementsTab } from '@/components/platform/AnnouncementsTab';
@@ -687,6 +687,10 @@ export default function PlatformAdmin() {
             <p className="text-muted-foreground">Manage all companies, licenses, discounts and gift cards</p>
           </div>
           <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => navigate('/platform/partners')} className="gap-1.5 font-medium border-primary/30 hover:bg-primary/10">
+              <Handshake className="h-4 w-4 text-primary" />
+              Partners Program
+            </Button>
             <Button variant="outline" onClick={fetchAllData} disabled={loading}>
               <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
               Refresh
@@ -773,6 +777,10 @@ export default function PlatformAdmin() {
             <TabsTrigger value="announcements" className="gap-2">
               <Megaphone className="h-4 w-4" />
               Announcements
+            </TabsTrigger>
+            <TabsTrigger value="partners" onClick={() => navigate('/platform/partners')} className="gap-2 text-primary font-medium hover:text-primary">
+              <Handshake className="h-4 w-4 text-primary" />
+              Partners Program
             </TabsTrigger>
           </TabsList>
 

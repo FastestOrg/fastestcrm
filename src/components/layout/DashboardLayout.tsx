@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useState } from 'react';
+import { ReactNode, useEffect, useState, useMemo } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -145,7 +145,11 @@ export default function DashboardLayout({
 
   // Task counts for sidebar badges (non-blocking — loads independently)
   const { urgent: urgentLeads, today: todayLeads, upcoming: upcomingLeads, isLoading: tasksLoading } = useTaskLeads();
-  const taskCounts = { urgent: urgentLeads.length, today: todayLeads.length, upcoming: upcomingLeads.length };
+  const taskCounts = useMemo(() => ({
+    urgent: urgentLeads.length,
+    today: todayLeads.length,
+    upcoming: upcomingLeads.length,
+  }), [urgentLeads.length, todayLeads.length, upcomingLeads.length]);
   const totalTaskCount = taskCounts.urgent + taskCounts.today + taskCounts.upcoming;
 
   const isTasksActive = location.pathname.startsWith('/dashboard/tasks');

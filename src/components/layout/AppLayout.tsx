@@ -1,13 +1,12 @@
 import { useNavigate, useLocation, useSearchParams, Outlet } from 'react-router-dom';
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { DashboardSkeleton, FullDashboardSkeleton } from '@/components/dashboard/DashboardSkeleton';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useCompany } from '@/hooks/useCompany';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
-import { LayoutDashboard, Users, UserCheck, CreditCard, Settings, LogOut, Phone, Workflow, Link2, BarChart3, Brain, Calendar, FileText, Building2, Shield, Package, PieChart, Database, CheckSquare, AlertTriangle, Clock, ChevronDown, ChevronUp, Mail, PanelLeftClose, PanelLeftOpen, MessageCircle, Receipt, Sparkles, Wand2, ShieldCheck, Bot, Zap, Target, Heart, Globe, PhoneCall } from 'lucide-react';
+import { LayoutDashboard, Users, UserCheck, CreditCard, Settings, LogOut, Phone, Workflow, Link2, BarChart3, Brain, Calendar, FileText, Building2, Shield, Package, PieChart, Database, CheckSquare, AlertTriangle, Clock, ChevronDown, ChevronUp, Mail, PanelLeftClose, PanelLeftOpen, MessageCircle, Receipt, Sparkles, Wand2, ShieldCheck, Bot, Zap, Target, Heart, Globe, PhoneCall, Handshake } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -238,6 +237,11 @@ const navItems: NavItem[] = [{
     path: '/dashboard/settings',
     section: 'Accounts'
 }, {
+    icon: Handshake,
+    label: 'Partner Program',
+    path: '/dashboard/partner',
+    section: 'Accounts'
+}, {
     icon: Receipt,
     label: 'Invoice Settings',
     path: '/dashboard/invoice-settings',
@@ -301,7 +305,11 @@ export default function AppLayout() {
     };
 
     const { urgent: urgentLeads, today: todayLeads, upcoming: upcomingLeads, isLoading: tasksLoading } = useTaskLeads();
-    const taskCounts = { urgent: urgentLeads.length, today: todayLeads.length, upcoming: upcomingLeads.length };
+    const taskCounts = useMemo(() => ({
+        urgent: urgentLeads.length,
+        today: todayLeads.length,
+        upcoming: upcomingLeads.length,
+    }), [urgentLeads.length, todayLeads.length, upcomingLeads.length]);
     const totalTaskCount = taskCounts.urgent + taskCounts.today + taskCounts.upcoming;
 
     // Check if email dashboard is enabled for this company
@@ -906,6 +914,11 @@ export default function AppLayout() {
                                                 >
                                                     <item.icon className={`h-3.5 w-3.5 shrink-0 transition-colors ${location.pathname === item.path ? 'text-amber-400' : 'text-muted-foreground'}`} />
                                                     <span className="flex-1 text-left whitespace-nowrap overflow-hidden text-ellipsis">{item.label}</span>
+                                                    {item.label === 'Partner Program' && (
+                                                        <span className="text-[10px] bg-primary/20 text-primary border border-primary/30 px-1.5 py-0.2 rounded-full font-mono shrink-0 ml-auto">
+                                                            {profile?.is_partner ? String(profile.partner_category || 'Partner').toUpperCase() : '40% cut'}
+                                                        </span>
+                                                    )}
                                                 </button>
                                             ))}
                                         </div>
@@ -1091,6 +1104,39 @@ export default function AppLayout() {
                 </nav>
 
                 <div className="p-4 border-t border-sidebar-border">
+                    {/* Partner Shortcut */}
+                    {profile?.is_partner && !isCollapsed && (
+                        <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => navigate('/dashboard/partner')}
+                            className="w-full mb-3 justify-start gap-2 bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary border border-primary/20 text-xs font-semibold"
+                        >
+                            <Handshake className="h-3.5 w-3.5 shrink-0 text-primary" />
+                            <span className="truncate">Partner Cockpit</span>
+                            <span className="ml-auto text-[9px] px-1.5 py-0.5 rounded-full bg-primary text-primary-foreground font-mono uppercase">
+                                {String(profile.partner_category || 'Partner')}
+                            </span>
+                        </Button>
+                    )}
+                    {profile?.is_partner && isCollapsed && (
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    onClick={() => navigate('/dashboard/partner')}
+                                    className="w-full mb-3 text-primary bg-primary/10 hover:bg-primary/20"
+                                >
+                                    <Handshake className="h-4 w-4" />
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="right" sideOffset={10}>
+                                Partner Cockpit ({String(profile.partner_category || 'Active')})
+                            </TooltipContent>
+                        </Tooltip>
+                    )}
+
                     <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3 mb-4'} `}>
                         <Tooltip>
                             <TooltipTrigger asChild>

@@ -1,5 +1,6 @@
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, Suspense, useMemo, useCallback } from 'react';
 import { lazyWithRetry as lazy } from '@/lib/lazyWithRetry';
+import { useFacetedFilterOptions } from '@/hooks/useFacetedFilterOptions';
 // DashboardLayout removed
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
@@ -118,7 +119,7 @@ export default function GenericAllLeads() {
 
 
     // Handlers for filters
-    const handleSetOwners = (newOwners: Set<string>) => {
+    const handleSetOwners = useCallback((newOwners: Set<string>) => {
         setSearchParams(prev => {
             const newParams = new URLSearchParams(prev);
             newParams.delete('owner');
@@ -126,9 +127,9 @@ export default function GenericAllLeads() {
             newParams.set('page', '1');
             return newParams;
         });
-    };
+    }, [setSearchParams]);
 
-    const handleSetStatuses = (newStatuses: Set<string>) => {
+    const handleSetStatuses = useCallback((newStatuses: Set<string>) => {
         setSearchParams(prev => {
             const newParams = new URLSearchParams(prev);
             newParams.delete('status');
@@ -136,9 +137,9 @@ export default function GenericAllLeads() {
             newParams.set('page', '1');
             return newParams;
         });
-    };
+    }, [setSearchParams]);
 
-    const handleSetProducts = (newProducts: Set<string>) => {
+    const handleSetProducts = useCallback((newProducts: Set<string>) => {
         setSearchParams(prev => {
             const newParams = new URLSearchParams(prev);
             newParams.delete('product');
@@ -146,7 +147,7 @@ export default function GenericAllLeads() {
             newParams.set('page', '1');
             return newParams;
         });
-    };
+    }, [setSearchParams]);
 
     const handlePageChange = (newPage: number) => {
         setSearchParams(prev => {
@@ -347,46 +348,129 @@ export default function GenericAllLeads() {
         }
     });
 
-    // Create the activeFilters list for MobileLeadsHeader
-    const activeFilters = filterableColumns.map((col: any) => {
-        let options: { label: string; value: string; group?: string }[] = [];
-        let selectedValues = new Set<string>();
-        let onSelectionChange = (newValues: Set<string>) => {};
-
-        if (col.id === 'owner') {
-            options = filterOptions?.owners || [];
-            selectedValues = selectedOwners;
-            onSelectionChange = handleSetOwners;
-        } else if (col.id === 'status') {
-            options = filterOptions?.statuses || [];
-            selectedValues = selectedStatuses;
-            onSelectionChange = handleSetStatuses;
-        } else if (col.id === 'product_purchased') {
-            options = filterOptions?.products || [];
-            selectedValues = selectedProducts;
-            onSelectionChange = handleSetProducts;
-        } else {
-            options = filterOptions?.dynamic?.[col.id] || [];
-            selectedValues = new Set(searchParams.getAll(col.id));
-            onSelectionChange = (newValues: Set<string>) => {
-                setSearchParams(prev => {
-                    const newParams = new URLSearchParams(prev);
-                    newParams.delete(col.id);
-                    newValues.forEach(val => newParams.append(col.id, val));
-                    newParams.set('page', '1');
-                    return newParams;
-                });
-            };
+    // Build active filters object mapped to database column names for faceted filtering
+    const activeDbFilters: Record<string, string[]> = useMemo(() => {
+        const filters: Record<string, string[]> = {};
+        if (selectedOwners.size > 0) {
+            filters['sales_owner_id'] = Array.from(selectedOwners);
         }
+        if (selectedStatuses.size > 0) {
+            filters['status'] = Array.from(selectedStatuses);
+        }
+        if (selectedProducts.size > 0) {
+            filters['product_purchased'] = Array.from(selectedProducts);
+        }
+        Object.entries(dynamicFilters).forEach(([colId, vals]) => {
+            if (vals && vals.length > 0) {
+                filters[colId] = vals;
+            }
+        });
+        return filters;
+    }, [selectedOwners, selectedStatuses, selectedProducts, dynamicFilters]);
 
-        return {
-            id: col.id,
-            label: col.label,
-            options,
-            selectedValues,
-            onSelectionChange
-        };
+    const targetDbColumns = useMemo(() => {
+        return filterableColumns.map((col: any) => {
+            if (col.id === 'owner') return 'sales_owner_id';
+            if (col.id === 'product_purchased') return 'product_purchased';
+            return col.id;
+        });
+    }, [filterableColumns]);
+
+    const { data: facetedOptions } = useFacetedFilterOptions({
+        orgClient,
+        tableName,
+        companyId: company?.id,
+        targetColumns: targetDbColumns,
+        activeFilters: activeDbFilters,
+        accessibleUserIds,
+        canViewAll,
+        enabled: !!company?.id && !!tableName && !hierarchyLoading
     });
+
+    // Create the activeFilters list for MobileLeadsHeader with cascading options
+    const activeFilters = useMemo(() => {
+        return filterableColumns.map((col: any) => {
+            let baseOptions: { label: string; value: string; group?: string }[] = [];
+            let selectedValues = new Set<string>();
+            let onSelectionChange = (newValues: Set<string>) => {};
+            let dbColName = col.id;
+
+            if (col.id === 'owner') {
+                baseOptions = filterOptions?.owners || [];
+                selectedValues = selectedOwners;
+                onSelectionChange = handleSetOwners;
+                dbColName = 'sales_owner_id';
+            } else if (col.id === 'status') {
+                baseOptions = filterOptions?.statuses || [];
+                selectedValues = selectedStatuses;
+                onSelectionChange = handleSetStatuses;
+                dbColName = 'status';
+            } else if (col.id === 'product_purchased') {
+                baseOptions = filterOptions?.products || [];
+                selectedValues = selectedProducts;
+                onSelectionChange = handleSetProducts;
+                dbColName = 'product_purchased';
+            } else {
+                baseOptions = filterOptions?.dynamic?.[col.id] || [];
+                selectedValues = new Set(searchParams.getAll(col.id));
+                onSelectionChange = (newValues: Set<string>) => {
+                    setSearchParams(prev => {
+                        const newParams = new URLSearchParams(prev);
+                        newParams.delete(col.id);
+                        newValues.forEach(val => newParams.append(col.id, val));
+                        newParams.set('page', '1');
+                        return newParams;
+                    });
+                };
+            }
+
+            // Determine cascading/faceted options if other filters are constraining this column
+            let options = baseOptions;
+            const allowedValues = facetedOptions?.[dbColName];
+
+            if (allowedValues && Array.isArray(allowedValues)) {
+                const allowedSet = new Set(allowedValues.map(v => String(v).toLowerCase()));
+
+                // Filter baseOptions to only include options that are in allowedSet OR currently selected
+                options = baseOptions.filter(opt => 
+                    allowedSet.has(String(opt.value).toLowerCase()) || selectedValues.has(opt.value)
+                );
+
+                // If any allowed values from the DB weren't present in baseOptions, include them
+                const existingOptionValues = new Set(options.map(o => String(o.value).toLowerCase()));
+                allowedValues.forEach(val => {
+                    const strVal = String(val);
+                    if (strVal && !existingOptionValues.has(strVal.toLowerCase())) {
+                        options.push({
+                            label: strVal.replace(/_/g, ' ').replace(/\b\w/g, ch => ch.toUpperCase()),
+                            value: strVal
+                        });
+                        existingOptionValues.add(strVal.toLowerCase());
+                    }
+                });
+            }
+
+            return {
+                id: col.id,
+                label: col.label,
+                options,
+                selectedValues,
+                onSelectionChange
+            };
+        });
+    }, [
+        filterableColumns,
+        filterOptions,
+        selectedOwners,
+        selectedStatuses,
+        selectedProducts,
+        searchParams,
+        facetedOptions,
+        handleSetOwners,
+        handleSetStatuses,
+        handleSetProducts,
+        setSearchParams
+    ]);
 
     // Active owner IDs (excludes the 'unassigned' sentinel) — used by useLeads to build the
     // "deleted-user" filter: leads where sales_owner_id NOT IN (activeOwnerIds)
