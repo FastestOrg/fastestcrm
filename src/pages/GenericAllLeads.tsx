@@ -376,12 +376,20 @@ export default function GenericAllLeads() {
         });
     }, [filterableColumns]);
 
+    // Active owner IDs (excludes the 'unassigned' sentinel) — used by useLeads & useFacetedFilterOptions
+    const activeOwnerIds = useMemo(() => {
+        return (filterOptions?.owners ?? [])
+            .filter(o => o.value !== 'unassigned')
+            .map(o => o.value);
+    }, [filterOptions?.owners]);
+
     const { data: facetedOptions } = useFacetedFilterOptions({
         orgClient,
         tableName,
         companyId: company?.id,
         targetColumns: targetDbColumns,
         activeFilters: activeDbFilters,
+        activeOwnerIds,
         accessibleUserIds,
         canViewAll,
         enabled: !!company?.id && !!tableName && !hierarchyLoading
@@ -429,25 +437,30 @@ export default function GenericAllLeads() {
             const allowedValues = facetedOptions?.[dbColName];
 
             if (allowedValues && Array.isArray(allowedValues)) {
-                const allowedSet = new Set(allowedValues.map(v => String(v).toLowerCase()));
+                const norm = (v: any) => String(v || '').toLowerCase().trim().replace(/[_\s-]+/g, '');
+                const allowedNormSet = new Set(allowedValues.map(v => norm(v)));
 
                 // Filter baseOptions to only include options that are in allowedSet OR currently selected
                 options = baseOptions.filter(opt => 
-                    allowedSet.has(String(opt.value).toLowerCase()) || selectedValues.has(opt.value)
+                    allowedNormSet.has(norm(opt.value)) || 
+                    allowedNormSet.has(norm(opt.label)) || 
+                    selectedValues.has(opt.value)
                 );
 
-                // If any allowed values from the DB weren't present in baseOptions, include them
-                const existingOptionValues = new Set(options.map(o => String(o.value).toLowerCase()));
-                allowedValues.forEach(val => {
-                    const strVal = String(val);
-                    if (strVal && !existingOptionValues.has(strVal.toLowerCase())) {
-                        options.push({
-                            label: strVal.replace(/_/g, ' ').replace(/\b\w/g, ch => ch.toUpperCase()),
-                            value: strVal
-                        });
-                        existingOptionValues.add(strVal.toLowerCase());
-                    }
-                });
+                // If any allowed values from the DB weren't present in baseOptions, include them (except for owner)
+                if (col.id !== 'owner') {
+                    const existingOptionValues = new Set(options.map(o => norm(o.value)));
+                    allowedValues.forEach(val => {
+                        const strVal = String(val).trim();
+                        if (strVal && !existingOptionValues.has(norm(strVal))) {
+                            options.push({
+                                label: strVal.replace(/_/g, ' ').replace(/\b\w/g, ch => ch.toUpperCase()),
+                                value: strVal
+                            });
+                            existingOptionValues.add(norm(strVal));
+                        }
+                    });
+                }
             }
 
             return {
@@ -471,12 +484,6 @@ export default function GenericAllLeads() {
         handleSetProducts,
         setSearchParams
     ]);
-
-    // Active owner IDs (excludes the 'unassigned' sentinel) — used by useLeads to build the
-    // "deleted-user" filter: leads where sales_owner_id NOT IN (activeOwnerIds)
-    const activeOwnerIds = (filterOptions?.owners ?? [])
-        .filter(o => o.value !== 'unassigned')
-        .map(o => o.value);
 
     const { data: leadsData, isLoading, refetch } = useLeads({
         search: searchQuery,

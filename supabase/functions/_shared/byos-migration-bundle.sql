@@ -786,12 +786,16 @@ $$;
 GRANT EXECUTE ON FUNCTION public.get_distinct_column_values(text, text, uuid) TO authenticated, service_role, anon;
 
 -- ─── Faceted Filter Options RPC for Cascading Dropdowns ───────────────────
+DROP FUNCTION IF EXISTS public.get_faceted_filter_options(text, uuid, text[], jsonb, uuid[]);
+DROP FUNCTION IF EXISTS public.get_faceted_filter_options(text, uuid, text[], jsonb, uuid[], uuid[]);
+
 CREATE OR REPLACE FUNCTION public.get_faceted_filter_options(
     p_table_name text,
     p_company_id uuid,
     p_target_columns text[],
     p_filters jsonb,
-    p_accessible_user_ids uuid[] DEFAULT NULL
+    p_accessible_user_ids uuid[] DEFAULT NULL,
+    p_active_owner_ids uuid[] DEFAULT NULL
 )
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -811,6 +815,7 @@ DECLARE
     v_quoted_vals text;
     v_valid_cols text[];
     v_has_other_filters boolean;
+    v_has_unassigned_leads boolean;
 BEGIN
     IF NOT EXISTS (
         SELECT 1 FROM information_schema.tables 
@@ -853,16 +858,20 @@ BEGIN
             CONTINUE;
         END IF;
 
-        v_where_clauses := ARRAY[
-            format('%I IS NOT NULL', v_col),
-            format('%I::text <> %L', v_col, '')
-        ];
+        IF v_col <> 'sales_owner_id' THEN
+            v_where_clauses := ARRAY[
+                format('%I IS NOT NULL', v_col),
+                format('%I::text <> %L', v_col, '')
+            ];
+        ELSE
+            v_where_clauses := ARRAY['1=1'];
+        END IF;
 
-        IF p_company_id IS NOT NULL THEN
+        IF p_company_id IS NOT NULL AND ('company_id' = ANY(v_valid_cols)) THEN
             v_where_clauses := array_append(v_where_clauses, format('company_id = %L', p_company_id));
         END IF;
 
-        IF p_accessible_user_ids IS NOT NULL AND array_length(p_accessible_user_ids, 1) > 0 THEN
+        IF p_accessible_user_ids IS NOT NULL AND array_length(p_accessible_user_ids, 1) > 0 AND ('sales_owner_id' = ANY(v_valid_cols)) THEN
             v_where_clauses := array_append(
                 v_where_clauses,
                 format('sales_owner_id = ANY(%L::uuid[])', p_accessible_user_ids)
@@ -907,17 +916,43 @@ BEGIN
                             END IF;
                         END LOOP;
 
-                        IF v_has_unassigned AND array_length(v_real_ids, 1) > 0 THEN
-                            v_where_clauses := array_append(
-                                v_where_clauses,
-                                format('(sales_owner_id IS NULL OR sales_owner_id = ANY(%L::uuid[]))', v_real_ids)
-                            );
-                        ELSIF v_has_unassigned THEN
-                            v_where_clauses := array_append(v_where_clauses, 'sales_owner_id IS NULL');
+                        IF v_has_unassigned THEN
+                            IF p_active_owner_ids IS NOT NULL AND array_length(p_active_owner_ids, 1) > 0 THEN
+                                IF array_length(v_real_ids, 1) > 0 THEN
+                                    v_where_clauses := array_append(
+                                        v_where_clauses,
+                                        format('(sales_owner_id IS NULL OR NOT (sales_owner_id = ANY(%L::uuid[])) OR sales_owner_id = ANY(%L::uuid[]))', p_active_owner_ids, v_real_ids)
+                                    );
+                                ELSE
+                                    v_where_clauses := array_append(
+                                        v_where_clauses,
+                                        format('(sales_owner_id IS NULL OR NOT (sales_owner_id = ANY(%L::uuid[])))', p_active_owner_ids)
+                                    );
+                                END IF;
+                            ELSE
+                                IF array_length(v_real_ids, 1) > 0 THEN
+                                    v_where_clauses := array_append(
+                                        v_where_clauses,
+                                        format('(sales_owner_id IS NULL OR sales_owner_id = ANY(%L::uuid[]))', v_real_ids)
+                                    );
+                                ELSE
+                                    v_where_clauses := array_append(v_where_clauses, 'sales_owner_id IS NULL');
+                                END IF;
+                            END IF;
                         ELSIF array_length(v_real_ids, 1) > 0 THEN
                             v_where_clauses := array_append(
                                 v_where_clauses,
                                 format('sales_owner_id = ANY(%L::uuid[])', v_real_ids)
+                            );
+                        END IF;
+                    ELSIF v_db_col = 'status' THEN
+                        SELECT string_agg(quote_literal(LOWER(REPLACE(x.val, ' ', '_'))), ', ') INTO v_quoted_vals
+                        FROM (SELECT jsonb_array_elements_text(v_filter_vals) AS val) x;
+
+                        IF v_quoted_vals IS NOT NULL AND v_quoted_vals <> '' THEN
+                            v_where_clauses := array_append(
+                                v_where_clauses,
+                                format('LOWER(REPLACE(%I::text, '' '', ''_'')) IN (%s)', v_db_col, v_quoted_vals)
                             );
                         END IF;
                     ELSE
@@ -927,7 +962,7 @@ BEGIN
                         IF v_quoted_vals IS NOT NULL AND v_quoted_vals <> '' THEN
                             v_where_clauses := array_append(
                                 v_where_clauses,
-                                format('%I::text IN (%s)', v_db_col, v_quoted_vals)
+                                format('(%I::text IN (%s) OR TRIM(%I::text) IN (%s))', v_db_col, v_quoted_vals, v_db_col, v_quoted_vals)
                             );
                         END IF;
                     END IF;
@@ -938,17 +973,55 @@ BEGIN
         v_where_sql := array_to_string(v_where_clauses, ' AND ');
 
         BEGIN
-            v_col_query := format(
-                'SELECT ARRAY(
-                    SELECT DISTINCT %I::text 
-                    FROM public.%I 
-                    WHERE %s 
-                    ORDER BY %I::text ASC 
-                    LIMIT 250
-                )',
-                v_col, p_table_name, v_where_sql, v_col
-            );
-            EXECUTE v_col_query INTO v_col_vals;
+            IF v_col = 'sales_owner_id' THEN
+                IF p_active_owner_ids IS NOT NULL AND array_length(p_active_owner_ids, 1) > 0 THEN
+                    EXECUTE format(
+                        'SELECT EXISTS(SELECT 1 FROM public.%I WHERE %s AND (sales_owner_id IS NULL OR NOT (sales_owner_id = ANY(%L::uuid[]))))',
+                        p_table_name, v_where_sql, p_active_owner_ids
+                    ) INTO v_has_unassigned_leads;
+
+                    EXECUTE format(
+                        'SELECT ARRAY(
+                            SELECT DISTINCT sales_owner_id::text 
+                            FROM public.%I 
+                            WHERE %s AND sales_owner_id = ANY(%L::uuid[])
+                            LIMIT 250
+                        )',
+                        p_table_name, v_where_sql, p_active_owner_ids
+                    ) INTO v_col_vals;
+                ELSE
+                    EXECUTE format(
+                        'SELECT EXISTS(SELECT 1 FROM public.%I WHERE %s AND sales_owner_id IS NULL)',
+                        p_table_name, v_where_sql
+                    ) INTO v_has_unassigned_leads;
+
+                    EXECUTE format(
+                        'SELECT ARRAY(
+                            SELECT DISTINCT sales_owner_id::text 
+                            FROM public.%I 
+                            WHERE %s AND sales_owner_id IS NOT NULL
+                            LIMIT 250
+                        )',
+                        p_table_name, v_where_sql
+                    ) INTO v_col_vals;
+                END IF;
+
+                IF v_has_unassigned_leads THEN
+                    v_col_vals := array_append(COALESCE(v_col_vals, ARRAY[]::text[]), 'unassigned');
+                END IF;
+            ELSE
+                v_col_query := format(
+                    'SELECT ARRAY(
+                        SELECT DISTINCT %I::text 
+                        FROM public.%I 
+                        WHERE %s 
+                        ORDER BY %I::text ASC 
+                        LIMIT 250
+                    )',
+                    v_col, p_table_name, v_where_sql, v_col
+                );
+                EXECUTE v_col_query INTO v_col_vals;
+            END IF;
 
             v_result := jsonb_set(
                 v_result, 
@@ -963,7 +1036,7 @@ BEGIN
     RETURN v_result;
 END;
 $$;
-GRANT EXECUTE ON FUNCTION public.get_faceted_filter_options(text, uuid, text[], jsonb, uuid[]) TO authenticated, service_role, anon;
+GRANT EXECUTE ON FUNCTION public.get_faceted_filter_options(text, uuid, text[], jsonb, uuid[], uuid[]) TO authenticated, service_role, anon;
 
 
 -- ─── Get Company Lead Columns ──────────────────────────────────────────────

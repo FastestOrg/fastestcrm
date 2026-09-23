@@ -7,6 +7,7 @@ export interface UseFacetedFilterOptionsParams {
   companyId?: string;
   targetColumns: string[];
   activeFilters: Record<string, string[]>;
+  activeOwnerIds?: string[];
   accessibleUserIds?: string[];
   canViewAll?: boolean;
   enabled?: boolean;
@@ -18,6 +19,7 @@ export function useFacetedFilterOptions({
   companyId,
   targetColumns,
   activeFilters,
+  activeOwnerIds,
   accessibleUserIds,
   canViewAll = true,
   enabled = true,
@@ -43,6 +45,7 @@ export function useFacetedFilterOptions({
     JSON.stringify(cleanActiveFilters),
     canViewAll,
     accessibleUserIds ? accessibleUserIds.slice().sort().join(',') : 'all',
+    activeOwnerIds ? activeOwnerIds.slice().sort().join(',') : 'none',
   ];
 
   return useQuery({
@@ -64,6 +67,10 @@ export function useFacetedFilterOptions({
             p_accessible_user_ids:
               !canViewAll && accessibleUserIds && accessibleUserIds.length > 0
                 ? accessibleUserIds
+                : null,
+            p_active_owner_ids:
+              activeOwnerIds && activeOwnerIds.length > 0
+                ? activeOwnerIds
                 : null,
           }
         );
@@ -98,8 +105,11 @@ export function useFacetedFilterOptions({
 
             let query = orgClient
               .from(tableName as any)
-              .select(col)
-              .not(col, 'is', null);
+              .select(col);
+
+            if (col !== 'sales_owner_id') {
+              query = query.not(col, 'is', null);
+            }
 
             if (companyId) {
               query = query.eq('company_id', companyId);
@@ -123,10 +133,21 @@ export function useFacetedFilterOptions({
               if (dbCol === 'sales_owner_id') {
                 const hasUnassigned = vals.includes('unassigned');
                 const realIds = vals.filter((v) => v !== 'unassigned');
-                if (hasUnassigned && realIds.length > 0) {
-                  query = query.or(`sales_owner_id.is.null,sales_owner_id.in.(${realIds.join(',')})`);
-                } else if (hasUnassigned) {
-                  query = query.is('sales_owner_id', null);
+                if (hasUnassigned) {
+                  if (activeOwnerIds && activeOwnerIds.length > 0) {
+                    const activeIdList = activeOwnerIds.join(',');
+                    if (realIds.length > 0) {
+                      query = query.or(`sales_owner_id.is.null,sales_owner_id.not.in.(${activeIdList}),sales_owner_id.in.(${realIds.join(',')})`);
+                    } else {
+                      query = query.or(`sales_owner_id.is.null,sales_owner_id.not.in.(${activeIdList})`);
+                    }
+                  } else {
+                    if (realIds.length > 0) {
+                      query = query.or(`sales_owner_id.is.null,sales_owner_id.in.(${realIds.join(',')})`);
+                    } else {
+                      query = query.is('sales_owner_id', null);
+                    }
+                  }
                 } else if (realIds.length > 0) {
                   query = query.in('sales_owner_id', realIds);
                 }
@@ -141,15 +162,36 @@ export function useFacetedFilterOptions({
 
             const { data, error } = await query.limit(500);
             if (!error && data) {
-              const unique = Array.from(
-                new Set(
-                  (data as any[])
-                    .map((r) => r[col])
-                    .filter((v) => v !== null && v !== undefined && v !== '')
-                    .map((v) => String(v))
-                )
-              ).sort();
-              fallbackResult[col] = unique;
+              if (col === 'sales_owner_id') {
+                const activeSet = new Set(activeOwnerIds || []);
+                let hasUnassignedLeads = false;
+                const activeFoundIds = new Set<string>();
+
+                (data as any[]).forEach((r) => {
+                  const ownerId = r.sales_owner_id;
+                  if (!ownerId || (activeOwnerIds && activeOwnerIds.length > 0 && !activeSet.has(ownerId))) {
+                    hasUnassignedLeads = true;
+                  } else if (ownerId && activeSet.has(ownerId)) {
+                    activeFoundIds.add(String(ownerId));
+                  }
+                });
+
+                const ownerValues = Array.from(activeFoundIds);
+                if (hasUnassignedLeads) {
+                  ownerValues.push('unassigned');
+                }
+                fallbackResult[col] = ownerValues;
+              } else {
+                const unique = Array.from(
+                  new Set(
+                    (data as any[])
+                      .map((r) => r[col])
+                      .filter((v) => v !== null && v !== undefined && v !== '')
+                      .map((v) => String(v))
+                  )
+                ).sort();
+                fallbackResult[col] = unique;
+              }
             }
           })
         );
