@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useReportAnalytics } from '@/hooks/useReportAnalytics';
+import { useReportPivotMatrix } from '@/hooks/useReportPivotMatrix';
 import { useTeam } from '@/hooks/useTeam';
 import { useProducts } from '@/hooks/useProducts';
 import { useLeadStatuses, CompanyLeadStatus } from '@/hooks/useLeadStatuses';
@@ -234,6 +235,26 @@ export default function Report() {
     enabled: !hierarchyLoading && !!company?.id,
   });
 
+  // ─── ⚡ Dynamic Multi-Dimensional Pivot Matrix (Server RPC) ────────────────
+  const {
+    rows: pivotRows,
+    columns: pivotColumns,
+    isLoading: pivotLoading,
+    isFetching: pivotFetching,
+  } = useReportPivotMatrix({
+    rowDim: displayConfig.rowDimension || displayConfig.groupBy || 'owner',
+    colDim: displayConfig.colDimension || 'status',
+    startDate,
+    endDate,
+    owners: effectiveOwners,
+    statuses: filters.statuses,
+    sources: filters.sources,
+    products: filters.products,
+    revenueStatus: filters.revenueStatus,
+    search: filters.search,
+    enabled: !hierarchyLoading && !!company?.id,
+  });
+
   const isInitialLoading = (analyticsLoading || hierarchyLoading) && !analytics;
 
   // Currency symbol
@@ -444,6 +465,20 @@ export default function Report() {
       })).sort((a, b) => b.key.localeCompare(a.key));
     }
 
+    // 6. Direct Pivot Matrix Aggregation for Custom Fields, Priority, City, etc.
+    if (pivotRows && pivotRows.length > 0) {
+      return pivotRows.map((r) => ({
+        key: r.key,
+        name: r.key === 'empty' ? '(Empty / Unset)' : r.name,
+        total: r.totalLeads,
+        sharePercent: totalCount > 0 ? ((r.totalLeads / totalCount) * 100).toFixed(1) : '0',
+        paid: r.paid,
+        conversionRate: r.conversionRate,
+        revenue: r.revenue,
+        avgScore: r.avgScore || 65,
+      })).sort((a, b) => b.total - a.total);
+    }
+
     return [];
   }, [
     displayConfig.groupBy,
@@ -454,6 +489,7 @@ export default function Report() {
     rpcProductBreakdown,
     rpcMonthBreakdown,
     leadStatuses,
+    pivotRows,
   ]);
 
   // ─── KPI Stats Calculation ──────────────────────────────────────────────────
@@ -969,6 +1005,9 @@ export default function Report() {
             customColumns={customColumns}
             ownersMap={ownersMap}
             currencySymbol={currencySymbol}
+            pivotRows={pivotRows}
+            pivotColumns={pivotColumns}
+            isLoading={pivotLoading || pivotFetching}
           />
         </TabsContent>
 
@@ -1368,6 +1407,8 @@ export default function Report() {
           leadStatuses={leadStatuses}
           customColumns={customColumns}
           ownersMap={ownersMap}
+          pivotRows={pivotRows}
+          pivotColumns={pivotColumns}
         />
       </div>
     </div>

@@ -5,6 +5,8 @@ import { ReportFilterState } from './ReportFilterBar';
 import { GroupSummaryRow } from './CustomReportTable';
 import { Lead } from '@/hooks/useLeads';
 import { CompanyLeadStatus } from '@/hooks/useLeadStatuses';
+import { CustomColumn } from '@/hooks/useCustomColumns';
+import { PivotMatrixRow, PivotMatrixColumn } from '@/hooks/useReportPivotMatrix';
 
 interface ReportPrintableTemplateProps {
   id: string;
@@ -30,6 +32,8 @@ interface ReportPrintableTemplateProps {
   leadStatuses: CompanyLeadStatus[];
   customColumns?: CustomColumn[];
   ownersMap?: Record<string, string>;
+  pivotRows?: PivotMatrixRow[];
+  pivotColumns?: PivotMatrixColumn[];
 }
 
 export const ReportPrintableTemplate = React.forwardRef<HTMLDivElement, ReportPrintableTemplateProps>(
@@ -49,6 +53,8 @@ export const ReportPrintableTemplate = React.forwardRef<HTMLDivElement, ReportPr
       leadStatuses,
       customColumns = [],
       ownersMap = {},
+      pivotRows = [],
+      pivotColumns = [],
     },
     ref
   ) {
@@ -123,6 +129,14 @@ export const ReportPrintableTemplate = React.forwardRef<HTMLDivElement, ReportPr
 
     // Columns items
     const colItems = React.useMemo(() => {
+      if (pivotColumns && pivotColumns.length > 0) {
+        return pivotColumns.map((c) => ({
+          key: c.key,
+          label: c.key === 'empty' ? '(Empty / Unset)' : c.label,
+          color: c.color,
+        }));
+      }
+
       if (colDim === 'status') {
         const map = new Map<string, { key: string; label: string; color?: string }>();
         leadStatuses.forEach((s) => map.set(s.value, { key: s.value, label: s.label, color: s.color }));
@@ -139,10 +153,33 @@ export const ReportPrintableTemplate = React.forwardRef<HTMLDivElement, ReportPr
         if (!map.has(item.key)) map.set(item.key, item);
       });
       return Array.from(map.values()).slice(0, 10);
-    }, [colDim, leadStatuses, leads, getLeadDimItem]);
+    }, [pivotColumns, colDim, leadStatuses, leads, getLeadDimItem]);
 
     // Matrix rows
     const matrixRows = React.useMemo(() => {
+      // 1. Prioritize Server-Aggregated Pivot Rows
+      if (pivotRows && pivotRows.length > 0) {
+        return pivotRows.map((r) => {
+          const cells: Record<string, { count: number; revenue: number }> = {};
+          if (r.colCells) {
+            Object.entries(r.colCells).forEach(([cKey, cVal]) => {
+              cells[cKey] = {
+                count: cVal.count || 0,
+                revenue: cVal.revenue || 0,
+              };
+            });
+          }
+          return {
+            key: r.key,
+            name: r.key === 'empty' ? '(Empty / Unset)' : r.name,
+            total: r.totalLeads,
+            revenue: r.revenue,
+            paid: r.paid,
+            cells,
+          };
+        });
+      }
+
       if ((!leads || leads.length === 0) && groupSummary && groupSummary.length > 0) {
         return groupSummary.map((g) => {
           const cells: Record<string, { count: number; revenue: number }> = {};
@@ -204,7 +241,7 @@ export const ReportPrintableTemplate = React.forwardRef<HTMLDivElement, ReportPr
       });
 
       return Object.values(rowMap).sort((a, b) => b.total - a.total);
-    }, [leads, rowDim, colDim, groupSummary, colItems, getLeadDimItem]);
+    }, [pivotRows, leads, rowDim, colDim, groupSummary, colItems, getLeadDimItem]);
 
     return (
       <div

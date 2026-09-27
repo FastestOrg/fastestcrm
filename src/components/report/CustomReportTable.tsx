@@ -22,6 +22,7 @@ import {
   Layers,
   ArrowLeftRight,
   FileSpreadsheet,
+  Loader2,
 } from 'lucide-react';
 import { Lead } from '@/hooks/useLeads';
 import { CompanyLeadStatus } from '@/hooks/useLeadStatuses';
@@ -35,6 +36,7 @@ import {
 } from './ReportCustomizerModal';
 import { format } from 'date-fns';
 import { calculatePriorityLevel } from '@/hooks/useLeadScoring';
+import { PivotMatrixRow, PivotMatrixColumn } from '@/hooks/useReportPivotMatrix';
 
 export interface GroupSummaryRow {
   key: string;
@@ -59,6 +61,9 @@ interface CustomReportTableProps {
   customColumns: CustomColumn[];
   ownersMap: Record<string, string>;
   currencySymbol?: string;
+  pivotRows?: PivotMatrixRow[];
+  pivotColumns?: PivotMatrixColumn[];
+  isLoading?: boolean;
 }
 
 interface DimensionItem {
@@ -76,6 +81,9 @@ export function CustomReportTable({
   customColumns,
   ownersMap,
   currencySymbol = '₹',
+  pivotRows = [],
+  pivotColumns = [],
+  isLoading = false,
 }: CustomReportTableProps) {
   const [matrixSearch, setMatrixSearch] = useState('');
 
@@ -224,6 +232,26 @@ export function CustomReportTable({
 
   // ─── 1. Build Column Headers (Column Axis) ─────────────────────────────────
   const columnItems = useMemo<DimensionItem[]>(() => {
+    // 1. If server-aggregated pivot columns from RPC are provided, prioritize them!
+    if (pivotColumns && pivotColumns.length > 0) {
+      return pivotColumns.map((c) => {
+        const stObj = colDim === 'status' ? statusMap.get(c.key) : undefined;
+        let label = c.label;
+        if (colDim === 'owner') {
+          label = ownersMap[c.key] || c.label;
+        } else if (colDim === 'status') {
+          label = stObj?.label || (c.label ? c.label.replace(/_/g, ' ').replace(/\b\w/g, (x) => x.toUpperCase()) : 'Unknown');
+        } else if (c.key === 'empty') {
+          label = '(Empty / Unset)';
+        }
+        return {
+          key: c.key,
+          label,
+          color: stObj?.color || c.color,
+        };
+      });
+    }
+
     if (colDim === 'status') {
       const map = new Map<string, DimensionItem>();
       (leadStatuses || []).forEach((st) => {
@@ -294,12 +322,150 @@ export function CustomReportTable({
     }
 
     return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label));
-  }, [colDim, leadStatuses, leads, ownersMap, getDimensionItem]);
+  }, [pivotColumns, colDim, leadStatuses, leads, ownersMap, getDimensionItem, statusMap]);
 
   // ─── 2. Build Multi-Dimensional Matrix (Rows × Columns) ───────────────────
   const matrixData = useMemo(() => {
-    // 1. If no raw leads are loaded, leverage master server-side groupSummary directly
-    if ((!leads || leads.length === 0) && groupSummary && groupSummary.length > 0) {
+    // 1. If server-aggregated pivot rows from RPC are provided, format them directly!
+    if (pivotRows && pivotRows.length > 0) {
+      const totalDatasetLeads = pivotRows.reduce((sum, r) => sum + r.totalLeads, 0) || 1;
+      return pivotRows.map((r) => {
+        const sharePercent = ((r.totalLeads / totalDatasetLeads) * 100).toFixed(1);
+        const stObj = rowDim === 'status' ? statusMap.get(r.key) : undefined;
+        let name = r.name;
+        if (rowDim === 'owner') {
+          name = ownersMap[r.key] || r.name;
+        } else if (rowDim === 'status') {
+          name = stObj?.label || (r.name ? r.name.replace(/_/g, ' ').replace(/\b\w/g, (x) => x.toUpperCase()) : 'Unknown');
+        } else if (r.key === 'empty') {
+          name = '(Empty / Unset)';
+        }
+
+        return {
+          key: r.key,
+          name,
+          color: stObj?.color,
+          totalLeads: r.totalLeads,
+          revenue: r.revenue,
+          pipeline: r.pipeline,
+          paid: r.paid,
+          totalScore: (r.avgScore || 65) * r.totalLeads,
+          sharePercent,
+          conversionRate: r.conversionRate,
+          avgScore: r.avgScore || 65,
+          colCells: r.colCells || {},
+        };
+      }).sort((a, b) => b.totalLeads - a.totalLeads);
+    }
+
+    // 2. Client-side grouping if sample leads are provided
+    if (leads && leads.length > 0) {
+      const rowMap: Record<
+        string,
+        {
+          key: string;
+          name: string;
+          color?: string;
+          totalLeads: number;
+          revenue: number;
+          pipeline: number;
+          paid: number;
+          totalScore: number;
+          colCells: Record<
+            string,
+            {
+              count: number;
+              revenue: number;
+              pipeline: number;
+              paid: number;
+              avgScore: number;
+            }
+          >;
+        }
+      > = {};
+
+      leads.forEach((lead) => {
+        const rowItem = getDimensionItem(lead, rowDim);
+        const colItem = getDimensionItem(lead, colDim);
+
+        if (!rowMap[rowItem.key]) {
+          rowMap[rowItem.key] = {
+            key: rowItem.key,
+            name: rowItem.label,
+            color: rowItem.color,
+            totalLeads: 0,
+            revenue: 0,
+            pipeline: 0,
+            paid: 0,
+            totalScore: 0,
+            colCells: {},
+          };
+        }
+
+        const row = rowMap[rowItem.key];
+        row.totalLeads += 1;
+        row.revenue += lead.revenue_received || 0;
+        row.pipeline += lead.revenue_projected || 0;
+
+        const { score } = calculatePriorityLevel(lead);
+        row.totalScore += score;
+
+        const isPaid =
+          lead.status === 'paid' ||
+          (lead.status ? paidStatusSet.has(lead.status) : false) ||
+          (lead.revenue_received !== null &&
+            lead.revenue_received !== undefined &&
+            lead.revenue_received > 0);
+
+        if (isPaid) {
+          row.paid += 1;
+        }
+
+        // Initialize column cell if not present
+        if (!row.colCells[colItem.key]) {
+          row.colCells[colItem.key] = {
+            count: 0,
+            revenue: 0,
+            pipeline: 0,
+            paid: 0,
+            avgScore: 0,
+          };
+        }
+
+        const cell = row.colCells[colItem.key];
+        cell.count += 1;
+        cell.revenue += lead.revenue_received || 0;
+        cell.pipeline += lead.revenue_projected || 0;
+        if (isPaid) cell.paid += 1;
+        cell.avgScore += score;
+      });
+
+      // Compute averages and sort rows by total volume
+      const totalDatasetLeads = leads.length || 1;
+
+      const rows = Object.values(rowMap).map((r) => {
+        const sharePercent = ((r.totalLeads / totalDatasetLeads) * 100).toFixed(1);
+        const conversionRate = r.totalLeads > 0 ? ((r.paid / r.totalLeads) * 100).toFixed(1) : '0';
+        const avgScore = r.totalLeads > 0 ? Math.round(r.totalScore / r.totalLeads) : 0;
+
+        // Finalize cell avg scores
+        Object.values(r.colCells).forEach((c) => {
+          c.avgScore = c.count > 0 ? Math.round(c.avgScore / c.count) : 0;
+        });
+
+        return {
+          ...r,
+          sharePercent,
+          conversionRate,
+          avgScore,
+        };
+      });
+
+      return rows.sort((a, b) => b.totalLeads - a.totalLeads);
+    }
+
+    // 3. Fallback to master server-side groupSummary directly
+    if (groupSummary && groupSummary.length > 0) {
       const totalDatasetLeads = groupSummary.reduce((sum, g) => sum + g.total, 0) || 1;
       return groupSummary.map((g) => {
         const colCells: Record<
@@ -343,110 +509,8 @@ export function CustomReportTable({
       }).sort((a, b) => b.totalLeads - a.totalLeads);
     }
 
-    // 2. Client-side grouping if sample leads are provided
-    const rowMap: Record<
-      string,
-      {
-        key: string;
-        name: string;
-        color?: string;
-        totalLeads: number;
-        revenue: number;
-        pipeline: number;
-        paid: number;
-        totalScore: number;
-        colCells: Record<
-          string,
-          {
-            count: number;
-            revenue: number;
-            pipeline: number;
-            paid: number;
-            avgScore: number;
-          }
-        >;
-      }
-    > = {};
-
-    (leads || []).forEach((lead) => {
-      const rowItem = getDimensionItem(lead, rowDim);
-      const colItem = getDimensionItem(lead, colDim);
-
-      if (!rowMap[rowItem.key]) {
-        rowMap[rowItem.key] = {
-          key: rowItem.key,
-          name: rowItem.label,
-          color: rowItem.color,
-          totalLeads: 0,
-          revenue: 0,
-          pipeline: 0,
-          paid: 0,
-          totalScore: 0,
-          colCells: {},
-        };
-      }
-
-      const row = rowMap[rowItem.key];
-      row.totalLeads += 1;
-      row.revenue += lead.revenue_received || 0;
-      row.pipeline += lead.revenue_projected || 0;
-
-      const { score } = calculatePriorityLevel(lead);
-      row.totalScore += score;
-
-      const isPaid =
-        lead.status === 'paid' ||
-        (lead.status ? paidStatusSet.has(lead.status) : false) ||
-        (lead.revenue_received !== null &&
-          lead.revenue_received !== undefined &&
-          lead.revenue_received > 0);
-
-      if (isPaid) {
-        row.paid += 1;
-      }
-
-      // Initialize column cell if not present
-      if (!row.colCells[colItem.key]) {
-        row.colCells[colItem.key] = {
-          count: 0,
-          revenue: 0,
-          pipeline: 0,
-          paid: 0,
-          avgScore: 0,
-        };
-      }
-
-      const cell = row.colCells[colItem.key];
-      cell.count += 1;
-      cell.revenue += lead.revenue_received || 0;
-      cell.pipeline += lead.revenue_projected || 0;
-      if (isPaid) cell.paid += 1;
-      cell.avgScore += score;
-    });
-
-    // Compute averages and sort rows by total volume
-    const totalDatasetLeads = (leads || []).length || 1;
-
-    const rows = Object.values(rowMap).map((r) => {
-      const sharePercent = ((r.totalLeads / totalDatasetLeads) * 100).toFixed(1);
-      const conversionRate = r.totalLeads > 0 ? ((r.paid / r.totalLeads) * 100).toFixed(1) : '0';
-      const avgScore = r.totalLeads > 0 ? Math.round(r.totalScore / r.totalLeads) : 0;
-
-      // Finalize cell avg scores
-      Object.values(r.colCells).forEach((c) => {
-        c.avgScore = c.count > 0 ? Math.round(c.avgScore / c.count) : 0;
-      });
-
-      return {
-        ...r,
-        sharePercent,
-        conversionRate,
-        avgScore,
-      };
-    });
-
-    return rows.sort((a, b) => b.totalLeads - a.totalLeads);
-  }, [leads, groupSummary, columnItems, rowDim, colDim, paidStatusSet, getDimensionItem]);
+    return [];
+  }, [pivotRows, leads, groupSummary, columnItems, rowDim, colDim, paidStatusSet, getDimensionItem, ownersMap, statusMap]);
 
   // ─── 3. Filtered Matrix Rows for in-table searching ──────────────────────
   const filteredMatrixRows = useMemo(() => {
@@ -662,7 +726,7 @@ export function CustomReportTable({
       {/* ══════════════════════════════════════════════════════════════════════
           1. MULTI-DIMENSIONAL CROSS-TAB & PIVOT MATRIX TABLE
          ══════════════════════════════════════════════════════════════════════ */}
-      {config.showBreakdownSummary && matrixData.length > 0 && (
+      {config.showBreakdownSummary && (
         <div className="bg-card/70 border border-border/70 rounded-xl overflow-hidden shadow-sm space-y-0">
           {/* Matrix Header & Interactive Axis Selectors */}
           <div className="p-4 border-b border-border/60 bg-muted/25 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
@@ -675,6 +739,9 @@ export function CustomReportTable({
                   <span className="text-muted-foreground mx-1">×</span>
                   <span className="text-cyan-400">{getDimensionTitle(colDim)}</span>
                 </h3>
+                {isLoading && (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-primary shrink-0" />
+                )}
               </div>
               <p className="text-[11px] text-muted-foreground mt-0.5">
                 Displaying {matrixData.length} row segments cross-tabulated with {columnItems.length}{' '}
@@ -754,6 +821,7 @@ export function CustomReportTable({
                     <SelectItem value="product">Product</SelectItem>
                     <SelectItem value="priority">Priority Tier</SelectItem>
                     <SelectItem value="date_month">Creation Month</SelectItem>
+                    <SelectItem value="metrics">Standard Metrics</SelectItem>
                     {customColumns.map((col) => (
                       <SelectItem key={col.id} value={`custom:${col.id}`}>
                         Custom: {col.label}
@@ -816,16 +884,34 @@ export function CustomReportTable({
             </div>
           </div>
 
-          {/* 2D Matrix Table */}
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/40 hover:bg-muted/40 text-xs">
-                  <TableHead className="font-semibold min-w-[160px] sticky left-0 bg-muted/40 z-10">
-                    {getDimensionTitle(rowDim)}
-                  </TableHead>
-                  <TableHead className="text-right font-semibold min-w-[80px]">Total Leads</TableHead>
-                  <TableHead className="text-right font-semibold min-w-[70px]">Share %</TableHead>
+          {/* 2D Matrix Table or Loading / Empty States */}
+          {isLoading && matrixData.length === 0 ? (
+            <div className="py-16 flex flex-col items-center justify-center gap-3">
+              <Loader2 className="h-7 w-7 animate-spin text-primary" />
+              <p className="text-xs text-muted-foreground">
+                Aggregating {getDimensionTitle(rowDim)} × {getDimensionTitle(colDim)} across database...
+              </p>
+            </div>
+          ) : matrixData.length === 0 ? (
+            <div className="py-16 text-center flex flex-col items-center justify-center gap-2">
+              <Layers className="h-8 w-8 text-muted-foreground/30" />
+              <p className="text-sm font-medium text-foreground">
+                No lead data found for {getDimensionTitle(rowDim)} × {getDimensionTitle(colDim)}
+              </p>
+              <p className="text-xs text-muted-foreground max-w-sm">
+                Try selecting different dimensions or adjusting your date and status filters.
+              </p>
+            </div>
+          ) : (
+            <div className={`overflow-x-auto transition-opacity duration-200 ${isLoading ? 'opacity-60' : 'opacity-100'}`}>
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/40 hover:bg-muted/40 text-xs">
+                    <TableHead className="font-semibold min-w-[160px] sticky left-0 bg-muted/40 z-10">
+                      {getDimensionTitle(rowDim)}
+                    </TableHead>
+                    <TableHead className="text-right font-semibold min-w-[80px]">Total Leads</TableHead>
+                    <TableHead className="text-right font-semibold min-w-[70px]">Share %</TableHead>
 
                   {/* Dynamic Column Headers */}
                   {columnItems.map((col) => (
@@ -939,9 +1025,10 @@ export function CustomReportTable({
               </TableBody>
             </Table>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+    )}
+  </div>
   );
 }
 

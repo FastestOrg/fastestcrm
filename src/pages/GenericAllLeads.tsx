@@ -436,16 +436,21 @@ export default function GenericAllLeads() {
             let options = baseOptions;
             const allowedValues = facetedOptions?.[dbColName];
 
-            if (allowedValues && Array.isArray(allowedValues)) {
+            if (allowedValues && Array.isArray(allowedValues) && allowedValues.length > 0) {
                 const norm = (v: any) => String(v || '').toLowerCase().trim().replace(/[_\s-]+/g, '');
                 const allowedNormSet = new Set(allowedValues.map(v => norm(v)));
 
                 // Filter baseOptions to only include options that are in allowedSet OR currently selected
-                options = baseOptions.filter(opt => 
+                const filtered = baseOptions.filter(opt => 
                     allowedNormSet.has(norm(opt.value)) || 
                     allowedNormSet.has(norm(opt.label)) || 
                     selectedValues.has(opt.value)
                 );
+
+                // Only replace options if filtered has results, preventing accidental blanking of dropdown
+                if (filtered.length > 0) {
+                    options = filtered;
+                }
 
                 // If any allowed values from the DB weren't present in baseOptions, include them (except for owner)
                 if (col.id !== 'owner') {

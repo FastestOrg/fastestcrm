@@ -1199,7 +1199,7 @@ BEGIN
         IF v_col <> 'sales_owner_id' THEN
             v_where_clauses := ARRAY[
                 format('%I IS NOT NULL', v_col),
-                format('%I::text <> %L', v_col, '')
+                format('%I <> %L', v_col, '')
             ];
         ELSE
             v_where_clauses := ARRAY['1=1'];
@@ -1284,24 +1284,39 @@ BEGIN
                             );
                         END IF;
                     ELSIF v_db_col = 'status' THEN
-                        SELECT string_agg(quote_literal(LOWER(REPLACE(x.val, ' ', '_'))), ', ') INTO v_quoted_vals
+                        SELECT array_agg(LOWER(REPLACE(x.val, ' ', '_'))) INTO v_status_vals
                         FROM (SELECT jsonb_array_elements_text(v_filter_vals) AS val) x;
 
-                        IF v_quoted_vals IS NOT NULL AND v_quoted_vals <> '' THEN
-                            v_where_clauses := array_append(
-                                v_where_clauses,
-                                format('LOWER(REPLACE(%I::text, '' '', ''_'')) IN (%s)', v_db_col, v_quoted_vals)
-                            );
+                        IF v_status_vals IS NOT NULL AND array_length(v_status_vals, 1) > 0 THEN
+                            IF array_length(v_status_vals, 1) = 1 THEN
+                                v_where_clauses := array_append(
+                                    v_where_clauses,
+                                    format('status = %L', v_status_vals[1])
+                                );
+                            ELSE
+                                v_where_clauses := array_append(
+                                    v_where_clauses,
+                                    format('status = ANY(%L)', v_status_vals)
+                                );
+                            END IF;
                         END IF;
                     ELSE
-                        SELECT string_agg(quote_literal(x.val), ', ') INTO v_quoted_vals
+                        -- Use clean single equality when 1 value, or ANY() for multiple values
+                        SELECT array_agg(x.val) INTO v_filter_val_arr
                         FROM (SELECT jsonb_array_elements_text(v_filter_vals) AS val) x;
 
-                        IF v_quoted_vals IS NOT NULL AND v_quoted_vals <> '' THEN
-                            v_where_clauses := array_append(
-                                v_where_clauses,
-                                format('(%I::text IN (%s) OR TRIM(%I::text) IN (%s))', v_db_col, v_quoted_vals, v_db_col, v_quoted_vals)
-                            );
+                        IF v_filter_val_arr IS NOT NULL AND array_length(v_filter_val_arr, 1) > 0 THEN
+                            IF array_length(v_filter_val_arr, 1) = 1 THEN
+                                v_where_clauses := array_append(
+                                    v_where_clauses,
+                                    format('%I = %L', v_db_col, v_filter_val_arr[1])
+                                );
+                            ELSE
+                                v_where_clauses := array_append(
+                                    v_where_clauses,
+                                    format('%I = ANY(%L)', v_db_col, v_filter_val_arr)
+                                );
+                            END IF;
                         END IF;
                     END IF;
                 END IF;
@@ -1348,17 +1363,59 @@ BEGIN
                     v_col_vals := array_append(COALESCE(v_col_vals, ARRAY[]::text[]), 'unassigned');
                 END IF;
             ELSE
-                v_col_query := format(
-                    'SELECT ARRAY(
-                        SELECT DISTINCT %I::text 
-                        FROM public.%I 
-                        WHERE %s 
-                        ORDER BY %I::text ASC 
-                        LIMIT 250
-                    )',
-                    v_col, p_table_name, v_where_sql, v_col
-                );
-                EXECUTE v_col_query INTO v_col_vals;
+                -- 1. Try ultra-fast Recursive CTE Loose Index Scan (Skip Scan)
+                BEGIN
+                    v_col_query := format(
+                        'WITH RECURSIVE t AS (
+                           (
+                             SELECT %I AS val
+                             FROM public.%I
+                             WHERE %s
+                               AND %I IS NOT NULL
+                               AND %I <> %L
+                             ORDER BY %I ASC
+                             LIMIT 1
+                           )
+                           UNION ALL
+                           SELECT (
+                             SELECT %I
+                             FROM public.%I
+                             WHERE %s
+                               AND %I IS NOT NULL
+                               AND %I <> %L
+                               AND %I > t.val
+                             ORDER BY %I ASC
+                             LIMIT 1
+                           )
+                           FROM t
+                           WHERE t.val IS NOT NULL
+                        )
+                        SELECT ARRAY(
+                          SELECT val::text FROM t 
+                          WHERE val IS NOT NULL 
+                          ORDER BY val ASC
+                          LIMIT 250
+                        )',
+                        v_col, p_table_name, v_where_sql, v_col, v_col, '', v_col,
+                        v_col, p_table_name, v_where_sql, v_col, v_col, '', v_col, v_col
+                    );
+                    EXECUTE v_col_query INTO v_col_vals;
+                EXCEPTION WHEN OTHERS THEN
+                    -- Fallback to standard DISTINCT query with local limit
+                    v_col_query := format(
+                        'SELECT ARRAY(
+                            SELECT DISTINCT %I::text 
+                            FROM public.%I 
+                            WHERE %s 
+                              AND %I IS NOT NULL 
+                              AND %I::text <> %L 
+                            ORDER BY %I::text ASC 
+                            LIMIT 250
+                        )',
+                        v_col, p_table_name, v_where_sql, v_col, v_col, '', v_col
+                    );
+                    EXECUTE v_col_query INTO v_col_vals;
+                END;
             END IF;
 
             v_result := jsonb_set(

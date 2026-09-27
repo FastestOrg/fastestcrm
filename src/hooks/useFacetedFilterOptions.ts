@@ -162,35 +162,43 @@ export function useFacetedFilterOptions({
 
             const { data, error } = await query.limit(500);
             if (!error && data) {
-              if (col === 'sales_owner_id') {
-                const activeSet = new Set(activeOwnerIds || []);
-                let hasUnassignedLeads = false;
-                const activeFoundIds = new Set<string>();
+              // CRITICAL SAFEGUARD:
+              // If data.length >= 500, the result was capped and truncated by the query limit.
+              // In large databases (e.g. 2.3M leads), taking distinct values from a 500-row slice
+              // only captures that single import batch, hiding valid options.
+              // ONLY accept the fallback if the scan was exhaustive (data.length < 500).
+              // If truncated, leaving fallbackResult[col] undefined allows the UI to safely retain baseOptions.
+              if (data.length < 500) {
+                if (col === 'sales_owner_id') {
+                  const activeSet = new Set(activeOwnerIds || []);
+                  let hasUnassignedLeads = false;
+                  const activeFoundIds = new Set<string>();
 
-                (data as any[]).forEach((r) => {
-                  const ownerId = r.sales_owner_id;
-                  if (!ownerId || (activeOwnerIds && activeOwnerIds.length > 0 && !activeSet.has(ownerId))) {
-                    hasUnassignedLeads = true;
-                  } else if (ownerId && activeSet.has(ownerId)) {
-                    activeFoundIds.add(String(ownerId));
+                  (data as any[]).forEach((r) => {
+                    const ownerId = r.sales_owner_id;
+                    if (!ownerId || (activeOwnerIds && activeOwnerIds.length > 0 && !activeSet.has(ownerId))) {
+                      hasUnassignedLeads = true;
+                    } else if (ownerId && activeSet.has(ownerId)) {
+                      activeFoundIds.add(String(ownerId));
+                    }
+                  });
+
+                  const ownerValues = Array.from(activeFoundIds);
+                  if (hasUnassignedLeads) {
+                    ownerValues.push('unassigned');
                   }
-                });
-
-                const ownerValues = Array.from(activeFoundIds);
-                if (hasUnassignedLeads) {
-                  ownerValues.push('unassigned');
+                  fallbackResult[col] = ownerValues;
+                } else {
+                  const unique = Array.from(
+                    new Set(
+                      (data as any[])
+                        .map((r) => r[col])
+                        .filter((v) => v !== null && v !== undefined && v !== '')
+                        .map((v) => String(v))
+                    )
+                  ).sort();
+                  fallbackResult[col] = unique;
                 }
-                fallbackResult[col] = ownerValues;
-              } else {
-                const unique = Array.from(
-                  new Set(
-                    (data as any[])
-                      .map((r) => r[col])
-                      .filter((v) => v !== null && v !== undefined && v !== '')
-                      .map((v) => String(v))
-                  )
-                ).sort();
-                fallbackResult[col] = unique;
               }
             }
           })
